@@ -29,7 +29,7 @@ import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 
 const BOT_OVERHANG = 40;
-const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
+
 /** Extra canvas on each side of Mochi, for the witch hat's brim and the Santa hat's tip. */
 const BOT_SIDE = 24;
 /** Same margin as the Rust hit test (src-tauri/src/island.rs). */
@@ -171,9 +171,7 @@ export class Island {
       },
       openTerminal: () => {
         const task = State.focusTask;
-        // Sessions from the Claude desktop app live there, not in a terminal.
-        if (task?.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-        else void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
+        void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
       },
       // The ↗ button — same targets as openAgentTarget() on macOS.
       openTarget: () => {
@@ -187,12 +185,10 @@ export class Island {
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
         };
-        if (task.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-        else if (task.id === "integration_claude" || task.sessionId) {
+        if (task.id === SPOTIFY_ID) void Bridge.spotifyOpen();
+        else if (task.sessionId) {
           void Bridge.openSession(task.sessionId ?? null, task.sessionCwd ?? null);
-        } else if (task.id === "integration_n8n") void Bridge.openN8n();
-        else if (task.id === SPOTIFY_ID) void Bridge.spotifyOpen();
-        else if (urls[task.id]) void Bridge.openUrl(urls[task.id]);
+        } else if (urls[task.id]) void Bridge.openUrl(urls[task.id]);
       },
       openUrl: (url) => {
         if (url) void Bridge.openUrl(url);
@@ -594,8 +590,6 @@ export class Island {
         if (State.droppedFile?.path !== path) return;
         State.droppedFile = { name: file.name, path: file.path };
         State.promptContext = { kind: "file", name: file.name, path: file.path };
-        const dsh = State.focusTask?.id === "agent_dsh" && State.focusTask.sessionId;
-        if (dsh) void Bridge.dshSteer(`The user dropped a file.\nName: ${file.name}\nPath: ${file.path}`);
         State.notify();
       })
       .catch((err) => {

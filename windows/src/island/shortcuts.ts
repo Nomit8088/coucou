@@ -13,8 +13,6 @@ import { cyclePill, islandKeyAction, navigate, pillByNumber, type IslandKeyActio
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
 
-const CLAUDE_DESKTOP_ID = "agent_claude-desktop";
-
 /** What the shortcuts need from the island. */
 export interface ShortcutHost {
   alert(view: IslandViewName): void;
@@ -93,8 +91,7 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
     // in VS Code; the Claude app for a Claude Desktop session.
     case "jumpToTerminal": {
       const task = State.focusTask;
-      if (task?.id === CLAUDE_DESKTOP_ID) void Bridge.openClaudeDesktop();
-      else void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
+      void Bridge.openSession(task?.sessionId ?? null, task?.sessionCwd ?? null);
       if (State.mode === "expanded") host.collapse();
       break;
     }

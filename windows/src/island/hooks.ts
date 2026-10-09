@@ -16,8 +16,6 @@ import { parseClaudePlan, restorePlanUsage } from "../core/plan";
 import { setClaudePlanUsage, storedClaudePlanUsage } from "../views/usage";
 import { N_, t } from "../i18n/i18n";
 
-const DSH_ID = "agent_dsh";
-
 /** Clears the approval card if no decision was made before the hook gave up. */
 let pendingTimeout: number | null = null;
 
@@ -419,11 +417,11 @@ function handleHook(island: Island, payload: HookPayload) {
         agentId,
         window.setTimeout(() => {
           stopTimers.delete(agentId);
-          if (isExternalAgent) {
-            State.removeTask(agentId);
-          } else {
+          if (State.isKept(agentId)) {
             State.updateTask(agentId, "idle");
             State.setPillBadge(agentId, null);
+          } else {
+            State.removeTask(agentId);
           }
         }, 5200),
       );
@@ -447,15 +445,11 @@ function handleHook(island: Island, payload: HookPayload) {
 
     case "SessionEnd":
       // Nothing left for the timer to do, and it must not outlive the session: a
-      // pill recreated within 5.2 s would be removed by it.
+      // pill recreated within 5.2 s would be removed by it. clearSession keeps a
+      // declared pill (idle, no session) and removes any other.
       cancelStopTimer(agentId);
       State.clearSessionDiffs(agentId);
-      if (isExternalAgent) {
-        State.removeTask(agentId);
-      } else {
-        State.updateTask(agentId, "idle");
-        clearSession(agentId);
-      }
+      clearSession(agentId);
       break;
 
     case "SubagentStart":

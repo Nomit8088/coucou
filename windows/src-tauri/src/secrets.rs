@@ -20,10 +20,24 @@ pub const KNOWN_KEYS: &[&str] = &[
     "resend-api-key",
     "notion-api-key",
     "calcom-api-key",
+    "deepseek-api-key",
+    "gitlab-url",
+    "gitlab-token",
 ];
 
+/// Custom chat providers get one credential each: `chat-` plus a short id.
+fn is_chat_provider_key(key: &str) -> bool {
+    let Some(rest) = key.strip_prefix("chat-") else { return false };
+    (1..=32).contains(&rest.len())
+        && rest.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+
+fn allowed(key: &str) -> bool {
+    KNOWN_KEYS.contains(&key) || is_chat_provider_key(key)
+}
+
 fn entry(key: &str) -> Option<Entry> {
-    if !KNOWN_KEYS.contains(&key) {
+    if !allowed(key) {
         return None;
     }
     Entry::new(SERVICE, key).ok()
@@ -52,4 +66,19 @@ pub fn clear(key: &str) -> Result<(), String> {
 
 pub fn present(key: &str) -> bool {
     get(key).is_some()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn deepseek_and_gitlab_credentials_are_allowed() {
+        for key in ["deepseek-api-key", "gitlab-url", "gitlab-token", "chat-c-abc"] {
+            assert!(allowed(key), "{key}");
+        }
+        assert!(!allowed("chat-"));
+        assert!(!allowed("gitlab-token-extra"));
+        assert!(!allowed("../gitlab-token"));
+    }
 }

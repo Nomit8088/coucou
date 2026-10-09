@@ -8,7 +8,7 @@ import {
 } from "../src/island/agents.ts";
 
 test("known agents carry the fork's names and colours", () => {
-  assert.equal(agentName("dsh"), "DeepSeek");
+  assert.equal(agentName("dsh"), "DeepSeek Harness");
   assert.equal(agentColor("dsh"), "#4D6BFE");
   assert.equal(agentName("codex"), "Codex");
   assert.equal(agentColor("codex"), "#2DD4BF");

@@ -1158,7 +1158,17 @@ input[type="range"]::-webkit-slider-thumb {
 .model-row {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   padding: 0 10px;
+}
+
+/* Says the chat goes to the configured API, not to a DSH session. */
+.chat-api-tag {
+  font: 400 10.5px var(--font);
+  color: var(--dim-3);
+  white-space: nowrap;
+  margin-right: auto;
 }
 
 .model-btn {
@@ -1331,6 +1341,11 @@ input[type="range"]::-webkit-slider-thumb {
   padding: 6px 10px;
   background: rgba(255, 255, 255, 0.07);
   border-radius: 12px;
+}
+
+/* The DSH session's own input, under its ticker; never the chat's. */
+.steer-bar {
+  margin: 6px 12px 0 108px;
 }
 
 .chat-input {

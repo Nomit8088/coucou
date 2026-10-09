@@ -72,7 +72,7 @@ test("the sample week adds up like the Mac's", () => {
   assert.equal(s.questions, 11);
   assert.equal(s.permissionsAllowed, 4);
   assert.equal(s.permissionsDenied, 1);
-  assert.equal(s.topAgent, "Claude Code");
+  assert.equal(s.topAgent, "DeepSeek Harness");
   assert.equal(s.topProject, "coucou");
   assert.equal(s.busiestDay, "Monday");
   assert.equal(s.longestSessionMinutes, 300);

@@ -7,7 +7,7 @@ export interface KnownAgent {
 }
 
 export const KNOWN_AGENTS: Record<string, KnownAgent> = {
-  dsh: { name: "DeepSeek", color: "#4D6BFE" },
+  dsh: { name: "DeepSeek Harness", color: "#4D6BFE" },
   codex: { name: "Codex", color: "#2DD4BF" },
 };
 

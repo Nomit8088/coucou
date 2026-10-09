@@ -13,16 +13,18 @@ test("the catalog is the personal fork set, with stable new ids", () => {
   assert.deepEqual(
     PILL_CATALOG.map((p) => [p.id, p.name, p.color]),
     [
-      ["agent_dsh", "DeepSeek", "#4D6BFE"],
+      ["agent_dsh", "DeepSeek Harness", "#4D6BFE"],
       ["agent_codex", "Codex", "#2DD4BF"],
       ["integration_github", "GitHub", "#F4505E"],
       ["integration_resend", "Resend", "#22C55E"],
       ["integration_gitlab", "GitLab", "#FC6D26"],
+      ["integration_spotify", "Spotify", "#1DB954"],
     ],
   );
   assert.equal(DEFAULT_MAIN_PILL, "agent_dsh");
   assert.equal(pillDefinition("integration_gitlab").connect.key, "gitlab-token");
-  for (const gone of ["integration_claude", "agent_cursor", "ai_anthropic", "integration_stripe"]) {
+  assert.equal(pillDefinition("integration_spotify").support, "linux");
+  for (const gone of ["integration_claude", "agent_cursor", "ai_anthropic", "integration_stripe", "integration_music"]) {
     assert.equal(pillDefinition(gone), undefined, gone);
   }
 });

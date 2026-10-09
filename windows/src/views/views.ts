@@ -182,7 +182,46 @@ function buildOverview(actions: ViewActions): ViewHost {
     State.notify();
   });
   const who = h("div", { class: "who" });
-  const tickerBody = h("div", { class: "card-body" }, who, ticker.el);
+  // A DSH session's own input. It is not the chat: the chat only talks to the
+  // configured API provider, and steering a running session is this bar's job.
+  const steerInput = h("input", {
+    type: "text",
+    class: "chat-input",
+    placeholder: tl("Send to this session…"),
+    spellcheck: "false",
+  }) as HTMLInputElement;
+  const steerSend = h("button", { class: "send-btn", title: tl("Send") }, svg(ICONS.arrowUp, 11));
+  const steerBar = h("div", { class: "chat-bar steer-bar" }, steerInput, steerSend);
+  steerBar.style.display = "none";
+  let steerBusy = false;
+  async function steer() {
+    const text = steerInput.value.trim();
+    if (!text || steerBusy) return;
+    steerBusy = true;
+    steerInput.disabled = true;
+    const sent = await Bridge.dshSteer(text);
+    steerBusy = false;
+    steerInput.disabled = false;
+    if (sent) {
+      steerInput.value = "";
+      steerInput.placeholder = t("Send to this session…");
+      steerInput.focus();
+      return;
+    }
+    // Coucou does not turn this into an error card: it just says where it is.
+    steerInput.placeholder = t("DeepSeek Harness is not listening.");
+    steerInput.value = "";
+  }
+  steerSend.addEventListener("click", () => void steer());
+  steerInput.addEventListener("keydown", (e) => {
+    const key = (e as KeyboardEvent).key;
+    if (key === "Enter") {
+      e.preventDefault();
+      void steer();
+    }
+    e.stopPropagation();
+  });
+  const tickerBody = h("div", { class: "card-body" }, who, ticker.el, steerBar);
   const leftBody = h("div", { class: "left-body" });
   const jump = h(
     "button",
@@ -341,6 +380,9 @@ function buildOverview(actions: ViewActions): ViewHost {
           mode = "ticker";
           cardKey = "";
         }
+        // Only a live DSH session can be steered; every other session shows
+        // its ticker alone.
+        steerBar.style.display = task.id === "agent_dsh" && task.sessionId ? "" : "none";
         clear(who);
         // The agent's name is already the pill's: the label says what kind of
         // pill it is, as on the Mac (PillDefinition.sessionSubtitle).
@@ -425,7 +467,7 @@ export function hasSessionTicker(task: AgentTask): boolean {
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
-  const label = task.id === "integration_claude" ? "VS Code" : task.name;
+  const label = task.name;
   const canvas = createMiniBot(task, 24);
   const pill = h(
     "div",
@@ -690,8 +732,7 @@ function buildFinished(actions: ViewActions): ViewHost {
       // The final message, else the last step that is not a diff (FinishedView).
       const task = State.focusTask;
       title.textContent = task?.finalLine || (task && lastTextStep(task.steps)) || t("Session finished");
-      // Sessions from the Claude desktop app live there, not in a terminal.
-      const label = task?.id === "agent_claude-desktop" ? t("Open Claude") : t("Open terminal");
+      const label = t("Open terminal");
       const span = open.firstElementChild as HTMLElement;
       if (span.textContent !== label) span.textContent = label;
     },

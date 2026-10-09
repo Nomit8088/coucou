@@ -3,8 +3,8 @@
 // integrations land here too in a later stage.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
-import { CUSTOM_SERVER_KEY, ensureProviders, newProviderId, providerDef, urlAllowed, urlExposure } from "../core/providers";
+import { Bridge, onEvent, type HookStatus, type ShortcutsReport } from "../core/bridge";
+import { ensureProviders, newProviderId, urlAllowed } from "../core/providers";
 import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
@@ -18,9 +18,9 @@ import {
 import { h, clear } from "../views/dom";
 import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
-import { renderDiff, statusDot } from "./parts";
+import { statusDot } from "./parts";
 import {
-  LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t, tn,
+  LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
 } from "../i18n/i18n";
 
 /** Where secrets.rs keeps the keys on this OS. */
@@ -55,232 +55,24 @@ function toggle(on: boolean, onChange: (v: boolean) => void): HTMLElement {
   return el;
 }
 
-// ── Changes to Claude Code's settings.json ────────────────────────────────────
-
-/** One kind of change to ~/.claude/settings.json, with the words that go with it. */
-interface Change {
-  preview: (install: boolean) => Promise<HookPreview | null>;
-  apply: (install: boolean, fingerprint: string) => Promise<string | null>;
-  installText: string;
-  removeText: string;
-  installButton: string;
-  removeButton: string;
-  /** The note once written; `backup` is "" when there was no file to back up. */
-  done: (backup: string) => string;
-}
-
-const HOOKS_CHANGE: Change = {
-  preview: Bridge.hooksPreview,
-  apply: Bridge.hooksApply,
-  get installText() { return t("This is exactly what will change in your settings.json. Your own hooks are left untouched."); },
-  get removeText() { return t("This removes Coucou's entries only. Your own hooks are left untouched."); },
-  get installButton() { return t("Back up and write"); },
-  get removeButton() { return t("Back up and remove"); },
-  done: (backup) => backup
-    ? t("Done. Previous settings saved as {backup}. Open a new Claude Code session to pick the hooks up.", { backup })
-    : t("Done. Open a new Claude Code session to pick the hooks up."),
-};
-
-const STATUS_LINE_CHANGE: Change = {
-  preview: Bridge.statusLinePreview,
-  apply: Bridge.statusLineApply,
-  get installText() { return t("This is exactly what will change: only the status line. If you already have one it keeps working, Coucou's relay runs it for you."); },
-  get removeText() { return t("This puts your previous status line back, or removes the entry if there was none."); },
-  get installButton() { return t("Back up and write"); },
-  get removeButton() { return t("Back up and remove"); },
-  done: (backup) => backup
-    ? t("Done. Previous settings saved as {backup}. The numbers appear after the next reply of a Claude Code session.", { backup })
-    : t("Done. The numbers appear after the next reply of a Claude Code session."),
-};
-
-/**
- * Shows the diff of a change in `body` and writes it only after an explicit
- * click, and only if settings.json still matches the diff that was shown.
- * `back` redraws the section; `applied` runs a moment after a successful write.
- */
-async function reviewChange(
-  body: HTMLElement,
-  change: Change,
-  install: boolean,
-  back: () => void,
-  applied: () => void,
-) {
-  let preview;
-  try {
-    preview = await change.preview(install);
-  } catch (err) {
-    // An unreadable or invalid settings.json stops here rather than being
-    // treated as empty and written over.
-    clear(body);
-    body.append(
-      h("div", { class: "notice err", text: String(err).replace(/^Error:\s*/, "") }),
-      h("div", { class: "row" }, h("button", { text: t("Back"), onclick: back })),
-    );
-    return;
-  }
-  if (!preview) return;
-  clear(body);
-  body.append(
-    h("div", { class: "hint", text: install ? change.installText : change.removeText }),
-    renderDiff(preview.diff),
-    h("div", { class: "row" },
-      h("span", {
-        class: "path",
-        text: preview.backup
-          ? t("Backup → {path}", { path: preview.backup })
-          : t("No settings.json yet — nothing to back up."),
-      }),
-    ),
-  );
-  const confirm = h("button", {
-    class: install ? "primary" : "danger",
-    text: install ? change.installButton : change.removeButton,
-  });
-  confirm.addEventListener("click", async () => {
-    confirm.disabled = true;
-    try {
-      const backup = await change.apply(install, preview.fingerprint);
-      clear(body);
-      body.append(h("div", { class: "notice ok", text: change.done(backup ?? "") }));
-      window.setTimeout(applied, 2600);
-    } catch (err) {
-      confirm.disabled = false;
-      body.append(h("div", { class: "notice err", text: t("Could not write: {error}", { error: String(err) }) }));
-    }
-  });
-  body.append(h("div", { class: "row" }, confirm, h("button", { text: t("Cancel"), onclick: back })));
-}
-
-// ── Claude Code section ───────────────────────────────────────────────────────
-
-function claudeSection(status: HookStatus): HTMLElement {
-  const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
-  const section = h(
-    "section",
-    {},
-    h("h2", {}, statusDot(status.installed), h("span", { text: "Claude Code" })),
-    body,
-  );
-
-  const redraw = () => {
-    clear(body);
-    draw();
-  };
-  const rebuild = async () => {
-    const fresh = await Bridge.hooksStatus();
-    if (fresh) Object.assign(status, fresh);
-    redraw();
-    const head = section.querySelector("h2")!;
-    clear(head);
-    head.append(statusDot(status.installed), h("span", { text: "Claude Code" }));
-  };
-
-  function draw() {
-    body.append(
-      h("div", {
-        class: "hint",
-        text: status.installed
-          ? t("Coucou is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.")
-          : t("Install the hooks to see your Claude Code sessions in the island and approve permissions without leaving what you are doing."),
-      }),
-      h("div", { class: "row" },
-        h("label", { text: "settings.json" }),
-        h("span", { class: "path", text: status.settingsPath }),
-      ),
-      h("div", { class: "row" },
-        h("label", { text: t("Relay") }),
-        h("span", { class: "path", text: status.hookPath }),
-        statusDot(status.hookReady),
-      ),
-    );
-
-    if (!status.hookReady) {
-      body.append(h("div", {
-        class: "notice warn",
-        text: t("coucou-hook.exe is not in place yet. Restart Coucou; if it still fails, build it with `cargo build -p coucou-hook`."),
-      }));
-    }
-
-    const actions = h("div", { class: "row" });
-    const install = h("button", {
-      class: "primary",
-      text: status.installed ? t("Reinstall hooks…") : t("Install hooks…"),
-      onclick: () => void reviewChange(body, HOOKS_CHANGE, true, redraw, () => void rebuild()),
-    });
-    // Writing hook commands that point at a relay which isn't there would give
-    // every Claude Code session a broken hook and nothing to show for it.
-    if (!status.hookReady) {
-      install.disabled = true;
-      install.title = t("The relay isn't installed yet.");
-    }
-    actions.append(install);
-    if (status.installed) {
-      actions.append(h("button", {
-        class: "danger",
-        text: t("Uninstall hooks…"),
-        onclick: () => void reviewChange(body, HOOKS_CHANGE, false, redraw, () => void rebuild()),
-      }));
-    }
-    body.append(actions);
-  }
-
-  draw();
-  return section;
-}
-
 // ── Plan usage section ────────────────────────────────────────────────────────
 
 /**
- * The 5-hour and weekly limits in the island's header. They come from Claude
- * Code's status line, so the relay has to be the status line first: turning the
- * switch on without it starts the install, and the switch only stays on once
- * that has been confirmed. A status line the user had keeps working.
+ * Codex's weekly limit in the island's header. Nothing is installed for it:
+ * Coucou asks the Codex CLI when the pill shows. Claude Code's status line is
+ * not part of this fork.
  */
 const PLAN_SETTINGS_TEXT = {
-  get claude() { return t("Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Coucou adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only."); },
-  get showClaude() { return t("Show in notch"); },
   get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
   get showCodex() { return t("Show Codex plan in the notch"); },
 };
 
-function planSection(status: HookStatus): HTMLElement {
+function planSection(_status: HookStatus): HTMLElement {
   const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
   const section = h("section", {}, h("h2", {}, h("span", { text: t("Plan usage") })), body);
 
-  const redraw = () => {
-    clear(body);
-    draw();
-  };
-  const rebuild = async () => {
-    const fresh = await Bridge.hooksStatus();
-    if (fresh) Object.assign(status, fresh);
-    settings.planRelayInstalled = status.planRelayInstalled;
-    // Cancelled or failed: a switch that was waiting for the install falls back.
-    if (!status.planRelayInstalled) settings.showPlanInNotch = false;
-    redraw();
-  };
-
   function draw() {
-    // The switch shows "on" while the install it asked for is being reviewed.
-    const sw = toggle(settings.showPlanInNotch, (on) => {
-      if (!on) {
-        settings.showPlanInNotch = false;
-        void save();
-      } else if (status.planRelayInstalled) {
-        settings.showPlanInNotch = true;
-        void save();
-      } else {
-        // Turned on before the relay is in: install it first; it stays on once confirmed.
-        void reviewChange(body, STATUS_LINE_CHANGE, true, () => void rebuild(), () => {
-          settings.planRelayInstalled = true;
-          settings.showPlanInNotch = true;
-          void save().then(rebuild);
-        });
-      }
-    });
     body.append(
-      // Codex only. Claude plan usage is not part of this fork.
-      // Codex: nothing to install, Coucou asks the Codex CLI when the pill shows.
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.codex }),
       h("div", { class: "row" },
         h("label", { text: PLAN_SETTINGS_TEXT.showCodex }),
@@ -294,89 +86,6 @@ function planSection(status: HookStatus): HTMLElement {
 
   draw();
   return section;
-}
-
-// ── Claude API section ────────────────────────────────────────────────────────
-
-const MODELS: [string, string][] = [
-  ["claude-opus-5", "Claude Opus 5"],
-  ["claude-sonnet-5", "Claude Sonnet 5"],
-  ["claude-haiku-4-5", "Claude Haiku 4.5"],
-];
-
-function apiSection(hasKey: boolean): HTMLElement {
-  const dot = statusDot(hasKey);
-  const state = h("span", { class: "hint", text: hasKey ? t("Key saved in the {store}.", { store: KEY_STORE }) : t("No key yet — the chat needs one.") });
-
-  const field = h("input", {
-    type: "password",
-    placeholder: hasKey ? `••••••••••••  ${t("(stored)")}` : "sk-ant-...",
-    style: "flex:1 1 auto;min-width:0",
-    autocomplete: "off",
-    spellcheck: "false",
-  }) as HTMLInputElement;
-
-  const saveBtn = h("button", { class: "primary", text: t("Save key") });
-  const clearBtn = h("button", { class: "danger", text: t("Remove") });
-  const feedback = h("div", {});
-
-  async function refresh() {
-    const present = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
-    dot.style.background = present ? "#22c55e" : "#f4505e";
-    state.textContent = present
-      ? t("Key saved in the {store}.", { store: KEY_STORE })
-      : t("No key yet — the chat needs one.");
-    field.placeholder = present ? `••••••••••••  ${t("(stored)")}` : "sk-ant-...";
-    clearBtn.style.display = present ? "" : "none";
-  }
-
-  saveBtn.addEventListener("click", async () => {
-    const value = field.value.trim();
-    if (!value) return;
-    clear(feedback);
-    try {
-      await Bridge.secretSet("anthropic-api-key", value);
-      field.value = "";
-      feedback.append(h("div", { class: "notice ok", text: t("Saved. It never touches disk.") }));
-      await refresh();
-    } catch (err) {
-      feedback.append(h("div", { class: "notice err", text: t("Could not save: {error}", { error: String(err) }) }));
-    }
-  });
-
-  clearBtn.addEventListener("click", async () => {
-    clear(feedback);
-    try {
-      await Bridge.secretClear("anthropic-api-key");
-      feedback.append(h("div", { class: "notice ok", text: t("Key removed.") }));
-      await refresh();
-    } catch (err) {
-      feedback.append(h("div", { class: "notice err", text: t("Could not remove: {error}", { error: String(err) }) }));
-    }
-  });
-
-  const model = h("select", {}) as HTMLSelectElement;
-  for (const [id, label] of MODELS) model.append(h("option", { value: id, text: label }));
-  if (!MODELS.some(([id]) => id === settings.model)) {
-    model.append(h("option", { value: settings.model, text: settings.model }));
-  }
-  model.value = settings.model;
-  model.addEventListener("change", () => {
-    settings.model = model.value;
-    void save();
-  });
-
-  clearBtn.style.display = hasKey ? "" : "none";
-
-  return h(
-    "section",
-    {},
-    h("h2", {}, dot, h("span", { text: "Claude" })),
-    state,
-    h("div", { class: "row" }, h("label", { text: t("API key") }), field, saveBtn, clearBtn),
-    h("div", { class: "row" }, h("label", { text: t("Model") }), model),
-    feedback,
-  );
 }
 
 // ── Active pills section ──────────────────────────────────────────────────────
@@ -404,7 +113,6 @@ function activePillsSection(connected: Record<string, boolean>): HTMLElement {
     if (isComingSoon(def.id)) return t("Coming soon");
     if (def.connect.kind === "hooks" && !connected[def.id]) return t("Hooks not installed");
     if (def.connect.kind === "key" && !connected[def.id]) return t("Key not configured");
-    if (def.connect.kind === "server" && !settings[def.connect.field]) return t("Not connected");
     return null;
   }
 
@@ -459,267 +167,6 @@ function activePillsSection(connected: Record<string, boolean>): HTMLElement {
     h("div", { class: "row" }, h("label", { text: t("Main tool") }), main),
     groups,
   );
-}
-
-// ── Chat providers section ────────────────────────────────────────────────────
-
-const CHAT_STRINGS = {
-  get providersTitle() { return t("Chat providers"); },
-  get providersHint() { return t("Chat with Google AI, OpenAI or OpenRouter instead of Claude: add a key here, then click the model name above the chat box to switch provider and model. Keys stay in the system keychain. These providers get no web search and no tools: they can answer, never act on this computer."); },
-  get stored() { return `••••••••  ${t("(stored)")}`; },
-  get save() { return t("Save"); },
-  get remove() { return t("Remove"); },
-  get localTitle() { return t("Local models"); },
-  get localHint() { return t("Chat with a model you run yourself: Ollama or LM Studio (leave the address empty for the usual one on this computer), or any server that speaks the OpenAI API, such as vLLM or llama.cpp. Once connected, pick it above the chat box."); },
-  get connect() { return t("Connect"); },
-  get connecting() { return t("Connecting…"); },
-  get disconnect() { return t("Disconnect"); },
-  get useInChat() { return t("Use in chat"); },
-  get inUse() { return t("In use"); },
-  get keyOptional() { return t("API key (optional)"); },
-  get localOnly() { return t("Nothing leaves your PC: the server runs on this computer."); },
-  get remote() { return t("This address is another machine: what you ask is sent to it."); },
-  get remoteHttp() { return t("This address is another machine, over plain http: what you ask travels unencrypted."); },
-  get keyOverHttp() { return t("Warning: the key would be sent unencrypted (http://) to another machine. Use https://, or a server on this computer."); },
-  get invalid() { return t("Not a valid http:// or https:// address."); },
-  noModels: (name: string) => t("No models yet. Download one in {name} first.", { name }),
-  models: (n: number) => tn("{count} model", "{count} models", n),
-};
-
-interface CloudDef {
-  id: "google" | "openai" | "openrouter";
-  name: string;
-  placeholder: string;
-  where: string;
-}
-
-const CLOUD: CloudDef[] = [
-  { id: "google", name: "Google AI", placeholder: "AIza…", where: "aistudio.google.com" },
-  { id: "openai", name: "OpenAI", placeholder: "sk-…", where: "platform.openai.com" },
-  { id: "openrouter", name: "OpenRouter", placeholder: "sk-or-…", where: "openrouter.ai/keys" },
-];
-
-function chatProvidersSection(
-  present: Record<string, boolean>,
-  keyChanged: (key: string, on: boolean) => void,
-): HTMLElement {
-  const list = h("div", { style: "display:flex;flex-direction:column;gap:8px" });
-  for (const def of CLOUD) {
-    const p = providerDef(def.id);
-    const key = p.key!;
-    const input = h("input", {
-      type: "password",
-      placeholder: present[key] ? CHAT_STRINGS.stored : def.placeholder,
-      autocomplete: "off",
-      spellcheck: "false",
-      style: "flex:1 1 auto;min-width:0",
-    }) as HTMLInputElement;
-    const dotEl = statusDot(present[key] ?? false);
-    const saveBtn = h("button", { text: CHAT_STRINGS.save });
-    const removeBtn = h("button", { class: "danger", text: CHAT_STRINGS.remove });
-    const refresh = () => {
-      input.placeholder = present[key] ? CHAT_STRINGS.stored : def.placeholder;
-      dotEl.style.background = present[key] ? "#22c55e" : "#f4505e";
-      removeBtn.style.display = present[key] ? "" : "none";
-    };
-    saveBtn.addEventListener("click", async () => {
-      const value = input.value.trim();
-      if (!value) return;
-      try {
-        await Bridge.secretSet(key, value);
-        present[key] = true;
-        input.value = "";
-        keyChanged(key, true);
-      } catch {
-        dotEl.style.background = "#f5a524";
-        return;
-      }
-      refresh();
-    });
-    removeBtn.addEventListener("click", async () => {
-      try {
-        await Bridge.secretClear(key);
-        present[key] = false;
-        keyChanged(key, false);
-      } catch {
-        dotEl.style.background = "#f5a524";
-        return;
-      }
-      refresh();
-    });
-    refresh();
-    list.append(
-      h("div", { class: "row" },
-        h("label", {},
-          h("i", { class: "dot", style: `background:${p.accent};margin-right:8px` }),
-          h("span", { text: def.name }),
-        ),
-        input, saveBtn, removeBtn, dotEl,
-      ),
-      h("div", { class: "hint", style: "margin:-4px 0 0 144px", text: t("Key from {site}", { site: def.where }) }),
-    );
-  }
-  return h(
-    "section",
-    {},
-    h("h2", {}, h("span", { text: CHAT_STRINGS.providersTitle })),
-    h("div", { class: "hint", text: CHAT_STRINGS.providersHint }),
-    list,
-  );
-}
-
-// ── Local models section ──────────────────────────────────────────────────────
-
-type LocalId = "ollama" | "lmstudio" | "custom";
-
-/** Redraws the local models section after a change made elsewhere (the island). */
-let localRedraw: (() => void) | null = null;
-
-const LOCAL: Record<LocalId, { name: string; usual: string }> = {
-  ollama: { name: "Ollama", usual: "http://127.0.0.1:11434" },
-  lmstudio: { name: "LM Studio", usual: "http://127.0.0.1:1234" },
-  // No usual address: any server that speaks the OpenAI API.
-  custom: { name: N_("OpenAI-compatible"), usual: "" },
-};
-
-/** What an address means for the user's data, as a hint line. */
-function exposureNotice(url: string, withKey: boolean): HTMLElement | null {
-  switch (urlExposure(url)) {
-    case "local":
-      return h("div", { class: "hint", text: CHAT_STRINGS.localOnly });
-    case "remote":
-      return h("div", { class: "hint", text: CHAT_STRINGS.remote });
-    case "remote-http":
-      return withKey
-        ? h("div", { class: "notice warn", text: CHAT_STRINGS.keyOverHttp })
-        : h("div", { class: "hint", text: CHAT_STRINGS.remoteHttp });
-    case "invalid":
-      return url.trim() ? h("div", { class: "notice err", text: CHAT_STRINGS.invalid }) : null;
-  }
-}
-
-function localSection(customKey: boolean): HTMLElement {
-  const body = h("div", { style: "display:flex;flex-direction:column;gap:14px" });
-  const section = h(
-    "section",
-    {},
-    h("h2", {}, h("span", { text: CHAT_STRINGS.localTitle })),
-    h("div", { class: "hint", text: CHAT_STRINGS.localHint }),
-    body,
-  );
-  const redraw = () => {
-    clear(body);
-    for (const id of Object.keys(LOCAL) as LocalId[]) body.append(serverBlock(id));
-  };
-
-  function serverBlock(id: LocalId): HTMLElement {
-    const def = LOCAL[id];
-    const p = providerDef(id);
-    const field = p.urlField!;
-    const connected = settings[field] !== "";
-    const status = h("div", {});
-    const exposure = h("div", {});
-    const label = h("label", {},
-      h("i", { class: "dot", style: `background:${p.accent};margin-right:8px` }),
-      h("span", { text: t(def.name) }),
-    );
-    const block = h("div", { style: "display:flex;flex-direction:column;gap:6px" });
-
-    if (connected) {
-      const inUse = settings.chatProvider === id;
-      const use = h("button", { class: inUse ? "" : "primary", text: inUse ? CHAT_STRINGS.inUse : CHAT_STRINGS.useInChat });
-      use.disabled = inUse;
-      use.addEventListener("click", () => {
-        settings.chatProvider = id;
-        void save().then(redraw);
-      });
-      const disconnect = h("button", { class: "danger", text: CHAT_STRINGS.disconnect });
-      disconnect.addEventListener("click", async () => {
-        settings[field] = "";
-        if (settings.chatProvider === id) settings.chatProvider = "anthropic";
-        if (id === "custom") {
-          await Bridge.secretClear(CUSTOM_SERVER_KEY).catch(() => {});
-          customKey = false;
-        }
-        await save();
-        redraw();
-      });
-      block.append(
-        h("div", { class: "row" }, label, h("span", { class: "path", text: settings[field] }), statusDot(true), use, disconnect),
-        status,
-      );
-      exposure.append(exposureNotice(settings[field], id === "custom" && customKey) ?? "");
-      block.append(exposure);
-      return block;
-    }
-
-    const input = h("input", {
-      type: "text",
-      placeholder: def.usual || "https://llm.example.com",
-      style: "flex:1 1 auto;min-width:0",
-      spellcheck: "false",
-      autocomplete: "off",
-    }) as HTMLInputElement;
-    // A custom server may want a key; it goes to the keychain, never to settings.json.
-    const key = h("input", {
-      type: "password",
-      placeholder: customKey ? CHAT_STRINGS.stored : CHAT_STRINGS.keyOptional,
-      style: "flex:1 1 auto;min-width:0",
-      autocomplete: "off",
-      spellcheck: "false",
-    }) as HTMLInputElement;
-    const connect = h("button", { class: "primary", text: CHAT_STRINGS.connect });
-
-    const showExposure = () => {
-      clear(exposure);
-      const withKey = id === "custom" && (customKey || key.value.trim() !== "");
-      const notice = exposureNotice(input.value || def.usual, withKey);
-      if (notice) exposure.append(notice);
-    };
-    input.addEventListener("input", showExposure);
-    key.addEventListener("input", showExposure);
-
-    connect.addEventListener("click", async () => {
-      connect.disabled = true;
-      clear(status);
-      status.append(h("div", { class: "hint", text: CHAT_STRINGS.connecting }));
-      try {
-        if (id === "custom" && key.value.trim()) {
-          // Stored with this address: the key is only ever sent there.
-          await Bridge.localSetKey(input.value || def.usual, key.value.trim());
-          key.value = "";
-          customKey = true;
-        }
-        const server = await Bridge.localConnect(id, input.value);
-        if (!server.models.length) {
-          clear(status);
-          status.append(h("div", { class: "notice err", text: CHAT_STRINGS.noModels(t(def.name)) }));
-        } else {
-          settings[field] = server.url;
-          if (!server.models.includes(settings.chatModels[id] ?? "")) {
-            settings.chatModels = { ...settings.chatModels, [id]: server.models[0] };
-          }
-          await save();
-          redraw();
-          return;
-        }
-      } catch (err) {
-        clear(status);
-        status.append(h("div", { class: "notice err", text: String(err).replace(/^Error:\s*/, "") }));
-      }
-      connect.disabled = false;
-    });
-
-    block.append(h("div", { class: "row" }, label, input, connect));
-    if (id === "custom") block.append(h("div", { class: "row" }, h("label", { text: "" }), key));
-    block.append(status, exposure);
-    showExposure();
-    return block;
-  }
-
-  redraw();
-  localRedraw = redraw;
-  return section;
 }
 
 // ── Integrations section ──────────────────────────────────────────────────────
@@ -788,7 +235,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
     for (const field of def.fields) {
       const input = h("input", {
         type: field.secret ? "password" : "text",
-        placeholder: present[field.key] ? CHAT_STRINGS.stored : field.placeholder,
+        placeholder: present[field.key] ? t("(stored)") : field.placeholder,
         autocomplete: "off",
         spellcheck: "false",
         style: "flex:1 1 auto;min-width:0",
@@ -801,7 +248,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
           await Bridge.secretSet(field.key, value);
           present[field.key] = value.length > 0;
           input.value = "";
-          input.placeholder = value ? CHAT_STRINGS.stored : field.placeholder;
+          input.placeholder = value ? t("(stored)") : field.placeholder;
           dotEl.style.background = value ? "#22c55e" : "#f4505e";
         } catch {
           dotEl.style.background = "#f5a524";
@@ -1275,12 +722,9 @@ async function main() {
 
   void onEvent<ShortcutsReport>("shortcuts-status", (fresh) => shortcutsListener?.report(fresh));
   void onEvent<Settings>("settings-changed", (s) => {
-    const before = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
     settings = { ...settings, ...s };
     shortcutsListener?.settingsChanged();
     for (const redraw of declaredViews) redraw();
-    const after = `${settings.chatProvider}|${settings.ollamaUrl}|${settings.lmstudioUrl}|${settings.customUrl}`;
-    if (before !== after) localRedraw?.();
     applyLanguage();
   });
 }
@@ -1292,12 +736,10 @@ async function render() {
   };
   const agents = await Bridge.agentHooksList();
 
-  const hasKey = (await Bridge.secretPresent("anthropic-api-key")) ?? false;
   const shortcutReport = await Bridge.shortcutsStatus();
 
   const keys = [
-    "stripe-api-key", "github-token", "vercel-token",
-    "n8n-url", "n8n-api-key", "resend-api-key", "notion-api-key", "calcom-api-key",
+    "github-token", "resend-api-key", "gitlab-url", "gitlab-token",
   ];
   const present: Record<string, boolean> = {};
   for (const k of keys) present[k] = (await Bridge.secretPresent(k)) ?? false;
@@ -1318,14 +760,11 @@ async function render() {
     for (const redraw of declaredViews) redraw();
   };
   const chatKeys: Record<string, boolean> = {};
-  for (const def of CLOUD) {
-    const key = providerDef(def.id).key!;
-    chatKeys[key] = (await Bridge.secretPresent(key)) ?? false;
+  for (const provider of ensureProviders(settings.chatProviders)) {
+    chatKeys[provider.keyName] = (await Bridge.secretPresent(provider.keyName)) ?? false;
   }
-  const customKey = (await Bridge.secretPresent(CUSTOM_SERVER_KEY)) ?? false;
 
   declaredViews.length = 0;
-  localRedraw = null;
   shortcutsListener = null;
   clear(root);
   root.append(
@@ -1452,8 +891,3 @@ function StateNote(message: string): void {
 async function saveSettings(): Promise<void> {
   await save();
 }
-
-void claudeSection;
-void apiSection;
-void localSection;
-void chatProvidersSection;

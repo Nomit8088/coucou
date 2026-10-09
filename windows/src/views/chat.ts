@@ -11,7 +11,8 @@ import { ICONS } from "./icons";
 import { renderMarkdown } from "./markdown";
 import { Bridge, onEvent, type ChatContext, type ModelInfo } from "../core/bridge";
 import {
-  activeModel, ensureProviders, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
+  activeModel, ensureProviders, isLoopbackHttp, pickModel, providerDef, visibleProviders, withModel,
+  type ProviderDef,
 } from "../core/providers";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
@@ -27,6 +28,8 @@ const STRINGS = {
   loading: N_("Loading models…"),
   noKey: N_("No API key — add it in Settings."),
   openSettings: N_("Open Settings"),
+  /** Says out loud that this is the API chat, not a DSH session. */
+  chatApi: N_("Chat API"),
 };
 
 let nextId = 1;
@@ -149,15 +152,16 @@ function buildPicker(onChange: () => void): Picker {
   }
 
   async function loadModels() {
-    const p = providerDef(State.settings.chatProvider);
+    const p = providerDef(State.settings.chatProvider, State.settings);
     const ticket = ++request;
     const cached = p.urlField ? undefined : cache.get(p.id);
     if (cached) {
       drawModels(p, cached);
       return;
     }
-    // Nothing is asked of a provider that has no key yet.
-    if (p.key && !(await Bridge.secretPresent(p.key))) {
+    // A provider with no key is not asked anything, unless it is a server on
+    // this machine: Rust allows those without one, so the picker must too.
+    if (p.key && !(await Bridge.secretPresent(p.key)) && !isLoopbackHttp(p.baseUrl)) {
       if (ticket === request) status(t(STRINGS.noKey), true);
       return;
     }
@@ -227,7 +231,12 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
     modelName,
     svg(ICONS.chevronUpDown, 9, { stroke: 2 }),
   );
-  const modelRow = h("div", { class: "model-row" }, modelBtn);
+  const modelRow = h(
+    "div",
+    { class: "model-row" },
+    h("span", { class: "chat-api-tag", text: t(STRINGS.chatApi) }),
+    modelBtn,
+  );
 
   const body = h("div", { class: "chat-body" });
   const picker = buildPicker(() => {
@@ -245,7 +254,7 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
   let live: HTMLElement | null = null;
 
   function drawModelButton() {
-    const p = providerDef(State.settings.chatProvider);
+    const p = providerDef(State.settings.chatProvider, State.settings);
     modelDot.style.background = p.accent;
     modelName.textContent = activeModel(State.settings) || t(STRINGS.noModel);
     modelBtn.classList.toggle("open", picker.isOpen);
@@ -288,17 +297,8 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.chatHistory.length === 1 && file ? { kind: "file", name: file.name, path: file.path } : null;
 
     try {
-      const dsh = State.focusTask?.id === "agent_dsh" && State.focusTask.sessionId;
-      if (dsh) {
-        const fileNote = file ? `\n\nFile: ${file.name}\nPath: ${file.path}` : "";
-        const sent = await Bridge.dshSteer(`${query}${fileNote}`);
-        if (sent) {
-          State.chatHistory.push({ id: nextId++, role: "assistant", content: t("Sent to DeepSeek Harness.") });
-          State.stateOverride = null;
-          Sound.play("finish");
-          return;
-        }
-      }
+      // The chat talks to the configured API provider. It never steers a DSH
+      // session: that is the session card's own input.
       const reply = await Bridge.chatSend(query, context);
       State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
       State.stateOverride = null;

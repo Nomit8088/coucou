@@ -96,20 +96,10 @@ export function shouldAutoShow(now: Date, lastShownWeek: string): boolean {
 /** English names, kept in the summary; shown with `t()` (src/i18n). */
 const DAY_NAMES = [N_("Sunday"), N_("Monday"), N_("Tuesday"), N_("Wednesday"), N_("Thursday"), N_("Friday"), N_("Saturday")];
 
-/** Pill IDs → names, from PillCatalog.swift. Claude Code hooks come from any
- *  terminal here, so its pill reads "Claude Code" rather than "VS Code". */
+/** Pill IDs → names for the pills this fork has. */
 const AGENT_NAMES: Record<string, string> = {
-  integration_claude: "Claude Code",
-  agent_cursor: "Cursor",
-  agent_antigravity: "Antigravity",
+  agent_dsh: "DeepSeek Harness",
   agent_codex: "Codex",
-  agent_gemini: "Gemini CLI",
-  agent_copilot: "Copilot CLI",
-  agent_muse: "Muse Code",
-  agent_opencode: "OpenCode",
-  agent_amp: "Amp",
-  agent_hermes: "Hermes",
-  "agent_claude-desktop": "Claude Desktop",
 };
 
 export function agentName(id: string): string {
@@ -231,12 +221,12 @@ export function sampleHistory(monday: Date): RecapHistory {
     agent: string, project: string, start: number, end: number,
     filesChanged: number, linesAdded: number, linesRemoved: number, commandsRun: number, questions: number,
   ): RecapTurn => ({ agent, project, start, end, filesChanged, linesAdded, linesRemoved, commandsRun, questions });
-  const claude = "integration_claude";
+  const claude = "agent_dsh";
   return {
     turns: [
       turn(claude, "coucou", at(0, 9), at(0, 11, 30), 8, 312, 87, 14, 2),
       turn(claude, "coucou", at(0, 14), at(0, 15, 45), 3, 95, 20, 5, 0),
-      turn("agent_gemini", "side-project", at(1, 10), at(1, 11), 2, 50, 10, 3, 1),
+      turn("agent_codex", "side-project", at(1, 10), at(1, 11), 2, 50, 10, 3, 1),
       turn(claude, "coucou", at(2, 9, 30), at(2, 12), 5, 180, 60, 8, 3),
       turn(claude, "coucou", at(3, 16), at(3, 17), 1, 40, 5, 2, 0),
       turn(claude, "coucou", at(4, 8), at(4, 13), 12, 540, 130, 22, 5),

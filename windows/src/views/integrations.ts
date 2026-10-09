@@ -62,7 +62,6 @@ const OPEN_URLS: Record<string, string> = {
 export function idleStatus(
   id: string,
   info: { configured: boolean; error: string | null } | undefined,
-  chatModel: string,
 ): { label: string; color: string } {
   if (isComingSoon(id)) return { label: t("Coming soon"), color: "#6B7079" };
   if (info?.error) return { label: info.error, color: "#F4505E" };
@@ -74,11 +73,6 @@ export function idleStatus(
   // are in place (Mac #183). A session replaces this card; nothing is loading.
   if (def?.connect.kind === "hooks") return configured ? ok(t("Hooks installed")) : missing(t("Hooks not installed"));
   if (def?.connect.kind === "none") return ok(t("Ready · no setup needed"));
-  if (def?.connect.kind === "server") return configured ? ok(t("Connected")) : missing(t("Not connected"));
-  if (def?.category === "ai") {
-    if (!configured) return missing(t("Key not configured"));
-    return ok(id === "ai_anthropic" ? t("Key configured · {model}", { model: chatModel }) : t("Key configured"));
-  }
   return configured ? ok(t("Connected · loading…")) : missing(t("Key not configured"));
 }
 
@@ -86,37 +80,10 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const info = State.integrations[task.id];
   const configured = info?.configured ?? false;
   const def = pillDefinition(task.id);
-  const status = idleStatus(task.id, info, State.settings.model);
+  const status = idleStatus(task.id, info);
 
   const actions = h("div", { class: "int-actions" });
-  if (task.id === "integration_claude") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}b3`,
-        text: t("Open Visual Studio Code"),
-        onclick: () => void Bridge.openInVSCode(task.sessionCwd ?? null),
-      }),
-    );
-  } else if (task.id === "agent_claude-desktop") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open Claude"),
-        onclick: () => void Bridge.openClaudeDesktop(),
-      }),
-    );
-  } else if (task.id === "integration_n8n") {
-    actions.append(
-      h("button", {
-        class: "link-btn",
-        style: `color:${task.color}d9`,
-        text: t("Open {name}", { name: "n8n" }),
-        onclick: () => void Bridge.openN8n(),
-      }),
-    );
-  } else if (OPEN_URLS[task.id]) {
+  if (OPEN_URLS[task.id]) {
     actions.append(
       h("button", {
         class: "link-btn",
@@ -129,14 +96,14 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const hookPill = def?.connect.kind === "hooks";
   if (isComingSoon(task.id) || def?.connect.kind === "none") {
     // Nothing to set up, and nothing to refresh.
-  } else if (configured && (hookPill || def?.category !== "ai")) {
+  } else if (configured && hookPill) {
     actions.append(
       h("button", {
         class: "link-btn",
         style: `color:${task.color}d9`,
         text: t("Refresh"),
         // A hook pill has nothing to poll: look at its hooks again instead.
-        onclick: () => void (hookPill ? refreshHookPills() : Bridge.refreshIntegration(task.id)),
+        onclick: () => void refreshHookPills(),
       }),
     );
   } else if (!configured) {
@@ -148,11 +115,7 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   return h(
     "div",
     { class: "int-card" },
-    header(
-      task.color,
-      task.id === "integration_claude" ? "VS Code" : task.name,
-      t(def?.subtitle ?? N_("Integration")),
-    ),
+    header(task.color, task.name, t(def?.subtitle ?? N_("Integration"))),
     h("div", { class: "int-status" }, dot(status.color, 5), h("span", { text: status.label })),
     actions,
   );
@@ -488,32 +451,44 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
   }
 }
 
+function gitlabLine(accent: string, tag: string, title: string, url: string): HTMLElement {
+  const line = listRow(
+    accent,
+    false,
+    h("span", { class: "int-ago", text: tag }),
+    h("span", { class: "int-name", text: title || t("Nothing here") }),
+  );
+  if (url) {
+    line.style.cursor = "pointer";
+    line.addEventListener("click", () => void Bridge.openUrl(url));
+  }
+  return line;
+}
+
 function gitlabCard(): HTMLElement {
   const mine = arr("integration_gitlab", "mine");
   const review = arr("integration_gitlab", "review");
   const pipelines = arr("integration_gitlab", "pipelines");
-  const root = h("div", { class: "int" }, header("#FC6D26", "GitLab", t("Merge requests")));
-  const section = (title: string, rows: Record<string, unknown>[]) => {
-    root.append(h("div", { class: "sub", text: title }));
-    if (rows.length === 0) {
-      root.append(h("div", { class: "hint", text: t("Nothing here") }));
-      return;
-    }
-    rows.forEach((row, i) => {
-      const label = String(row.title ?? row.status ?? row.project ?? "");
-      const line = listRow("#FC6D26", i === 0, h("span", { text: label }));
-      const url = typeof row.url === "string" ? row.url : "";
-      if (url) {
-        line.style.cursor = "pointer";
-        line.addEventListener("click", () => void Bridge.openUrl(url));
-      }
-      root.append(line);
-    });
+  const rows = h("div", { class: "int-rows tight" });
+  const mr = (tag: string, row: Record<string, unknown> | undefined) => {
+    if (!row) return gitlabLine("#6B7079", tag, t("Nothing here"), "");
+    const iid = row.iid != null ? `!${row.iid}` : tag;
+    return gitlabLine("#FC6D26", iid, String(row.title ?? ""), String(row.url ?? ""));
   };
-  section(t("My MRs"), mine);
-  section(t("To review"), review);
-  section(t("Pipeline"), pipelines);
-  return root;
+  rows.append(mr(t("My MRs"), mine[0]), mr(t("To review"), review[0]));
+  const pipe = pipelines[0];
+  if (!pipe) {
+    rows.append(gitlabLine("#6B7079", t("Pipeline"), t("Nothing here"), ""));
+  } else {
+    const status = String(pipe.status ?? "");
+    const accent = status === "success" ? "#22C55E" : status === "failed" ? "#F4505E" : "#FC6D26";
+    const title = [status, pipe.project].filter(Boolean).join(" · ");
+    rows.append(gitlabLine(accent, t("Pipeline"), title, String(pipe.url ?? "")));
+  }
+  const extra = mine.length + review.length > 0
+    ? h("span", { class: "int-total" }, h("span", { text: String(mine.length + review.length) }))
+    : undefined;
+  return h("div", { class: "int-card" }, header("#FC6D26", "GitLab", t("Merge requests"), extra), rows);
 }
 
 export { clear };

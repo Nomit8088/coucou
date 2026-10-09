@@ -436,6 +436,10 @@ class AppState {
       delete t.stepSeq;
       t.pillBadge = null;
       t.finalLine = null;
+      // The session is over: its id must not outlive it, or a steer would go to
+      // a turn that has already ended.
+      t.sessionId = null;
+      t.sessionCwd = undefined;
       const def = pillDefinition(id);
       if (def) t.name = def.name;
       this.clearSessionDiffs(id);

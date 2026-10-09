@@ -66,7 +66,8 @@ fn yaml_quote(value: &str) -> String {
 
 fn block(plugin: &Path) -> String {
     let (pipe, steer) = pipe_names();
-    let name = plugin.to_string_lossy().replace('\\', "/");
+    // A directory file URL is not a valid ESM import. Point at index.js.
+    let name = plugin.join("index.js").to_string_lossy().replace('\\', "/");
     format!(
         "{MARKER_BEGIN}\n- insert:\n    - id: {ROW_ID}\n      name: {}\n      config:\n        pipe: {}\n        steerPipe: {}\n{MARKER_END}\n",
         yaml_quote(&name),

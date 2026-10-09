@@ -372,10 +372,10 @@ test("go to alert: the permission first, then a question, else Mochi is annoyed"
   assert.equal(State.focusId, "agent_gemini");
 
   did = [];
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_dsh", tool: "write", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
+  assert.equal(State.focusId, "agent_dsh");
   // Nothing is ever decided from a shortcut.
   assert.deepEqual(sent("approval_decision"), []);
 });
@@ -389,18 +389,18 @@ test("go to alert brings up the unified card: any agent's pill, a question as a 
 
   did = [];
   State.pendingApproval = {
-    requestId: "r2", sessionId: "s", pillId: "integration_claude", tool: "AskUserQuestion", command: "",
+    requestId: "r2", sessionId: "s", pillId: "agent_dsh", tool: "user-questions", command: "",
     questions: [{ question: "Which?", options: [], multiSelect: false }],
   };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
-  assert.equal(State.focusId, "integration_claude");
+  assert.equal(State.focusId, "agent_dsh");
   assert.deepEqual(sent("approval_decision"), []);
   assert.deepEqual(sent("approval_answer"), []);
 });
 
 test("the island toggle opens on a waiting card, and folds it rather than dropping it", () => {
-  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "integration_claude", tool: "Bash", command: "ls" };
+  State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_dsh", tool: "write", command: "ls" };
   runGlobalShortcut(host, "toggleIsland", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
   did = [];
@@ -418,12 +418,12 @@ test("the terminal shortcut is the existing Open terminal (the session's window)
   assert.deepEqual(sent("open_session"), [{ sessionId: null, path: "C:\\work\\proj" }]);
   assert.deepEqual(did, ["collapse"]);
 
-  // A Claude Desktop session lives in the Claude app.
+  // A session without a window found opens its own folder instead.
   did = [];
-  State.upsertExternalAgent("agent_claude-desktop", "Claude Desktop", "#D97757");
-  State.setFocus("agent_claude-desktop");
+  State.upsertExternalAgent("agent_dsh", "DeepSeek Harness", "#4D6BFE");
+  State.setFocus("agent_dsh");
   runGlobalShortcut(host, "jumpToTerminal", resume);
-  assert.equal(sent("open_claude_desktop").length, 1);
+  assert.deepEqual(sent("open_session").at(-1), { sessionId: null, path: "C:\\work\\proj" });
 });
 
 test("next and previous pill wrap around and open the overview", () => {

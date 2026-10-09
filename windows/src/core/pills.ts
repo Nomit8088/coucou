@@ -36,9 +36,10 @@ export type HostOs = "windows" | "linux";
 
 const hooks: PillConnect = { kind: "hooks" };
 const key = (k: string): PillConnect => ({ kind: "key", key: k });
+const none: PillConnect = { kind: "none" };
 
 export const PILL_CATALOG: readonly PillDefinition[] = [
-  { id: "agent_dsh", name: "DeepSeek", color: "#4D6BFE", category: "workspace",
+  { id: "agent_dsh", name: "DeepSeek Harness", color: "#4D6BFE", category: "workspace",
     subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "workspace",
     subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
@@ -48,6 +49,10 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("resend-api-key") },
   { id: "integration_gitlab", name: "GitLab", color: "#FC6D26", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("gitlab-token") },
+  // Spotify's MPRIS interface on the session bus (src-tauri/src/spotify.rs).
+  // Windows has nothing to read it from yet.
+  { id: "integration_spotify", name: "Spotify", color: "#1DB954", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "linux", connect: none },
 ];
 
 /** The always-on pill unless the user picks another workspace tool. */
