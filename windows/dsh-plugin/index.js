@@ -395,7 +395,18 @@ export function apply(ctx, config) {
     remember(payload?.agent);
     const sid = sessionIdOf(payload?.agent);
     turnOpen.add(sid);
-    const text = (payload?.messages ?? []).map((message) => textOf(message?.content)).filter(Boolean).join("\n");
+    // Only a prompt the human actually sent is a UserPromptSubmit. DSH puts its
+    // own injected context in this same batch — a background job finishing
+    // (`tool-jobs`, form `notice`), a changed approval policy (`user-approval`) —
+    // and those are user-role messages too. The island reads UserPromptSubmit as
+    // "the turn that asked is over", so a notice landing just after a permission
+    // request or a question cancelled the card on screen and handed the request
+    // back to DSH's own UI, which left the session waiting on it.
+    const text = (payload?.messages ?? [])
+      .filter((message) => message?.source?.kind === "user")
+      .map((message) => textOf(message?.content))
+      .filter(Boolean)
+      .join("\n");
     if (text.trim()) {
       display(pipe, {
         hook_event_name: "UserPromptSubmit",
@@ -691,9 +702,13 @@ export function apply(ctx, config) {
     const raw = parsed?.answers;
     if (!raw || typeof raw !== "object") return next();
     const answers = questions.map((question) => {
-      const value = raw[question.id];
+      // The island keys an answer by the question's id, or by its text when the
+      // asker gave no id (views.ts). Read both, or a question without an id
+      // would be silently unanswered.
+      const key = typeof question?.id === "string" && question.id ? question.id : question?.question;
+      const value = key == null ? undefined : raw[key];
       const selected = Array.isArray(value) ? value.map(String) : value ? [String(value)] : [];
-      return { id: question.id, selected };
+      return { id: question?.id, selected };
     }).filter((item) => item.selected.length > 0);
     if (answers.length === 0) return next();
     return { answers };

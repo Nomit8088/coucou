@@ -478,12 +478,12 @@ function gitlabCard(): HTMLElement {
   rows.append(mr(t("My MRs"), mine[0]), mr(t("To review"), review[0]));
   const pipe = pipelines[0];
   if (!pipe) {
-    rows.append(gitlabLine("#6B7079", t("Pipeline"), t("Nothing here"), ""));
+    rows.append(gitlabLine("#6B7079", t("My pipeline"), t("Nothing here"), ""));
   } else {
     const status = String(pipe.status ?? "");
     const accent = status === "success" ? "#22C55E" : status === "failed" ? "#F4505E" : "#FC6D26";
     const title = [status, pipe.project].filter(Boolean).join(" · ");
-    rows.append(gitlabLine(accent, t("Pipeline"), title, String(pipe.url ?? "")));
+    rows.append(gitlabLine(accent, t("My pipeline"), title, String(pipe.url ?? "")));
   }
   const extra = mine.length + review.length > 0
     ? h("span", { class: "int-total" }, h("span", { text: String(mine.length + review.length) }))

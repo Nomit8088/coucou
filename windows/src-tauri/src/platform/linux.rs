@@ -308,6 +308,12 @@ pub fn left_button_down() -> bool {
     false
 }
 
+/// Nothing polls the cursor on Linux, and Wayland gives no window the clicks
+/// another one gets: a click outside the island cannot be seen here. The page
+/// still folds on a click that reaches neither the island nor its cards
+/// (island.ts), which covers most of it.
+pub fn set_outside_click_watch(_win: &WebviewWindow, _active: bool) {}
+
 // ── Island window ─────────────────────────────────────────────────────────────
 
 /// The few gtk-layer-shell calls we need, straight from the C library.

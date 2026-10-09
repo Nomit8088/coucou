@@ -163,6 +163,34 @@ body {
   width: 0;
 }
 
+/* The compact island's −: hides it until the next notification. The island is
+   only 32 pt tall, so the button is small and sits at its right end, past the
+   mini grid. */
+#dismiss {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #8e939c;
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  line-height: 1;
+  cursor: default;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease-in-out, color 0.15s ease-in-out,
+    background-color 0.15s ease-in-out;
+}
+
+#dismiss:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #f5f6f8;
+}
+
 /* Compact 2×2 mini grid, to the right of the notch. */
 #mini-grid {
   position: absolute;
@@ -413,12 +441,49 @@ body {
   padding-top: 10px;
 }
 
+/* The DSH session's card: ticker, then the steering input. Laid out as a column
+   so the input keeps its own height and the ticker gives up the rest — the card
+   used to clip the input whenever the chips pushed the row over. */
+.card-body.steer-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* No floor on the ticker here: whatever the chip row needs, the ticker gives
+   it up. A minimum height would push the steering input back under the edge,
+   which is the very thing this layout exists to prevent. */
+.card-body.steer-card .ticker {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.card-body.steer-card .steer-bar {
+  flex: 0 0 auto;
+}
+
 .who {
   padding: 0 36px 0 108px;
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+/* A steerable session's chips (context, jobs, reminders, permission preset,
+   step count) on a row of their own, across the whole card. In the name row
+   they only had the 178 px left past Mochi, and wrapping there turned them
+   into four lines — which pushed the steering input under the card's edge. */
+.chips {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  /* Aligned with the name row's text column, not the card's left edge: Mochi
+     is drawn down that side, so chips starting at 12 px sat under his hat with
+     a band of empty card to their right. */
+  margin: 4px 12px 0 108px;
 }
 
 .who .name {
@@ -435,7 +500,8 @@ body {
   white-space: nowrap;
 }
 
-.who .count {
+.who .count,
+.chips .count {
   font: 400 11px var(--font);
   color: var(--dim-3);
   margin-left: auto;
@@ -443,7 +509,8 @@ body {
 }
 
 /* DSH's context pressure on the session card: its own colour is set inline. */
-.who .ctx-pill {
+.who .ctx-pill,
+.chips .ctx-pill {
   font: 500 10.5px var(--font);
   padding: 1px 6px;
   border-radius: 7px;

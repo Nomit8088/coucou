@@ -7,7 +7,7 @@ import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
-  QUESTION_PICKER_H,
+  DSH_SESSION_H, QUESTION_PICKER_H, isSteerable,
   type BotEmoteName, type IslandMode, type IslandViewName,
 } from "../core/layout";
 import { Sound } from "../core/sound";
@@ -23,6 +23,7 @@ import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
+import { tl } from "../i18n/i18n";
 import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
@@ -58,6 +59,7 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private countdown!: HTMLElement;
+  private dismissBtn!: HTMLElement;
   private wakeStrip!: HTMLElement;
 
   private header!: ViewHost;
@@ -87,6 +89,8 @@ export class Island {
   private wasInIsland = false;
   /** Last shape handed to Rust for the click-through test. */
   private pushedRect = { x: -1, y: -1, w: -1, h: -1 };
+  /** Whether Rust is watching for clicks that miss the island. */
+  private outsideWatchArmed = false;
 
   // Bot hover → love (IslandWindowController.botHoverIn)
   private botHovering = false;
@@ -255,6 +259,20 @@ export class Island {
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.countdown = h("div", { id: "countdown" });
+    // The compact island's −: off the screen until something happens. Only the
+    // compact island has it — an open island is closed by clicking outside it.
+    this.dismissBtn = h(
+      "button",
+      { id: "dismiss", title: tl("Hide until the next notification") },
+      // A glyph, not a word: the same mark in every language.
+      h("span", { text: "−" }),
+    );
+    this.dismissBtn.addEventListener("click", () => this.dismiss());
+    // The island itself opens on a click: the − must not get there.
+    this.dismissBtn.addEventListener("mousedown", (e) => {
+      e.stopPropagation();
+      Sound.resume();
+    });
 
     this.header = buildHeader(actions);
     this.views = buildViews(actions, () => this.animateGeometry(false));
@@ -307,6 +325,7 @@ export class Island {
       this.botGlow,
       this.botCanvas,
       this.miniGrid,
+      this.dismissBtn,
       this.countdown,
     );
 
@@ -383,6 +402,13 @@ export class Island {
     }
     this.updateWindowCollapsed();
     this.animateGeometry(modeOrder(mode) < modeOrder(prev));
+    // Clicks that miss the island only matter while it is open: Rust looks for
+    // them only then, so a shut island still costs nothing.
+    const watchOutside = mode === "expanded";
+    if (watchOutside !== this.outsideWatchArmed) {
+      this.outsideWatchArmed = watchOutside;
+      void Bridge.setOutsideClickWatch(watchOutside);
+    }
     State.notify();
   }
 
@@ -435,6 +461,28 @@ export class Island {
     // back left it thinking the island was still open, and a click on the compact
     // island then did nothing — the island could never be reopened.
     this.fsm.forcePetit();
+  }
+
+  /**
+   * The compact island's −: the island leaves the screen and stays away until
+   * something happens — an agent starting work, an alert, the tray's Open, a
+   * shortcut. Hovering the top of the screen does not bring it back.
+   */
+  dismiss() {
+    if (State.mode !== "compact") return;
+    Sound.play("close");
+    this.fsm.dismiss();
+  }
+
+  /**
+   * A click that landed nowhere near the island while it was open: fold it back
+   * to the compact island, as clicking outside a card does on the Mac. A
+   * waiting card is only ever folded, never answered — Escape and the card's
+   * own buttons keep that job.
+   */
+  clickedOutside() {
+    if (State.mode !== "expanded") return;
+    this.collapse();
   }
 
   /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
@@ -663,8 +711,23 @@ export class Island {
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
     }
+    // A DSH session in front shows its steering input and its wrapped chips:
+    // at the usual height the input was cut off by the card.
+    if (State.mode === "expanded" && this.dshSessionCard()) {
+      h = DSH_SESSION_H;
+    }
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
     return { w, h, r };
+  }
+
+  /**
+   * The overview is showing a live DSH session's own card: the ticker with the
+   * steering input under it. Only that card needs the extra height.
+   */
+  private dshSessionCard(): boolean {
+    if (State.view !== "overview") return false;
+    const task = State.focusTask;
+    return !!task && isSteerable(task);
   }
 
   private animateGeometry(shrinking: boolean) {
@@ -693,6 +756,10 @@ export class Island {
     // the state-driven DOM sync.
     this.miniGrid.style.left = `${w - 40 - 14.5}px`;
     this.miniGrid.style.top = `${hh / 2 - 14.5}px`;
+    // The − takes the 25 pt left at the island's right end, past the mini grid,
+    // which keeps the place it had before there was a button here.
+    this.dismissBtn.style.left = `${w - 20}px`;
+    this.dismissBtn.style.top = `${hh / 2 - 8}px`;
     this.greetingCanvas.style.left = `${(w - EXPANDED_W) / 2}px`;
     this.uploadCanvas.el.style.left = `${(w - EXPANDED_W) / 2}px`;
 
@@ -741,6 +808,21 @@ export class Island {
     this.wakeStrip.addEventListener("mouseenter", () => {
       Sound.resume();
       if (State.mode === "hidden") this.fsm.mouseEntered();
+    });
+
+    // A press the page sees that lands on none of the island's own controls is
+    // a click beside the island. The window is click-through outside the island,
+    // so this is the fallback for where the OS does hand such a press over
+    // (plain `npm run dev`, and a desktop that delivers it anyway): the cursor
+    // poll watching for it (Rust, Windows) is the real thing.
+    this.root.addEventListener("mousedown", (e) => {
+      if (State.mode !== "expanded") return;
+      // A file being dragged or Mochi being carried keeps the island open: the
+      // whole panel takes the mouse then, and that is never a click beside it.
+      if (State.fileDragOver || UploadSeq.isActive || this.desktop.carrying) return;
+      const on = e.target as Element | null;
+      if (on?.closest("#island, #wake-strip")) return;
+      this.clickedOutside();
     });
 
     this.islandEl.addEventListener("mousedown", (e) => {
@@ -1190,6 +1272,10 @@ export class Island {
     // Compact mini grid
     const showGrid = State.mode === "compact";
     this.miniGrid.style.opacity = showGrid ? "1" : "0";
+    // The − rides with the compact island; the island takes the mouse only over
+    // its own shape, so the button is given a rect of its own to be hit in.
+    this.dismissBtn.style.opacity = showGrid ? "1" : "0";
+    this.dismissBtn.style.pointerEvents = showGrid ? "auto" : "none";
     if (showGrid) {
       const others = State.otherTasks.slice(0, 4);
       const key = others.map((t) => t.id).join("|");

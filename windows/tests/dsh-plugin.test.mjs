@@ -161,13 +161,64 @@ test("a user prompt becomes UserPromptSubmit carrying the text", async () => {
   fire(listeners, "agent/created", { agent: agent("s1") });
   fire(listeners, "agent/pre-step", {
     agent: agent("s1"),
-    messages: [{ content: [{ type: "text", text: "Fix the relay" }] }],
+    // A real prompt, as DSH stores one: a user-role message whose source says a
+    // human sent it. `source.kind` is what tells it apart from injected context.
+    messages: [{ role: "user", source: { kind: "user" }, content: [{ type: "text", text: "Fix the relay" }] }],
   }, () => Promise.resolve());
   await waitFor(2, "UserPromptSubmit");
 
   const ev = written.at(-1);
   assert.equal(ev.hook_event_name, "UserPromptSubmit");
   assert.equal(ev.prompt, "Fix the relay");
+});
+
+// The island reads UserPromptSubmit as "the turn that asked is over" and drops a
+// waiting permission or question card. DSH puts its own injected context in the
+// same user-role batch, so reporting those as prompts cancelled cards that were
+// still on screen — the request then fell back to DSH's own UI and the session
+// looked stuck.
+test("DSH's own injected context is not reported as a user prompt", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "agent/pre-step", {
+    agent: agent("s1"),
+    messages: [
+      {
+        role: "user",
+        source: { kind: "tool-jobs", form: "notice", summary: "job finished" },
+        content: [{ type: "text", text: "background job pwsh-5 (pwsh) finished" }],
+      },
+      {
+        role: "user",
+        source: { kind: "user-approval" },
+        content: [{ type: "text", text: "The approval policy changed" }],
+      },
+    ],
+  }, () => Promise.resolve());
+
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  assert.equal(
+    written.some((e) => e.hook_event_name === "UserPromptSubmit"),
+    false,
+    `injected context became a prompt: ${JSON.stringify(written)}`,
+  );
+});
+
+test("a step carrying both a real prompt and a notice reports only the prompt", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "agent/pre-step", {
+    agent: agent("s1"),
+    messages: [
+      { role: "user", source: { kind: "tool-jobs", form: "notice" }, content: [{ type: "text", text: "job done" }] },
+      { role: "user", source: { kind: "user" }, content: [{ type: "text", text: "Now do the other thing" }] },
+    ],
+  }, () => Promise.resolve());
+  await waitFor(2, "UserPromptSubmit");
+
+  const prompts = written.filter((e) => e.hook_event_name === "UserPromptSubmit");
+  assert.equal(prompts.length, 1);
+  assert.equal(prompts[0].prompt, "Now do the other thing");
 });
 
 test("a tool call is display-only: the plugin never decides anything", async () => {

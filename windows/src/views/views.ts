@@ -6,7 +6,7 @@ import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { Ticker } from "./ticker";
 import { State, type AgentTask } from "../core/state";
-import { washRGBA, type IslandViewName, type Wash } from "../core/layout";
+import { isSteerable, washRGBA, type IslandViewName, type Wash } from "../core/layout";
 import { createMiniBot, pruneMiniBots } from "../mochi/minibots";
 import { buildPrompt } from "./chat";
 import { buildChoose, buildUpload, buildUploading } from "./upload";
@@ -235,7 +235,12 @@ function buildOverview(actions: ViewActions): ViewHost {
     }
     e.stopPropagation();
   });
-  const tickerBody = h("div", { class: "card-body" }, who, ticker.el, steerBar);
+  // A steerable session's chips get a row of their own, across the whole card.
+  // Inside the name row they only have the 178 px left past Mochi, and wrapping
+  // there turned four small chips into four lines — which pushed the steering
+  // input under the card's edge.
+  const chips = h("div", { class: "chips" });
+  const tickerBody = h("div", { class: "card-body" }, who, chips, ticker.el, steerBar);
   const leftBody = h("div", { class: "left-body" });
   const jump = h(
     "button",
@@ -396,17 +401,27 @@ function buildOverview(actions: ViewActions): ViewHost {
         }
         // Only a live DSH session can be steered; every other session shows
         // its ticker alone.
-        steerBar.style.display = task.id === "agent_dsh" && task.sessionId ? "" : "none";
+        const steerable = isSteerable(task);
+        steerBar.style.display = steerable ? "" : "none";
+        // Its card is the one that carries the input and the chips row.
+        tickerBody.classList.toggle("steer-card", steerable);
+        chips.style.display = steerable ? "" : "none";
         // Stop only makes sense while the driver is actually running.
         steerStop.style.display = task.state === "working" || task.state === "thinking" ? "" : "none";
+        // Every other session keeps its chips in the name row, exactly as before.
+        const chipHost = steerable ? chips : who;
         clear(who);
+        clear(chips);
         // The agent's name is already the pill's: the label says what kind of
         // pill it is, as on the Mac (PillDefinition.sessionSubtitle).
-        who.append(
-          dot(task.color, 7),
-          h("span", { class: "name", text: task.name }),
-          h("span", { class: "tool", text: t(sessionSubtitle(task.id)) }),
-        );
+        // The subtitle says what kind of pill this is, which the name already
+        // says when the two match (DSH's own session): showing it twice only
+        // squeezed the name down to an ellipsis.
+        const subtitle = t(sessionSubtitle(task.id));
+        who.append(dot(task.color, 7), h("span", { class: "name", text: task.name }));
+        if (subtitle && subtitle !== task.name) {
+          who.append(h("span", { class: "tool", text: subtitle }));
+        }
         // DSH's own context pressure, when its token meter reported one. The
         // percentage is only meaningful against a window: without one the raw
         // count is shown, never a made-up ratio.
@@ -422,7 +437,7 @@ function buildOverview(actions: ViewActions): ViewHost {
             text: `${t("Context")} ${text}`,
           });
           pill.style.color = planColor(usage.window > 0 ? Math.min(100, pct) : null);
-          who.append(pill);
+          chipHost.append(pill);
         }
         // DSH's background jobs: how many are live, and the producer's own
         // line for the most recent one. Never a job's output.
@@ -434,12 +449,12 @@ function buildOverview(actions: ViewActions): ViewHost {
             text: `${t("Jobs")} ${jobs.running}/${jobs.total}`,
           });
           pill.style.color = jobs.running > 0 ? "#3B9EFF" : "#6B7079";
-          who.append(pill);
+          chipHost.append(pill);
         }
         // Scheduled reminders are host-wide, so they are shown once, on the
         // DSH pill only, and only when some exist.
         if (task.id === "agent_dsh" && State.scheduleInfo.active > 0) {
-          who.append(h("span", {
+          chipHost.append(h("span", {
             class: "ctx-pill",
             title: State.scheduleInfo.next || t("Reminders"),
             text: `${t("Reminders")} ${State.scheduleInfo.active}`,
@@ -461,8 +476,11 @@ function buildOverview(actions: ViewActions): ViewHost {
               void Bridge.dshSetPreset(nextPreset);
             },
           });
-          who.append(pill);
+          chipHost.append(pill);
         }
+        // The step count stays on the name row, right-aligned: it is a session
+        // fact, not one of the chips, and the name row has the space for it.
+        // In the chips row it wrapped a line of its own and cost the ticker one.
         if (task.steps.length > 1) {
           who.append(h("span", {
             class: "count",

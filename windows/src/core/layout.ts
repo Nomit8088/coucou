@@ -102,6 +102,22 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
 /** The question view with options to pick from: room for two rows of them. */
 export const QUESTION_PICKER_H = 200;
 
+/**
+ * The overview while a DSH session is the one in front: its card carries the
+ * steering input under the ticker, and a row of its own chips (context, jobs,
+ * reminders, permission preset) that wraps to a second line. The usual 160
+ * clipped both.
+ */
+export const DSH_SESSION_H = 200;
+
+/** The DSH pill's id — the only session the island can steer. */
+export const DSH_PILL_ID = "agent_dsh";
+
+/** True when this task is a live DSH session the island can steer. */
+export function isSteerable(task: { id: string; sessionId?: string | null } | null): boolean {
+  return !!task && task.id === DSH_PILL_ID && !!task.sessionId;
+}
+
 /** Chat view grows with the conversation — IslandContainer.chatPromptHeight. */
 export function chatPromptHeight(messageCount: number): number {
   return Math.min(300, 240 + messageCount * 40);

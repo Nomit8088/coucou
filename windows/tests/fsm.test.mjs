@@ -308,6 +308,123 @@ test("an unusable delay is ignored", () => {
   assert.equal(fsm.homeToPetitDelay, 15);
 });
 
+// ── The compact island's − (dismiss) ─────────────────────────────────────────
+//
+// The island leaves the screen and stays away until something happens: an agent
+// starting work, an alert, the tray's Open or a shortcut. Hovering the top of
+// the screen is not "something happening" — the pointer crosses it all day.
+
+test("the − takes the island off the screen", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  assert.equal(fsm.state, "hidden");
+  assert.equal(fsm.dismissed, true);
+});
+
+test("a dismissed island ignores the pointer passing the top of the screen", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  for (const _ of [0, 1, 2]) {
+    fsm.mouseEntered();
+    seconds(600);
+    assert.equal(fsm.state, "hidden");
+  }
+});
+
+test("open on hover does not defeat a dismissed island either", () => {
+  fsm.openOnHover = true;
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.mouseEntered();
+  assert.equal(fsm.state, "hidden");
+  assert.equal(fsm.openedByHover, false);
+});
+
+test("an alert brings a dismissed island back", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.forceHome();
+  assert.equal(fsm.state, "home");
+  assert.equal(fsm.dismissed, false);
+  // Back to normal: the pointer wakes it again.
+  fsm.mouseLeft();
+  seconds(15);
+  assert.equal(fsm.state, "petit");
+});
+
+test("an agent starting work brings a dismissed island back", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.reveal();
+  assert.equal(fsm.state, "petit");
+  assert.equal(fsm.dismissed, false);
+  seconds(60);
+  assert.equal(fsm.state, "hidden");
+});
+
+test("the launch greeting brings a dismissed island back", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.launch();
+  assert.equal(fsm.state, "coucou");
+  assert.equal(fsm.dismissed, false);
+});
+
+test("an explicit close lifts the dismissal, as any ordinary island", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.forcePetit();
+  assert.equal(fsm.state, "petit");
+  assert.equal(fsm.dismissed, false);
+});
+
+test("Pause lifts the dismissal too: hiding and dismissing are not the same", () => {
+  fsm.mouseEntered();
+  fsm.dismiss();
+  fsm.forceHidden();
+  assert.equal(fsm.dismissed, false);
+});
+
+// ── A click that missed the island ───────────────────────────────────────────
+
+test("a click outside the open island folds it", () => {
+  fsm.forceHome();
+  fsm.clickedOutside();
+  assert.equal(fsm.state, "petit");
+  assert.deepEqual(transitions, ["hidden>home", "home>petit"]);
+});
+
+test("a click outside folds a waiting card too, without answering it", () => {
+  fsm.forceHome();
+  fsm.pinned = true;
+  fsm.clickedOutside();
+  // Folded, not answered: the card is still waiting (Island.foldApproval).
+  assert.equal(fsm.state, "petit");
+  assert.equal(fsm.pinned, true);
+  // And it stays on screen until it is answered.
+  fsm.mouseLeft();
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+});
+
+test("a click outside does nothing when the island is not open", () => {
+  fsm.forcePetit();
+  fsm.clickedOutside();
+  assert.equal(fsm.state, "petit");
+  fsm.forceHidden();
+  fsm.clickedOutside();
+  assert.equal(fsm.state, "hidden");
+});
+
+test("folding on a click outside cancels the countdown that was running", () => {
+  fsm.forceHome();
+  fsm.mouseLeft();
+  seconds(14);
+  fsm.clickedOutside();
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+});
+
 // ── Open on hover (IslandHoverTests.swift) ────────────────────────────────────
 
 test("open on hover off: hovering only peeks", () => {

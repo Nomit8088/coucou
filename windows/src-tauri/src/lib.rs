@@ -164,6 +164,17 @@ fn set_island_rect(app: AppHandle, shared: State<Shared>, x: f64, y: f64, width:
     }
 }
 
+/// Folds the open island when the user clicks elsewhere: the cursor poll looks
+/// for those clicks only while this is on (and never while the island is shut).
+#[tauri::command]
+fn set_outside_click_watch(app: AppHandle, shared: State<Shared>, active: bool) {
+    shared.gate.outside.armed.store(active, std::sync::atomic::Ordering::Relaxed);
+    shared.gate.outside.down_outside.store(false, std::sync::atomic::Ordering::Relaxed);
+    if let Some(win) = island::window(&app) {
+        platform::set_outside_click_watch(&win, active);
+    }
+}
+
 #[tauri::command]
 fn focus_window(app: AppHandle, focused: bool) {
     let Some(win) = island::window(&app) else { return };
@@ -757,6 +768,7 @@ pub fn run() {
             set_system_languages,
             set_collapsed,
             set_island_rect,
+            set_outside_click_watch,
             focus_window,
             reposition,
             list_monitors,

@@ -53,6 +53,21 @@ pub struct IslandRect {
     pub h: f64,
 }
 
+/// What the poll needs to notice a click that missed the island.
+#[derive(Default)]
+pub struct OutsideWatch {
+    /// The island is expanded: a click elsewhere folds it (see the poll).
+    pub armed: AtomicBool,
+    /// The press now down began outside the island.
+    pub down_outside: AtomicBool,
+}
+
+impl OutsideWatch {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Wakes / parks the cursor poll thread so a hidden island costs literally nothing.
 pub struct PollGate {
     active: Mutex<bool>,
@@ -61,6 +76,8 @@ pub struct PollGate {
     pub rect: Mutex<IslandRect>,
     /// Mirrors the window flag so we only call into the OS when it changes.
     ignoring: AtomicBool,
+    /// Clicks that miss the island, found on the poll's own tick.
+    pub outside: OutsideWatch,
 }
 
 impl PollGate {
@@ -71,6 +88,7 @@ impl PollGate {
             collapsed: AtomicBool::new(true),
             rect: Mutex::new(IslandRect::default()),
             ignoring: AtomicBool::new(false),
+            outside: OutsideWatch::new(),
         }
     }
 
@@ -388,7 +406,12 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
                     Err(_) => (PANEL_W, PANEL_H),
                 };
-                if (x - last.0).abs() < 1.0 && (y - last.1).abs() < 1.0 {
+                // Read the button before deciding to skip: a click that does not
+                // move the cursor must still be seen, or an island that is open
+                // would never learn that the user clicked beside it.
+                let down = left_button_down();
+                let moved = (x - last.0).abs() >= 1.0 || (y - last.1).abs() >= 1.0;
+                if !moved && down == was_down {
                     continue;
                 }
                 last = (x, y);
@@ -412,18 +435,37 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // the mouse, which also makes the drop zone as forgiving as the Mac's.
                 // A press may be the start of a drag: make sure the drop target is
                 // ours before the file arrives.
-                let down = left_button_down();
                 if down && !was_down {
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
                 }
-                was_down = down;
 
                 let dragging = down
                     && x >= 0.0
                     && x <= size.0
                     && y >= 0.0
                     && y <= size.1;
+
+                // A click that missed the island while it was open folds it, as
+                // clicking outside a card does on the Mac. The poll already reads
+                // the button and the cursor, so no second watcher is needed. Only
+                // the button-up is reported, and only when the press began off
+                // the island and ended there too: a press that starts on the
+                // island is its own (a card, a drag of Mochi out to the desktop),
+                // and one that ends on it is a file dropped onto it.
+                let watch = &gate.outside;
+                if watch.armed.load(Ordering::Relaxed) {
+                    if down && !was_down {
+                        watch.down_outside.store(!on_island, Ordering::Relaxed);
+                    } else if !down
+                        && was_down
+                        && !on_island
+                        && watch.down_outside.swap(false, Ordering::Relaxed)
+                    {
+                        let _ = win.emit("outside-click", ());
+                    }
+                }
+                was_down = down;
 
                 let accept = on_island || dragging;
                 if gate.ignoring.load(Ordering::Relaxed) == accept {

@@ -275,6 +275,10 @@ pub fn left_button_down() -> bool {
     unsafe { (GetAsyncKeyState(VK_LBUTTON.0 as i32) as u16 & 0x8000) != 0 }
 }
 
+/// Clicks that miss the island are found by the cursor poll, which already
+/// reads the button and the cursor on every tick (see island.rs).
+pub fn set_outside_click_watch(_win: &WebviewWindow, _active: bool) {}
+
 // ── Island window ─────────────────────────────────────────────────────────────
 
 fn hwnd_of(win: &WebviewWindow) -> Option<HWND> {

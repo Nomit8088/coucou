@@ -52,6 +52,8 @@ You can also [build it yourself](#build-it-yourself).
 |---|---|
 | Move the mouse to the very top-centre of the screen | Mochi peeks out |
 | Click the small island | It opens. With **Settings → General → Open on hover**, resting the pointer on it is enough, and it folds again shortly after the pointer leaves (click inside to keep it open) |
+| Click beside the open island | It folds back to the small island, as clicking outside a card does on the Mac |
+| Click the **−** on the small island | It leaves the screen until something happens again — an agent starting work, a waiting permission or question, the tray's **Open Coucou**, or a shortcut. Hovering the top of the screen does not bring it back |
 | Click Mochi | It gets annoyed. Three times in a row and it goes dizzy |
 | Rest the pointer on Mochi for two seconds | Hearts |
 | Right-click Mochi | The wardrobe: rest the pointer on an outfit to try it on, click to keep it. **Auto** dresses him for the season (witch hat in October, Santa hat in December…) |

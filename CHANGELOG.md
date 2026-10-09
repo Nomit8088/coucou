@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **Windows: an answer given in the island now reaches the agent.** The relay wrote its decision and closed the pipe at once, and Windows throws away whatever the other end has not read yet — so Allow, Deny and a chosen option looked accepted in the island while Claude Code, Codex or DSH went on waiting and asked again in its own terminal. The relay now waits for the reader to take the decision before it disconnects
+- **DSH: a permission request or a question no longer vanishes from the island.** DeepSeek Harness puts its own injected context (a background job finishing, a changed approval policy) into the same user-role batch as a real prompt, and the plugin reported those as `UserPromptSubmit`. The island reads that event as "the turn that asked is over", so it dropped a card that was still on screen and handed the request back to DSH's own UI — the session then waited on an answer nothing would send. Only a prompt a human actually sent is reported now
+- **The DSH session card is no longer cut off**: the island grows while a DSH session is in front, and its chips (context, jobs, reminders, permission preset) get a row of their own, aligned with the name so they sit in the space beside Mochi instead of under his hat or clipped at the card's right edge. The ticker gives up whatever height they need, so the steering input under it is always fully visible. A pill whose subtitle repeats its name (DSH's own) no longer shows it twice, which was squeezing the name into an ellipsis
+- **DSH: a question the asker gave no id to is now answered**, by its text. The island keys an answer by a question's id or its text, and the plugin only read it back by id, so such a question was silently unanswered — the island said it was answered while DSH went on waiting
+- **GitLab: the pipeline row is yours, and only yours.** It used to show the default branch of whichever project was touched last, whoever ran it — so a colleague's pipeline could appear as if it were yours, and its runs set the polling pace. It now lists the pipelines you triggered (GitLab's own `/pipelines`), across every project you can see
+- **Clicking outside the open island folds it** back to the small one, as clicking outside a card does on the Mac
+- **The small island gets a −**: it leaves the screen until something happens again — an agent starting work, a waiting permission or question, **Open Coucou** in the tray, or a shortcut. Hovering the top of the screen no longer brings it back on its own
+
 ## Windows and Linux 0.3.0 — October 9, 2026
 
 The first Linux release since 0.1.1, so on Linux it also brings everything in Windows and Linux 0.2.0 below.

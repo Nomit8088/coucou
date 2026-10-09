@@ -43,6 +43,12 @@ export const Bridge = {
   setCollapsed: (collapsed: boolean) => call<void>("set_collapsed", { collapsed }),
 
   /**
+   * Looks for clicks that miss the island while it is open (Rust, Windows).
+   * Armed only then, so a shut island costs nothing.
+   */
+  setOutsideClickWatch: (active: boolean) => call<void>("set_outside_click_watch", { active }),
+
+  /**
    * Pushes the island shape in window coordinates. Rust flips click-through from
    * its own cursor poll, so the flag is never a frame behind a click.
    */

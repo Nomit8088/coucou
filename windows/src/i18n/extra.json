@@ -804,6 +804,17 @@
    "ru": "Удерживайте вместе с ней Ctrl, Alt или клавишу Windows.",
    "id": "Tahan Ctrl, Alt, atau tombol Windows bersamaan."
   },
+  "Hide until the next notification": {
+   "zh-Hans": "下次通知前隐藏",
+   "hi": "अगली सूचना तक छिपाएँ",
+   "es": "Ocultar hasta la próxima notificación",
+   "ar": "إخفاء حتى الإشعار التالي",
+   "fr": "Masquer jusqu'à la prochaine notification",
+   "bn": "পরবর্তী বিজ্ঞপ্তি পর্যন্ত লুকান",
+   "pt-BR": "Ocultar até a próxima notificação",
+   "ru": "Скрыть до следующего уведомления",
+   "id": "Sembunyikan sampai notifikasi berikutnya"
+  },
   "Images": {
    "zh-Hans": "图片",
    "hi": "छवियाँ",
@@ -2945,16 +2956,16 @@
    "ru": "Мои MR",
    "id": "MR saya"
   },
-  "Pipeline": {
-   "zh-Hans": "流水线",
-   "hi": "पाइपलाइन",
-   "es": "Pipeline",
-   "ar": "خط الأنابيب",
-   "fr": "Pipeline",
-   "bn": "পাইপলাইন",
-   "pt-BR": "Pipeline",
-   "ru": "Pipeline",
-   "id": "Pipeline"
+  "My pipeline": {
+   "zh-Hans": "我的流水线",
+   "hi": "मेरी पाइपलाइन",
+   "es": "Mi pipeline",
+   "ar": "خط الأنابيب الخاص بي",
+   "fr": "Mon pipeline",
+   "bn": "আমার পাইপলাইন",
+   "pt-BR": "Meu pipeline",
+   "ru": "Мой пайплайн",
+   "id": "Pipeline saya"
   },
   "Unknown chat provider.": {
    "zh-Hans": "未知的聊天提供商。",

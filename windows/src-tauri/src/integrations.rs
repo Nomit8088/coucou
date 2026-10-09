@@ -1052,6 +1052,45 @@ async fn gitlab_get(base: &reqwest::Url, token: &str, path: &str) -> Option<Valu
     response.json().await.ok()
 }
 
+fn gitlab_pipelines(base: &reqwest::Url, list: Option<&Value>) -> (Vec<Value>, bool) {
+    let mut out = Vec::new();
+    let mut running = false;
+    for row in list.and_then(Value::as_array).into_iter().flatten().take(3) {
+        let status = row.get("status").and_then(Value::as_str).unwrap_or("");
+        if status == "running" || status == "pending" {
+            running = true;
+        }
+        let pid = row.get("id").and_then(Value::as_i64).unwrap_or(0);
+        let name = row
+            .get("project")
+            .and_then(|p| p.get("path_with_namespace"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        // /pipelines answers refs the way git spells them ("refs/heads/main");
+        // the card wants the branch.
+        let git_ref = row.get("ref").and_then(Value::as_str).unwrap_or("");
+        let branch = git_ref
+            .strip_prefix("refs/heads/")
+            .or_else(|| git_ref.strip_prefix("refs/tags/"))
+            .unwrap_or(git_ref);
+        // /pipelines carries the project's own web_url, so this fallback is only
+        // ever reached for a row without one.
+        let fallback = if name.is_empty() {
+            format!("/-/pipelines/{pid}")
+        } else {
+            format!("/{name}/-/pipelines/{pid}")
+        };
+        out.push(json!({
+            "id": pid,
+            "status": status,
+            "ref": branch,
+            "project": name,
+            "url": gitlab_link(base, row.get("web_url").and_then(Value::as_str), &fallback),
+        }));
+    }
+    (out, running)
+}
+
 fn gitlab_mrs(base: &reqwest::Url, list: Option<&Value>) -> Vec<Value> {
     list.and_then(Value::as_array)
         .map(|items| {
@@ -1093,35 +1132,12 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
     if review.is_none() {
         review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
     }
-    let projects = gitlab_get(&base, &token, "/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&sort=desc&per_page=5").await;
-    let mut pipelines = Vec::new();
-    let mut running = false;
-    if let Some(list) = projects.as_ref().and_then(Value::as_array) {
-        if let Some(project) = list.first() {
-            let id = project.get("id").and_then(Value::as_i64).unwrap_or(0);
-            let branch = project.get("default_branch").and_then(Value::as_str).unwrap_or("main");
-            let name = project.get("path_with_namespace").and_then(Value::as_str).unwrap_or("");
-            if id > 0 {
-                let path = format!("/api/v4/projects/{id}/pipelines?ref={branch}&per_page=3");
-                if let Some(rows) = gitlab_get(&base, &token, &path).await.and_then(|v| v.as_array().cloned()) {
-                    for row in rows.into_iter().take(3) {
-                        let status = row.get("status").and_then(Value::as_str).unwrap_or("");
-                        if status == "running" || status == "pending" {
-                            running = true;
-                        }
-                        let pid = row.get("id").and_then(Value::as_i64).unwrap_or(0);
-                        pipelines.push(json!({
-                            "id": pid,
-                            "status": status,
-                            "ref": row.get("ref").and_then(Value::as_str).unwrap_or(branch),
-                            "project": name,
-                            "url": gitlab_link(&base, row.get("web_url").and_then(Value::as_str), &format!("/{name}/-/pipelines/{pid}")),
-                        }));
-                    }
-                }
-            }
-        }
-    }
+    // The pipelines I triggered, across every project I can see — GitLab's
+    // /pipelines is defined as "pipelines triggered by the authenticated user",
+    // so a colleague pushing to main never shows up here. (It used to be "the
+    // default branch of whichever project was touched last", whoever ran it.)
+    let mine_pipelines = gitlab_get(&base, &token, "/api/v4/pipelines?per_page=3").await;
+    let (pipelines, running) = gitlab_pipelines(&base, mine_pipelines.as_ref());
     {
         let mut cache = GITLAB.lock().unwrap();
         cache.fetched_at = now;
@@ -1167,5 +1183,65 @@ mod tests {
         assert_eq!(data["totalRepos"], json!(12));
         assert_eq!(data["activity"], json!({ "total": 5, "weeks": [], "fetchedAt": 9 }));
         assert!(data.get("pulse").is_none());
+    }
+
+    fn gitlab_test_base() -> reqwest::Url {
+        reqwest::Url::parse("https://gitlab.example.com").unwrap()
+    }
+
+    #[test]
+    fn a_gitlab_pipeline_row_keeps_its_project_and_its_branch() {
+        let base = gitlab_test_base();
+        let list = json!([{
+            "id": 47,
+            "status": "success",
+            "ref": "refs/heads/main",
+            "web_url": "https://gitlab.example.com/foo/bar/-/pipelines/47",
+            "project": { "path_with_namespace": "foo/bar" },
+        }]);
+        let (rows, running) = gitlab_pipelines(&base, Some(&list));
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0]["id"], json!(47));
+        assert_eq!(rows[0]["project"], json!("foo/bar"));
+        // The card shows a branch, not the way git spells one.
+        assert_eq!(rows[0]["ref"], json!("main"));
+        assert_eq!(rows[0]["url"], json!("https://gitlab.example.com/foo/bar/-/pipelines/47"));
+        assert!(!running);
+    }
+
+    #[test]
+    fn a_running_or_pending_gitlab_pipeline_keeps_the_poll_short() {
+        let base = gitlab_test_base();
+        for status in ["running", "pending"] {
+            let list = json!([{ "id": 1, "status": status, "ref": "main" }]);
+            assert!(gitlab_pipelines(&base, Some(&list)).1, "{status}");
+        }
+        for status in ["success", "failed", "canceled", "skipped"] {
+            let list = json!([{ "id": 1, "status": status, "ref": "main" }]);
+            assert!(!gitlab_pipelines(&base, Some(&list)).1, "{status}");
+        }
+    }
+
+    #[test]
+    fn gitlab_pipelines_never_show_more_than_three() {
+        let base = gitlab_test_base();
+        let list = json!((1..=9).map(|i| json!({ "id": i, "status": "success", "ref": "main" })).collect::<Vec<_>>());
+        assert_eq!(gitlab_pipelines(&base, Some(&list)).0.len(), 3);
+        assert_eq!(gitlab_pipelines(&base, None).0.len(), 0);
+    }
+
+    #[test]
+    fn a_gitlab_pipeline_url_stays_on_the_configured_host() {
+        let base = gitlab_test_base();
+        // A web_url from another host is never a link the user asked for.
+        let list = json!([{
+            "id": 5,
+            "status": "failed",
+            "ref": "main",
+            "web_url": "https://evil.example.org/foo/bar/-/pipelines/5",
+            "project": { "path_with_namespace": "foo/bar" },
+        }]);
+        let rows = gitlab_pipelines(&base, Some(&list)).0;
+        assert_eq!(rows[0]["url"], json!("https://gitlab.example.com/foo/bar/-/pipelines/5"));
     }
 }

@@ -153,6 +153,10 @@ pub fn start(app: AppHandle) {
 
 /// One accepted relay connection, whatever carries it.
 trait Relay: AsyncRead + AsyncWrite + Unpin {
+    /// Waits until the client has read everything we wrote. Windows needs it
+    /// before `finish`, where closing the pipe would throw the bytes away —
+    /// see the Windows implementation.
+    fn drain(&self) {}
     /// Ends the conversation once everything has been written.
     fn finish(&mut self) {}
     /// The relay process on the other end, where the OS says.
@@ -163,6 +167,17 @@ trait Relay: AsyncRead + AsyncWrite + Unpin {
 
 #[cfg(windows)]
 impl Relay for NamedPipeServer {
+    /// DisconnectNamedPipe throws away whatever the client has not read yet, and
+    /// tokio's `AsyncWrite::flush` is a no-op on a pipe, so without this the
+    /// decision we just wrote never reaches the relay. FlushFileBuffers returns
+    /// once the client has taken it; a client that is already gone errors
+    /// instead, which is the one case with nothing left to wait for.
+    fn drain(&self) {
+        use std::os::windows::io::AsRawHandle;
+        use windows::Win32::Foundation::HANDLE;
+        use windows::Win32::Storage::FileSystem::FlushFileBuffers;
+        let _ = unsafe { FlushFileBuffers(HANDLE(self.as_raw_handle())) };
+    }
     fn finish(&mut self) {
         let _ = self.disconnect();
     }
@@ -246,7 +261,8 @@ async fn handle(app: AppHandle, mut pipe: impl Relay) {
     // and Claude Code asks in the terminal, exactly as if Coucou were closed.
     if let Some(d) = decision {
         let _ = pipe.write_all(format!("{d}\n").as_bytes()).await;
-        let _ = pipe.flush().await;
+        // The decision must be read before finish() closes the pipe.
+        pipe.drain();
     }
     pipe.finish();
 }

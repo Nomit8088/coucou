@@ -44,6 +44,8 @@ async function main() {
 
   await onEvent<{ x: number; y: number }>("cursor", ({ x, y }) => island.onCursor(x, y));
   await onEvent<boolean>("pointer-inside", (inside) => island.setPointerInside(inside));
+  // A click that landed outside the island folds it (Rust sees it, Windows).
+  await onEvent<null>("outside-click", () => island.clickedOutside());
 
   /** Pause has to reach Rust too, or the pollers keep calling out. */
   const setPaused = (on: boolean) => {

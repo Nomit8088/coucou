@@ -30,6 +30,12 @@ export class IslandStateMachine {
   /** An alert waiting for an answer stays open, even when the mouse leaves. */
   pinned = false;
   /**
+   * The compact island's − was clicked: the island left the screen and the
+   * pointer alone must not bring it back — only a real event does (an agent
+   * starting work, an alert, the tray's Open or a shortcut), see `dismiss()`.
+   */
+  dismissed = false;
+  /**
    * Hovering opens the island all the way instead of peeking (Settings →
    * General → Open on hover, off by default), as IslandStateMachine.openOnHover.
    */
@@ -57,11 +63,15 @@ export class IslandStateMachine {
   // ── Inputs ──────────────────────────────────────────────────────────────────
 
   launch() {
+    this.dismissed = false;
     this.cancelTimers();
     this.transition("coucou");
   }
 
   mouseEntered() {
+    // A dismissed island is not there: hovering the top of the screen does
+    // nothing until something real happens.
+    if (this.dismissed) return;
     if (this.openOnHover && (this.state === "hidden" || this.state === "petit") && !this.pinned) {
       this.cancelTimers();
       this.byHover = true;
@@ -117,6 +127,7 @@ export class IslandStateMachine {
 
   /** Non-alert work event: show compact from hidden. */
   reveal() {
+    this.dismissed = false;
     if (this.state !== "hidden") return;
     this.cancelTimers();
     this.transition("petit");
@@ -136,6 +147,7 @@ export class IslandStateMachine {
 
   /** Alert or explicit request: open straight to expanded. */
   forceHome() {
+    this.dismissed = false;
     this.byHover = false;
     this.cancelTimers();
     this.transition("home");
@@ -143,15 +155,36 @@ export class IslandStateMachine {
 
   /// Explicit close (OK button, Escape, an alert being answered).
   forcePetit() {
+    this.dismissed = false;
     this.byHover = false;
     this.cancelTimers();
     this.transition("petit");
   }
 
   forceHidden() {
+    this.dismissed = false;
     this.byHover = false;
     this.cancelTimers();
     this.transition("hidden");
+  }
+
+  /**
+   * The compact island's − was clicked: off the screen until something happens.
+   * The usual exit path (petit) is deliberately not used: a dismissed island is
+   * not merely folded, and a pointer passing the top of the screen must not
+   * bring it back.
+   */
+  dismiss() {
+    this.dismissed = true;
+    this.byHover = false;
+    this.cancelTimers();
+    this.transition("hidden");
+  }
+
+  /** A click that missed the island while it was open: fold it back to compact. */
+  clickedOutside() {
+    if (this.state !== "home") return;
+    this.forcePetit();
   }
 
   // ── Timers ──────────────────────────────────────────────────────────────────
