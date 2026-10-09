@@ -179,6 +179,8 @@ interface IntegrationDef {
   fields: { key: string; label: string; placeholder: string; secret: boolean }[];
   /** What the key needs, shown under its field. */
   hint?: string;
+  /** A music pill: the player's Windows media-session id (core/pills.ts). */
+  mediaApp?: string;
 }
 
 const INTEGRATIONS: IntegrationDef[] = [
@@ -193,6 +195,17 @@ const INTEGRATIONS: IntegrationDef[] = [
       { key: "gitlab-token", label: N_("Access token"), placeholder: "glpat-…", secret: true },
     ],
     hint: N_("Sent as PRIVATE-TOKEN. The card lists your open merge requests, reviews, and the default-branch pipeline.") },
+  { id: "integration_qqmail", name: "QQ Mail", color: "#12B7F5",
+    fields: [
+      { key: "qqmail-address", label: N_("Email address"), placeholder: "you@qq.com", secret: false },
+      { key: "qqmail-auth-code", label: N_("Authorisation code"), placeholder: "16 characters", secret: true },
+    ],
+    hint: N_("Turn on IMAP in QQ Mail's settings and paste the 16-character authorisation code it gives you. Coucou only reads your unread count and subjects — it never sends, marks or deletes anything.") },
+  // The music pills carry no key: the player is the connection.
+  { id: "integration_spotify", name: "Spotify", color: "#1DB954",
+    fields: [], mediaApp: "Spotify.exe" },
+  { id: "integration_qqmusic", name: "QQ Music", color: "#31C27C",
+    fields: [], mediaApp: "QQMusic.exe" },
 ];
 
 const MAX_ACTIVE = MAX_DECLARED;
@@ -263,11 +276,11 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
     }
 
     if (def.hint) rows.append(h("div", { class: "hint", text: t(def.hint) }));
-    if (def.id === "integration_spotify") {
-      // As on the Mac's row: said only when there is no Spotify to launch.
+    if (def.mediaApp != null) {
+      // As on the Mac's row: said only when there is no player to launch.
       const hint = h("div", { class: "hint", style: "padding-top:5px" });
       rows.append(hint);
-      void Bridge.spotifyInstalled().then((ok) => {
+      void Bridge.spotifyInstalled(def.id).then((ok) => {
         hint.textContent = ok === false ? t("Not installed") : "";
       });
     }

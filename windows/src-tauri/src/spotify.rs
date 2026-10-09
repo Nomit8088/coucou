@@ -30,6 +30,69 @@ const ARTWORK_EVENT: &str = "spotify-artwork";
 /// The biggest cover we read (Spotify's are 640 px JPEGs, ~100 KB).
 const ARTWORK_LIMIT: usize = 3 * 1024 * 1024;
 
+// ── The music pills ───────────────────────────────────────────────────────────
+//
+// One pill per player. On Linux every player reaches Coucou through MPRIS, so the
+// Spotify pill is the only one there; on Windows the media session names the
+// application, and these are the pills that follow one. Mirrors `mediaApp` in
+// windows/src/core/pills.ts.
+
+/// (pill id, the application id Windows' media session reports).
+#[cfg(any(windows, test))]
+pub const PLAYERS: &[(&str, &str)] = &[
+    ("integration_spotify", "Spotify.exe"),
+    ("integration_qqmusic", "QQMusic.exe"),
+];
+
+/// Where "Get Spotify" leads on Windows.
+#[cfg(any(windows, test))]
+pub const SPOTIFY_DOWNLOAD: &str = "https://www.spotify.com/download/windows/";
+/// Where "Get QQ Music" leads.
+#[cfg(any(windows, test))]
+pub const QQMUSIC_DOWNLOAD: &str = "https://y.qq.com/download/index.html";
+
+/// The pill that follows this application id (as the media session spells it).
+#[cfg(any(windows, test))]
+pub fn pill_for_app(app_id: &str) -> Option<&'static str> {
+    let app_id = app_id.trim();
+    PLAYERS.iter().find(|(_, app)| app.eq_ignore_ascii_case(app_id)).map(|(pill, _)| *pill)
+}
+
+/// The application the player behind this pill installs as.
+#[cfg(any(windows, test))]
+pub fn app_for_pill(pill: &str) -> Option<&'static str> {
+    PLAYERS.iter().find(|(id, _)| *id == pill).map(|(_, app)| *app)
+}
+
+/// The download page of a player that is not installed.
+#[cfg(any(windows, test))]
+pub fn download_url(pill: &str) -> &'static str {
+    match pill {
+        "integration_qqmusic" => QQMUSIC_DOWNLOAD,
+        _ => SPOTIFY_DOWNLOAD,
+    }
+}
+
+/// Which session to follow when a player each is open: the first declared pill
+/// that is playing, else the first declared pill that has a session at all.
+/// `None` when no declared pill has one — that is "nothing is playing".
+#[cfg(any(windows, test))]
+pub fn choose(sessions: &[(String, bool)], declared: &[&str]) -> Option<usize> {
+    let mut idle = None;
+    for (index, (app_id, playing)) in sessions.iter().enumerate() {
+        let Some(pill) = pill_for_app(app_id) else { continue };
+        if !declared.contains(&pill) {
+            continue;
+        }
+        if *playing {
+            return Some(index);
+        }
+        idle = idle.or(Some(index));
+    }
+    idle
+}
+
+
 // ── Values ────────────────────────────────────────────────────────────────────
 
 /// A D-Bus value as far as MPRIS needs it, so the parsing is plain Rust that
@@ -99,6 +162,23 @@ pub struct Track {
     pub object_path: String,
 }
 
+/// What the player behind the state can actually do. Linux's MPRIS answers all
+/// three; Windows' media session answers none of them, and the card hides the
+/// controls it has no answer for.
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct Caps {
+    pub volume: bool,
+    pub shuffle: bool,
+    pub repeat: bool,
+}
+
+impl Default for Caps {
+    fn default() -> Self {
+        Caps { volume: true, shuffle: true, repeat: true }
+    }
+}
+
 /// What the island is told, whenever it changes.
 #[derive(Serialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -118,6 +198,11 @@ pub struct PlayerState {
     pub repeat: bool,
     /// 0…100.
     pub volume: i32,
+    /// The pill this player belongs to (`integration_spotify`, `integration_qqmusic`…):
+    /// one player is on screen at a time, and the page routes on this.
+    pub pill_id: String,
+    /// What the player answers.
+    pub caps: Caps,
 }
 
 impl Default for PlayerState {
@@ -132,6 +217,8 @@ impl Default for PlayerState {
             shuffle: false,
             repeat: false,
             volume: 50,
+            pill_id: PILL_ID.to_string(),
+            caps: Caps::default(),
         }
     }
 }
@@ -424,7 +511,12 @@ pub async fn spotify_refresh(app: AppHandle) -> Option<PlayerState> {
     {
         tauri::async_runtime::spawn_blocking(move || linux::refresh(&linux::Out::App(app))).await.ok().flatten()
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    {
+        let _ = app;
+        tauri::async_runtime::spawn_blocking(windows::refresh).await.ok().flatten()
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
     {
         let _ = app;
         None
@@ -439,7 +531,12 @@ pub async fn spotify_control(app: AppHandle, action: String, value: Option<f64>)
     {
         tauri::async_runtime::spawn_blocking(move || linux::control(&linux::Out::App(app), &action, value)).await.unwrap_or(false)
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    {
+        let _ = app;
+        tauri::async_runtime::spawn_blocking(move || windows::control(&action, value)).await.unwrap_or(false)
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
     {
         let _ = (app, action, value);
         false
@@ -449,37 +546,593 @@ pub async fn spotify_control(app: AppHandle, action: String, value: Option<f64>)
 /// "Open Spotify": brings it forward, or starts it. Without Spotify, its
 /// download page. True when Spotify was reached or started.
 #[tauri::command]
-pub async fn spotify_open() -> bool {
+pub async fn spotify_open(pill_id: Option<String>) -> bool {
+    let pill = pill_id.unwrap_or_else(|| PILL_ID.to_string());
     #[cfg(target_os = "linux")]
     {
+        let _ = pill;
         tauri::async_runtime::spawn_blocking(linux::open).await.unwrap_or(false)
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
     {
+        tauri::async_runtime::spawn_blocking(move || windows::open(&pill)).await.unwrap_or(false)
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        let _ = pill;
         false
     }
 }
 
-/// For Settings: whether there is a Spotify to launch.
+/// For Settings: whether there is a player to launch.
 #[tauri::command]
-pub fn spotify_installed() -> bool {
+pub fn spotify_installed(pill_id: Option<String>) -> bool {
+    let pill = pill_id.unwrap_or_else(|| PILL_ID.to_string());
     #[cfg(target_os = "linux")]
     {
+        let _ = pill;
         linux::installed()
     }
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
     {
+        windows::installed(&pill)
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        let _ = pill;
         false
     }
 }
 
-/// Starts the listener when the pill is declared, stops it when it is not.
+/// Starts the listener when a music pill is declared, stops it when none is.
 /// Called at launch and after every settings save.
 pub fn sync(app: &AppHandle, active_integrations: &[String]) {
     #[cfg(target_os = "linux")]
     linux::sync(app, active_integrations.iter().any(|id| id == PILL_ID));
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    windows::sync(app, active_integrations);
+    #[cfg(not(any(target_os = "linux", windows)))]
     let _ = (app, active_integrations);
+}
+
+// ── The music pills' rules ────────────────────────────────────────────────────
+//
+// These run everywhere: they are what the page and the listener agree on, so
+// they are tested on every platform, not only where a media session exists.
+
+#[cfg(test)]
+mod pill_tests {
+    use super::*;
+
+    fn sessions(entries: &[(&str, bool)]) -> Vec<(String, bool)> {
+        entries.iter().map(|(app, playing)| (app.to_string(), *playing)).collect()
+    }
+
+    #[test]
+    fn an_application_id_finds_its_pill() {
+        assert_eq!(pill_for_app("QQMusic.exe"), Some("integration_qqmusic"));
+        assert_eq!(pill_for_app("qqmusic.exe"), Some("integration_qqmusic"));
+        assert_eq!(pill_for_app(" Spotify.exe "), Some("integration_spotify"));
+        assert_eq!(pill_for_app("chrome.exe"), None);
+        assert_eq!(pill_for_app(""), None);
+        assert_eq!(app_for_pill("integration_qqmusic"), Some("QQMusic.exe"));
+        assert_eq!(app_for_pill("integration_nope"), None);
+        assert_eq!(download_url("integration_qqmusic"), QQMUSIC_DOWNLOAD);
+        assert_eq!(download_url("integration_spotify"), SPOTIFY_DOWNLOAD);
+    }
+
+    #[test]
+    fn a_playing_player_wins_over_one_that_is_only_open() {
+        let open = sessions(&[("QQMusic.exe", false), ("Spotify.exe", false)]);
+        assert_eq!(choose(&open, &["integration_spotify", "integration_qqmusic"]), Some(0));
+
+        let spotify_plays = sessions(&[("QQMusic.exe", false), ("Spotify.exe", true)]);
+        assert_eq!(choose(&spotify_plays, &["integration_spotify", "integration_qqmusic"]), Some(1));
+        // The other way round: the first playing one wins wherever it sits.
+        let qq_plays = sessions(&[("QQMusic.exe", true), ("Spotify.exe", true)]);
+        assert_eq!(choose(&qq_plays, &["integration_spotify", "integration_qqmusic"]), Some(0));
+    }
+
+    #[test]
+    fn only_declared_pills_are_followed() {
+        let both = sessions(&[("Spotify.exe", true), ("QQMusic.exe", true)]);
+        assert_eq!(choose(&both, &["integration_qqmusic"]), Some(1));
+        assert_eq!(choose(&both, &[]), None);
+        assert_eq!(choose(&both, &["integration_resend"]), None);
+        // A browser playing music is nobody's pill.
+        let browser = sessions(&[("msedge.exe", true)]);
+        assert_eq!(choose(&browser, &["integration_spotify", "integration_qqmusic"]), None);
+        assert_eq!(choose(&[], &["integration_qqmusic"]), None);
+    }
+
+    #[test]
+    fn the_track_titles_read_like_the_macs() {
+        assert_eq!(short_title("Song - Remastered 2011 (Live)"), "Song");
+        assert_eq!(short_artist("Artist feat. Someone"), "Artist");
+    }
+}
+
+// ── Windows: Windows' media sessions (SMTC) ───────────────────────────────────
+
+#[cfg(windows)]
+mod windows {
+    use super::*;
+    use std::path::PathBuf;
+    use std::sync::mpsc::{channel, RecvTimeoutError, Sender};
+    use std::sync::{LazyLock, Mutex};
+    use std::time::Duration;
+
+    use tauri::Emitter;
+    use ::windows::core::{w, HSTRING, Interface, PCWSTR};
+    use ::windows::Foundation::TypedEventHandler;
+    use ::windows::Media::Control::{
+        GlobalSystemMediaTransportControlsSession as Session,
+        GlobalSystemMediaTransportControlsSessionManager as Manager,
+        GlobalSystemMediaTransportControlsSessionPlaybackStatus as PlaybackStatus,
+    };
+    use ::windows::Storage::Streams::{DataReader, IInputStream, IRandomAccessStreamReference};
+    use ::windows::Win32::System::WinRT::{RoInitialize, RO_INIT_MULTITHREADED};
+    use ::windows::Win32::UI::Shell::ShellExecuteW;
+    use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+
+    /// What a media session answers. Nothing else: SMTC has no volume, and no
+    /// shuffle or repeat of its own.
+    const CAPS: Caps = Caps { volume: false, shuffle: false, repeat: false };
+
+    /// Bound on a lost wake-up. When the player says nothing, this loop sleeps
+    /// here rather than reading the sessions again and again.
+    const IDLE: Duration = Duration::from_secs(30);
+
+    /// 1601 (WinRT's epoch) to 1970, in seconds.
+    const EPOCH: i64 = 11_644_473_600;
+
+    struct Shared {
+        /// Bumped on every start and stop: a listener from an older one quits.
+        generation: u64,
+        active: bool,
+        /// The music pills the user declared, in the catalog's order.
+        declared: Vec<String>,
+        /// Wakes the listener: the session list changed, or its player said so.
+        wake: Option<Sender<()>>,
+        /// The session the controls drive, while one is followed.
+        session: Option<Session>,
+        state: PlayerState,
+    }
+
+    static SHARED: LazyLock<Mutex<Shared>> = LazyLock::new(|| {
+        Mutex::new(Shared {
+            generation: 0,
+            active: false,
+            declared: Vec::new(),
+            wake: None,
+            session: None,
+            state: PlayerState::default(),
+        })
+    });
+
+    /// The last cover sent: a thumbnail is not re-read on every signal.
+    static COVER: Mutex<Option<(String, String)>> = Mutex::new(None);
+
+    fn current(generation: u64) -> bool {
+        let s = SHARED.lock().unwrap();
+        s.active && s.generation == generation
+    }
+
+    fn seconds(ticks: i64) -> f64 {
+        ticks as f64 / 10_000_000.0
+    }
+
+    // ── Start / stop ──────────────────────────────────────────────────────────
+
+    /// Starts the listener when a music pill is declared, stops it when none is.
+    pub fn sync(app: &AppHandle, active_integrations: &[String]) {
+        let declared: Vec<String> = PLAYERS
+            .iter()
+            .map(|(pill, _)| pill.to_string())
+            .filter(|pill| active_integrations.iter().any(|id| id == pill))
+            .collect();
+        let on = !declared.is_empty();
+        let (generation, wake) = {
+            let mut s = SHARED.lock().unwrap();
+            if s.active == on && s.declared == declared {
+                return;
+            }
+            s.active = on;
+            s.declared = declared;
+            s.generation += 1;
+            s.session = None;
+            s.state = PlayerState::default();
+            (s.generation, s.wake.clone())
+        };
+        // Whoever was listening wakes, sees a new generation and leaves.
+        if let Some(wake) = wake {
+            let _ = wake.send(());
+        }
+        if !on {
+            let state = SHARED.lock().unwrap().state.clone();
+            emit_state(app, &state);
+            return;
+        }
+        let app = app.clone();
+        if let Err(err) =
+            std::thread::Builder::new().name("coucou-smtc".into()).spawn(move || listen(app, generation))
+        {
+            crate::log::line(format!("smtc: no listener thread: {err}"));
+        }
+    }
+
+    /// The card came on screen: read the player again, and answer with what is
+    /// known right now (the fresh reading follows as a state event).
+    pub fn refresh() -> Option<PlayerState> {
+        let s = SHARED.lock().unwrap();
+        if !s.active {
+            return None;
+        }
+        if let Some(wake) = s.wake.clone() {
+            let _ = wake.send(());
+        }
+        Some(s.state.clone())
+    }
+
+    // ── The listener ──────────────────────────────────────────────────────────
+
+    /// The session being followed, and the handlers to drop when it lets go.
+    /// A registration token is a plain i64 in this windows crate.
+    struct Watched {
+        session: Session,
+        media: Option<i64>,
+        playback: Option<i64>,
+        timeline: Option<i64>,
+    }
+
+    impl Watched {
+        /// Every signal only wakes the loop, which then reads everything again.
+        fn bind(session: &Session, tx: Sender<()>) -> Watched {
+            let media = {
+                let tx = tx.clone();
+                session
+                    .MediaPropertiesChanged(&TypedEventHandler::new(move |_, _| {
+                        let _ = tx.send(());
+                        Ok(())
+                    }))
+                    .ok()
+            };
+            let playback = {
+                let tx = tx.clone();
+                session
+                    .PlaybackInfoChanged(&TypedEventHandler::new(move |_, _| {
+                        let _ = tx.send(());
+                        Ok(())
+                    }))
+                    .ok()
+            };
+            let timeline = {
+                let tx = tx;
+                session
+                    .TimelinePropertiesChanged(&TypedEventHandler::new(move |_, _| {
+                        let _ = tx.send(());
+                        Ok(())
+                    }))
+                    .ok()
+            };
+            Watched { session: session.clone(), media, playback, timeline }
+        }
+
+        /// The same session object, not merely the same application.
+        fn is(&self, session: &Session) -> bool {
+            self.session.as_raw() == session.as_raw()
+        }
+
+        fn unbind(&self) {
+            if let Some(token) = self.media {
+                let _ = self.session.RemoveMediaPropertiesChanged(token);
+            }
+            if let Some(token) = self.playback {
+                let _ = self.session.RemovePlaybackInfoChanged(token);
+            }
+            if let Some(token) = self.timeline {
+                let _ = self.session.RemoveTimelinePropertiesChanged(token);
+            }
+        }
+    }
+
+    fn listen(app: AppHandle, generation: u64) {
+        // WinRT needs an apartment on this thread; the callbacks arrive on their
+        // own threads, so this one stays free to block on the reads.
+        unsafe {
+            let _ = RoInitialize(RO_INIT_MULTITHREADED);
+        }
+        let manager = match Manager::RequestAsync().and_then(|operation| operation.get()) {
+            Ok(manager) => manager,
+            Err(err) => {
+                crate::log::line(format!("smtc: no session manager: {err}"));
+                return;
+            }
+        };
+        let (tx, rx) = channel::<()>();
+        {
+            let mut s = SHARED.lock().unwrap();
+            if !(s.active && s.generation == generation) {
+                return;
+            }
+            s.wake = Some(tx.clone());
+        }
+        let registered = {
+            let tx = tx.clone();
+            manager.SessionsChanged(&TypedEventHandler::new(move |_, _| {
+                let _ = tx.send(());
+                Ok(())
+            }))
+        };
+        if let Err(err) = registered {
+            crate::log::line(format!("smtc: cannot watch the sessions: {err}"));
+        }
+
+        let mut watched: Option<Watched> = None;
+        while current(generation) {
+            tick(&app, &manager, &tx, &mut watched, generation);
+            match rx.recv_timeout(IDLE) {
+                Ok(()) | Err(RecvTimeoutError::Timeout) => {}
+                Err(RecvTimeoutError::Disconnected) => break,
+            }
+        }
+        // Turning the pill off is the sender's business, not this thread's.
+        if let Some(watched) = watched {
+            watched.unbind();
+        }
+    }
+
+    /// Reads the sessions, follows the right one, and reports what it plays.
+    fn tick(app: &AppHandle, manager: &Manager, tx: &Sender<()>, watched: &mut Option<Watched>, generation: u64) {
+        if !current(generation) {
+            return;
+        }
+        let declared = SHARED.lock().unwrap().declared.clone();
+        let mut sessions: Vec<Session> = Vec::new();
+        let mut apps: Vec<String> = Vec::new();
+        let mut playing: Vec<bool> = Vec::new();
+        if let Ok(list) = manager.GetSessions() {
+            for index in 0..list.Size().unwrap_or(0) {
+                let Ok(session) = list.GetAt(index) else { continue };
+                apps.push(session.SourceAppUserModelId().map(|id| id.to_string()).unwrap_or_default());
+                playing.push(is_playing(&session));
+                sessions.push(session);
+            }
+        }
+        let pairs: Vec<(String, bool)> = apps.iter().cloned().zip(playing.iter().copied()).collect();
+        let declared_ids: Vec<&str> = declared.iter().map(String::as_str).collect();
+        let chosen = choose(&pairs, &declared_ids);
+
+        // Follow the session that won, let go of the one that lost.
+        let same = match (watched.as_ref(), chosen) {
+            (Some(watched), Some(index)) => watched.is(&sessions[index]),
+            (None, None) => true,
+            _ => false,
+        };
+        if !same {
+            if let Some(old) = watched.take() {
+                old.unbind();
+            }
+            *watched = chosen.map(|index| Watched::bind(&sessions[index], tx.clone()));
+        }
+
+        // Nothing is playing: the pill still says whether its player is installed.
+        let idle_pill = declared.first().cloned().unwrap_or_else(|| PILL_ID.to_string());
+        let (state, cover) = match chosen {
+            Some(index) => read(&sessions[index], pill_for_app(&apps[index]).unwrap_or(PILL_ID)),
+            None => (
+                PlayerState {
+                    pill_id: idle_pill.clone(),
+                    installed: known_exe(&idle_pill).is_some(),
+                    caps: CAPS,
+                    ..PlayerState::default()
+                },
+                None,
+            ),
+        };
+        {
+            let mut s = SHARED.lock().unwrap();
+            if !(s.active && s.generation == generation) {
+                return;
+            }
+            s.session = chosen.map(|index| sessions[index].clone());
+            s.state = state.clone();
+        }
+        emit_state(app, &state);
+        if let Some((key, reference)) = cover {
+            emit_cover(app, &key, &reference, &state);
+        }
+    }
+
+    fn is_playing(session: &Session) -> bool {
+        session
+            .GetPlaybackInfo()
+            .and_then(|info| info.PlaybackStatus())
+            .map(|status| status == PlaybackStatus::Playing)
+            .unwrap_or(false)
+    }
+
+    /// What the player has loaded, and the thumbnail to read if the card needs it.
+    fn read(session: &Session, pill: &str) -> (PlayerState, Option<(String, IRandomAccessStreamReference)>) {
+        let now = now_ms();
+        let mut state = PlayerState {
+            running: true,
+            installed: true,
+            pill_id: pill.to_string(),
+            caps: CAPS,
+            position_at: now,
+            ..PlayerState::default()
+        };
+        let mut cover = None;
+        if let Ok(properties) = session.TryGetMediaPropertiesAsync().and_then(|operation| operation.get()) {
+            let title = properties.Title().map(|value| value.to_string()).unwrap_or_default();
+            let artist = properties.Artist().map(|value| value.to_string()).unwrap_or_default();
+            let album = properties.AlbumTitle().map(|value| value.to_string()).unwrap_or_default();
+            // A media session has no track id: the cover's key stands in for it,
+            // and changes exactly when the track does.
+            let key = format!("smtc:{title}|{artist}|{album}");
+            state.track = Some(Track {
+                id: key.clone(),
+                title: short_title(&title),
+                artist: short_artist(&artist),
+                album,
+                duration: 0.0,
+                art_url: Some(key.clone()),
+                object_path: String::new(),
+            });
+            cover = properties.Thumbnail().ok().map(|reference| (key, reference));
+        }
+        state.playing = is_playing(session);
+        if let Ok(timeline) = session.GetTimelineProperties() {
+            let end = seconds(timeline.EndTime().map(|value| value.Duration).unwrap_or(0));
+            let mut position = seconds(timeline.Position().map(|value| value.Duration).unwrap_or(0));
+            // The timeline is only refreshed now and then: run it on from the
+            // moment the player last updated it, so the bar matches the sound.
+            if state.playing {
+                if let Ok(updated) = timeline.LastUpdatedTime() {
+                    let elapsed = now / 1000.0 - (updated.UniversalTime / 10_000_000 - EPOCH) as f64;
+                    if (0.0..10.0).contains(&elapsed) {
+                        position += elapsed;
+                    }
+                }
+            }
+            if let Some(track) = state.track.as_mut() {
+                if end > 0.0 {
+                    track.duration = end;
+                }
+            }
+            state.position = if end > 0.0 { position.min(end) } else { position.max(0.0) };
+        }
+        if state.track.is_none() {
+            state.playing = false;
+        }
+        (state, cover)
+    }
+
+    // ── The cover ─────────────────────────────────────────────────────────────
+
+    /// The cover as a data URL: the page may not load a remote image, and this
+    /// one was never a URL to begin with.
+    fn emit_cover(app: &AppHandle, key: &str, reference: &IRandomAccessStreamReference, state: &PlayerState) {
+        if state.track.as_ref().and_then(|track| track.art_url.as_deref()) != Some(key) {
+            return;
+        }
+        if let Some((cached, data)) = COVER.lock().unwrap().clone() {
+            if cached == key {
+                emit_artwork(app, key, data);
+                return;
+            }
+        }
+        let Some(bytes) = read_cover(reference) else { return };
+        let Some(data) = data_url(&bytes) else { return };
+        *COVER.lock().unwrap() = Some((key.to_string(), data.clone()));
+        emit_artwork(app, key, data);
+    }
+
+    fn emit_artwork(app: &AppHandle, art_url: &str, data_url: String) {
+        let artwork = Artwork { art_url: art_url.to_string(), data_url };
+        let _ = app.emit_to(crate::island::WINDOW_LABEL, ARTWORK_EVENT, artwork);
+    }
+
+    fn read_cover(reference: &IRandomAccessStreamReference) -> Option<Vec<u8>> {
+        let stream = reference.OpenReadAsync().ok()?.get().ok()?;
+        let size = stream.Size().ok()? as usize;
+        if size == 0 || size > ARTWORK_LIMIT {
+            return None;
+        }
+        let input: IInputStream = stream.cast().ok()?;
+        let reader = DataReader::CreateDataReader(&input).ok()?;
+        let loaded = reader.LoadAsync(size as u32).ok()?.get().ok()? as usize;
+        let mut bytes = vec![0u8; loaded];
+        reader.ReadBytes(&mut bytes).ok()?;
+        Some(bytes)
+    }
+
+    // ── Controls ──────────────────────────────────────────────────────────────
+
+    /// A control from the card or the pill: `playPause`, `next`, `previous` or a
+    /// seek. The volume, shuffle and repeat answer false: a media session has no
+    /// such controls, and the card does not show them.
+    pub fn control(action: &str, value: Option<f64>) -> bool {
+        // This runs on a command thread, where WinRT is not initialized yet.
+        unsafe {
+            let _ = RoInitialize(RO_INIT_MULTITHREADED);
+        }
+        let session = SHARED.lock().unwrap().session.clone();
+        let Some(session) = session else { return false };
+        let sent = match action {
+            "playPause" => session.TryTogglePlayPauseAsync().and_then(|operation| operation.get()),
+            "next" => session.TrySkipNextAsync().and_then(|operation| operation.get()),
+            "previous" => session.TrySkipPreviousAsync().and_then(|operation| operation.get()),
+            "seek" => {
+                let ticks = (value.unwrap_or(0.0).max(0.0) * 10_000_000.0) as i64;
+                session.TryChangePlaybackPositionAsync(ticks).and_then(|operation| operation.get())
+            }
+            _ => Ok(false),
+        }
+        .unwrap_or(false);
+        if sent {
+            // The player usually says what changed; this nudge covers the ones
+            // that do not.
+            if let Some(wake) = SHARED.lock().unwrap().wake.clone() {
+                let _ = wake.send(());
+            }
+        }
+        sent
+    }
+
+    // ── Launching ─────────────────────────────────────────────────────────────
+
+    /// Where the player behind a pill usually installs its program.
+    fn known_exe(pill: &str) -> Option<PathBuf> {
+        let root = |name: &str| std::env::var_os(name).map(PathBuf::from);
+        let candidates: Vec<PathBuf> = match pill {
+            "integration_qqmusic" => ["ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"]
+                .iter()
+                .filter_map(|name| root(name))
+                .map(|dir| dir.join("Tencent").join("QQMusic").join("QQMusic.exe"))
+                .collect(),
+            _ => ["APPDATA", "LOCALAPPDATA"]
+                .iter()
+                .filter_map(|name| root(name))
+                .flat_map(|dir| {
+                    [
+                        dir.join("Spotify").join("Spotify.exe"),
+                        dir.join("Microsoft").join("WindowsApps").join("Spotify.exe"),
+                    ]
+                })
+                .collect(),
+        };
+        candidates.into_iter().find(|path| path.is_file())
+    }
+
+    /// For Settings: whether there is a player to launch.
+    pub fn installed(pill: &str) -> bool {
+        let running = {
+            let s = SHARED.lock().unwrap();
+            s.state.running && s.state.pill_id == pill
+        };
+        running || known_exe(pill).is_some()
+    }
+
+    /// Brings the player forward or starts it; without it, its download page.
+    pub fn open(pill: &str) -> bool {
+        let Some(exe) = app_for_pill(pill) else { return false };
+        if shell_open(exe) {
+            return true;
+        }
+        crate::platform::open_url(download_url(pill));
+        false
+    }
+
+    /// ShellExecuteW resolves the application paths Windows registered when the
+    /// player was installed, which a bare `Command::new` would not.
+    fn shell_open(exe: &str) -> bool {
+        let file = HSTRING::from(exe);
+        let started = unsafe { ShellExecuteW(None, w!("open"), &file, PCWSTR::null(), PCWSTR::null(), SW_SHOWNORMAL) };
+        // ShellExecuteW answers a value above 32 when it worked.
+        started.0 as usize > 32
+    }
 }
 
 // ── Linux: MPRIS over D-Bus ───────────────────────────────────────────────────

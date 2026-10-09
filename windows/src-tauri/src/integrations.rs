@@ -67,7 +67,10 @@ pub fn start(app: AppHandle) {
     spawn(app.clone(), "integration_resend", 6, 60, poll_resend);
     spawn(app.clone(), "integration_github", 7, 300, poll_github);
     spawn_github_loops(app.clone());
-    spawn(app, "integration_gitlab", 8, 60, poll_gitlab);
+    spawn(app.clone(), "integration_gitlab", 8, 60, poll_gitlab);
+    // A mailbox is read every five minutes, never more: IMAP signs in again
+    // each time, and nobody needs a second's notice for an email.
+    spawn(app, "integration_qqmail", 9, 300, poll_qqmail);
 }
 
 /// True when the user has this integration switched on in settings.
@@ -112,6 +115,7 @@ pub async fn poll_once(app: AppHandle, id: &str) {
         }
         "integration_resend" => poll_resend(app).await,
         "integration_gitlab" => poll_gitlab(app).await,
+        "integration_qqmail" => poll_qqmail(app).await,
         _ => {}
     }
 }
@@ -683,6 +687,46 @@ async fn poll_resend(app: AppHandle) {
         error: None,
         event: None,
     });
+}
+
+// ── QQ Mail ───────────────────────────────────────────────────────────────────
+
+/// INBOX over IMAP (mail.rs): the unseen count and the newest unseen subjects.
+/// Nothing is marked read, no body is fetched, nothing is ever sent, and the
+/// connection is opened and closed within the poll.
+async fn poll_qqmail(app: AppHandle) {
+    let (Some(address), Some(code)) = (secrets::get("qqmail-address"), secrets::get("qqmail-auth-code")) else {
+        return;
+    };
+    match crate::mail::fetch(&address, &code).await {
+        Ok(mailbox) => {
+            // The newest arrival gets the badge and the sound, once.
+            let newest = mailbox.messages.last();
+            let event = newest.filter(|m| is_new("qqmail", &m.uid.to_string())).map(|last| IntegrationEvent {
+                success: true,
+                label: if last.subject.is_empty() { last.from.clone() } else { last.subject.clone() },
+                detail: Some(last.from.clone()),
+            });
+            emit(&app, IntegrationUpdate {
+                id: "integration_qqmail",
+                data: serde_json::to_value(&mailbox).unwrap_or_else(|_| json!({})),
+                error: None,
+                event,
+            });
+        }
+        Err(crate::mail::Error::Auth) => emit(&app, IntegrationUpdate {
+            id: "integration_qqmail",
+            data: json!({}),
+            error: Some(crate::i18n::t("Sign-in refused — check the authorisation code")),
+            event: None,
+        }),
+        Err(err) => emit(&app, IntegrationUpdate {
+            id: "integration_qqmail",
+            data: json!({}),
+            error: Some(crate::i18n::tf("No connection: {error}", &[("error", &err.to_string())])),
+            event: None,
+        }),
+    }
 }
 
 // ── Notion ────────────────────────────────────────────────────────────────────

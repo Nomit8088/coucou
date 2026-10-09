@@ -1,12 +1,13 @@
-// The Spotify pill on the page: what src-tauri/src/spotify.rs reports (Linux,
-// through MPRIS), and the pure rules the views and Mochi follow — ports of
-// SpotifyController.swift, NowPlayingViews.swift and the Mac's dance rules
-// (BotCanvasView, DesktopMochi.swift).
+// The now-playing pill on the page: what src-tauri/src/spotify.rs reports (MPRIS
+// on Linux, Windows' SMTC for Spotify and QQ Music), and the pure rules the views
+// and Mochi follow — ports of SpotifyController.swift, NowPlayingViews.swift and
+// the Mac's dance rules (BotCanvasView, DesktopMochi.swift).
 //
-// Windows has no music source yet: nothing ever reports a track there, so
-// nothing plays and Mochi never dances, through the same code.
+// A report names the pill it belongs to (`pillId`): one player is on screen at a
+// time, so the same state, card and dance serve every music pill.
 
 import type { BotStateName, IslandMode, IslandViewName } from "./layout";
+import { pillDefinition } from "./pills";
 
 export const SPOTIFY_ID = "integration_spotify";
 /** SpotifyController.green. */
@@ -23,10 +24,20 @@ export interface SpotifyTrack {
   artUrl: string | null;
 }
 
+/** What the player behind the state can actually do. */
+export interface MusicCaps {
+  volume: boolean;
+  shuffle: boolean;
+  repeat: boolean;
+}
+
+/** MPRIS answers all three; Windows' media session answers none of them. */
+export const FULL_CAPS: MusicCaps = { volume: true, shuffle: true, repeat: true };
+
 export interface SpotifyState {
-  /** Spotify is running. */
+  /** The player is running. */
   running: boolean;
-  /** There is a Spotify to launch. */
+  /** There is a player to launch. */
   installed: boolean;
   track: SpotifyTrack | null;
   playing: boolean;
@@ -37,11 +48,20 @@ export interface SpotifyState {
   repeat: boolean;
   /** 0…100. */
   volume: number;
+  /**
+   * The pill this player belongs to (`integration_spotify`, `integration_qqmusic`…):
+   * one player is on screen at a time, so the report says which one it is. Absent
+   * means Spotify, as every report did before.
+   */
+  pillId?: string;
+  /** What the player can do; the card hides what it cannot. */
+  caps?: MusicCaps;
 }
 
 export const IDLE_SPOTIFY: SpotifyState = {
   running: false, installed: false, track: null, playing: false,
   position: 0, positionAt: 0, shuffle: false, repeat: false, volume: 50,
+  pillId: SPOTIFY_ID, caps: FULL_CAPS,
 };
 
 /** The page's copy of the player, and the cover of the track that has one. */
@@ -49,6 +69,21 @@ export const Spotify = {
   state: { ...IDLE_SPOTIFY } as SpotifyState,
   artwork: null as { artUrl: string; dataUrl: string } | null,
 };
+
+/** Whether a pill is one of the players this state can belong to (pills.ts `mediaApp`). */
+export function isMusicPill(id: string | null | undefined): boolean {
+  return !!id && pillDefinition(id)?.mediaApp != null;
+}
+
+/** The pill the current report belongs to; Spotify when the player says nothing. */
+export function pillIdOf(s: SpotifyState = Spotify.state): string {
+  return isMusicPill(s.pillId) ? (s.pillId as string) : SPOTIFY_ID;
+}
+
+/** What the player can do — everything, unless it said otherwise (SMTC says none). */
+export function capsOf(s: SpotifyState = Spotify.state): MusicCaps {
+  return s.caps ?? FULL_CAPS;
+}
 
 /** The cover to show for the current track, if it has arrived. */
 export function currentArtwork(s: SpotifyState = Spotify.state): string | null {
@@ -94,9 +129,9 @@ export function volumeLevel(volume: number): 0 | 1 | 2 | 3 {
   return 3;
 }
 
-/** Music is playing on a declared Spotify pill. */
+/** Music is playing on a declared player pill (Spotify, QQ Music…). */
 export function musicPlaying(s: SpotifyState, activeIntegrations: readonly string[]): boolean {
-  return s.playing && s.track != null && activeIntegrations.includes(SPOTIFY_ID);
+  return s.playing && s.track != null && activeIntegrations.includes(pillIdOf(s));
 }
 
 /** The states Mochi dances in; the rest (an alert, an error, sleep) win. */
@@ -112,10 +147,12 @@ export function islandDances(o: {
   mode: IslandMode;
   view: IslandViewName;
   focusId: string | null | undefined;
+  /** The pill the music is on; Spotify when nobody says (the Mac's rule). */
+  musicPillId?: string;
 }): boolean {
   if (!o.music || !DANCE_STATES.has(o.state)) return false;
   if (o.mode === "compact") return true;
-  return o.mode === "expanded" && o.view === "overview" && o.focusId === SPOTIFY_ID;
+  return o.mode === "expanded" && o.view === "overview" && o.focusId === (o.musicPillId ?? SPOTIFY_ID);
 }
 
 /** Mochi on the desktop: the compact island's rules (DesktopMochi.swift). */

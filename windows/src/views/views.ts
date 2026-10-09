@@ -23,7 +23,7 @@ import { Bridge } from "../core/bridge";
 import { buildRecap } from "./recap";
 import { buildWardrobe } from "./wardrobe";
 import { buildSpotifyCard, buildSpotifyPill, type SpotifyPillHost } from "./spotify";
-import { SPOTIFY_ID } from "../core/spotify";
+import { isMusicPill } from "../core/spotify";
 import type { Outfit, OutfitSelection } from "../mochi/wardrobe";
 import { language, t, tl, type Msg } from "../i18n/i18n";
 import type { ViewCommand } from "../island/shortcuts";
@@ -173,13 +173,15 @@ function buildOverview(actions: ViewActions): ViewHost {
   /** The diff open in the left card (a FileDiff id), as activeDiffId on macOS. */
   let activeDiffId: number | null = null;
   const closeDiff = () => {
-    if (activeDiffId == null) return;
+    if (activeDiffId == null && !State.showingDiffDetail) return;
     activeDiffId = null;
+    State.showingDiffDetail = false;
     State.notify();
   };
   const ticker = new Ticker((diffId) => {
     actions.blip();
     activeDiffId = diffId;
+    State.showingDiffDetail = true;
     State.notify();
   });
   const who = h("div", { class: "who" });
@@ -275,6 +277,7 @@ function buildOverview(actions: ViewActions): ViewHost {
   State.subscribe(() => {
     if (activeDiffId != null && (State.view !== "overview" || State.mode !== "expanded")) {
       activeDiffId = null;
+      State.showingDiffDetail = false;
     }
   });
   // Escape steps back out of the diff before it closes the island.
@@ -344,6 +347,7 @@ function buildOverview(actions: ViewActions): ViewHost {
       const last = diffs?.[diffs.length - 1];
       if (last?.id == null) return;
       activeDiffId = last.id;
+      State.showingDiffDetail = true;
       State.notify();
     },
     sync() {
@@ -367,9 +371,19 @@ function buildOverview(actions: ViewActions): ViewHost {
       }
       syncPlanTimer(planOpen);
 
+      // DSH can request the editor view as soon as an edit completes. Pick the
+      // newest diff once the overview has rendered the event.
+      if (State.showingDiffDetail && activeDiffId == null && task) {
+        const latest = State.sessionDiffs.get(task.id)?.at(-1);
+        if (latest) activeDiffId = latest.id;
+      }
       // A diff that has since been dropped (cap, expiry, session end) just closes.
       const diff = task && activeDiffId != null ? State.findDiff(task.id, activeDiffId) : null;
-      if (!diff) activeDiffId = null;
+      if (!diff) {
+        activeDiffId = null;
+        State.showingDiffDetail = false;
+      }
+      el.classList.toggle("diff-open", !!diff);
 
       if (planOpen) {
         if (mode !== "plan") {
@@ -488,10 +502,11 @@ function buildOverview(actions: ViewActions): ViewHost {
           }));
         }
         ticker.sync(task);
-      } else if (task && task.id === SPOTIFY_ID) {
+      } else if (task && isMusicPill(task.id)) {
         // Its own card for every state: playing, idle, not installed.
         if (mode !== "spotify") {
           clear(leftBody);
+          spotifyCard.setAccent(task.color);
           leftBody.append(spotifyCard.el);
           mode = "spotify";
           cardKey = "";
@@ -528,7 +543,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         clear(pills);
         spotifyPill = null;
         for (const t of others) {
-          if (t.id === SPOTIFY_ID) {
+          if (isMusicPill(t.id)) {
             spotifyPill = buildSpotifyPill(t, () => actions.setFocus(t.id));
             pills.append(spotifyPill.el);
           } else {

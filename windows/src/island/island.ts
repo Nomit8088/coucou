@@ -7,12 +7,12 @@ import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
-  DSH_SESSION_H, QUESTION_PICKER_H, isSteerable,
+  DSH_SESSION_H, DIFF_DETAIL_H, QUESTION_PICKER_H, isSteerable,
   type BotEmoteName, type IslandMode, type IslandViewName,
 } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
-import { SPOTIFY_ID, islandDances } from "../core/spotify";
+import { islandDances, isMusicPill, pillIdOf } from "../core/spotify";
 import { BotEngine, hexToRGB } from "../mochi/engine";
 import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
@@ -189,7 +189,7 @@ export class Island {
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
         };
-        if (task.id === SPOTIFY_ID) void Bridge.spotifyOpen();
+        if (isMusicPill(task.id)) void Bridge.spotifyOpen(task.id);
         else if (task.sessionId) {
           void Bridge.openSession(task.sessionId ?? null, task.sessionCwd ?? null);
         } else if (urls[task.id]) void Bridge.openUrl(urls[task.id]);
@@ -716,6 +716,9 @@ export class Island {
     if (State.mode === "expanded" && this.dshSessionCard()) {
       h = DSH_SESSION_H;
     }
+    if (State.mode === "expanded" && State.view === "overview" && State.showingDiffDetail) {
+      h = DIFF_DETAIL_H;
+    }
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;
     return { w, h, r };
   }
@@ -1192,6 +1195,7 @@ export class Island {
       mode: State.mode,
       view: State.view,
       focusId: State.focusTask?.id,
+      musicPillId: pillIdOf(),
     }));
 
     this.engine.update(dt);

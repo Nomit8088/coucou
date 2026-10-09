@@ -280,6 +280,50 @@ minute while a CI is running, and as soon as you open the card on data older
 than a minute; contributions every 30 minutes. Nothing is fetched while the pill
 is off or Coucou is paused.
 
+## Music
+
+Music is its own pill, because Coucou reads it from the system rather than from
+an account:
+
+- **Spotify** — Linux reads it over MPRIS, Windows over the media session
+  Spotify registers with Windows.
+- **QQ Music** *(Windows)* — the PC client registers a media session too.
+
+Declare the pill in **Settings → Integrations**, where the other services live.
+The pill then wears the track's title and offers play/pause and next under the
+pointer; the card has the cover, the progress bar (drag it to seek), previous,
+next and play/pause; and Mochi dances while it plays — in the small island, on
+the pill and on the desktop. Clicking the cover, or **Open** on the idle card,
+brings the player forward or starts it; without one it opens the player's
+download page, and the row in Settings says *Not installed*.
+
+Windows' media sessions carry no volume, and no shuffle or repeat of their own,
+so those three controls are not shown on Windows — everything else is the same
+on both systems. Nothing is polled: while the pill is declared, one thread waits
+on the player's own events and stops as soon as the pill is turned off. When two
+declared players are open at once, Coucou follows the one that is playing.
+
+## QQ Mail
+
+**Settings → Integrations → QQ Mail** takes two values, both kept in the
+Credential Manager:
+
+- **Email address** — the mailbox's full address.
+- **Authorisation code** — the 16-character code QQ Mail's own settings hand out
+  for third-party clients. Turn IMAP on there first ([QQ Mail's help on enabling
+  POP3/SMTP/IMAP and getting the code](https://help.mail.qq.com/detail/0/1087));
+  the account password never works for this, and should not be used.
+
+The pill then shows how many messages are unseen, and the card lists the newest
+of them — sender, subject and when it arrived. A new one badges the pill and
+plays a sound, once. A click opens the mailbox in your browser.
+
+Reading is all Coucou does: it signs in, asks INBOX what is unseen, fetches those
+messages' `From`, `Subject` and `Date` headers, and signs out. No message body is
+downloaded, nothing is marked read, moved or deleted, and nothing is ever sent.
+The mailbox is checked every five minutes, and only while the pill is declared
+and Coucou is not paused.
+
 ## Build it yourself
 
 You need [Rust](https://rustup.rs), [Node 20+](https://nodejs.org), and the
@@ -413,8 +457,9 @@ own window.
   the island, and reopened by clicking the island, Open in the tray or **Go to
   alert**.
 - Apple Music, the one pill from the Mac catalog with nothing behind it here,
-  is left out. Spotify is on Linux only (see [Linux](#linux)): Windows has
-  nothing to read it from yet.
+  is left out. Spotify is read over MPRIS on Linux and over Windows' own media
+  sessions here; **QQ Music** rides the same media sessions on Windows (see
+  [Music](#music)).
 - Not in this version: sending a dropped file by email and dragging Mochi onto
   a window to attach it as context. On the Mac, email goes through Resend or
   Apple Mail's scripting; neither has a safe equivalent that attaches a file
@@ -477,9 +522,9 @@ own window.
   without a restart (the Mac's **Restart Coucou** isn't needed). Arabic turns
   the island's text right to left but not its layout: Mochi and the pills keep
   their sides.
-- Mochi on the desktop dances only on Linux, to Spotify; on Windows there is
-  no music integration to dance to yet. While he dances he stays awake (the
-  Mac lets him doze off mid-dance). Dropping him on a window doesn't attach it
+- Mochi on the desktop dances to whatever plays: Spotify on Linux and Windows,
+  and QQ Music on Windows. While he dances he stays awake (the Mac lets him
+  doze off mid-dance). Dropping him on a window doesn't attach it
   to the chat. While he
   sleeps, the transparent square around him (120 px) takes the first mouse
   move, which wakes him and gives the rest back to the desktop.
@@ -577,7 +622,8 @@ What changes on Linux:
   (or a local track's file) and are fetched by Coucou itself, not the page.
   Spotify builds that don't report the position over MPRIS show the bar
   from where the track started; the Mac's Automation prompt has no
-  equivalent here.
+  equivalent here. Windows reads Spotify, and QQ Music, through its own media
+  sessions instead (see [Music](#music)).
 - **Plan usage**: the status line relay is `~/.local/share/coucou/bin/coucou-hook
   --statusline` and runs your previous status line with `/bin/sh -c`, like Claude
   Code. Codex is found on `$PATH`, in `~/.local/bin`, npm's global prefix, Volta,

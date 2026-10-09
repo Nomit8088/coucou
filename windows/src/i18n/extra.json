@@ -3010,6 +3010,105 @@
    "pt-BR": "O Coucou não escreveu este manifesto do plugin DSH e não o alterou.",
    "ru": "Coucou не писал этот манифест плагина DSH и не трогал его.",
    "id": "Coucou tidak menulis manifes plugin DSH ini dan tidak mengubahnya."
+  },
+  "Authorisation code": {
+   "zh-Hans": "授权码",
+   "hi": "प्राधिकरण कोड",
+   "es": "Código de autorización",
+   "ar": "رمز التخويل",
+   "fr": "Code d’autorisation",
+   "bn": "অনুমোদন কোড",
+   "pt-BR": "Código de autorização",
+   "ru": "Код авторизации",
+   "id": "Kode otorisasi"
+  },
+  "Email address": {
+   "zh-Hans": "邮箱地址",
+   "hi": "ईमेल पता",
+   "es": "Dirección de correo",
+   "ar": "عنوان البريد الإلكتروني",
+   "fr": "Adresse e-mail",
+   "bn": "ইমেল ঠিকানা",
+   "pt-BR": "Endereço de e-mail",
+   "ru": "Адрес почты",
+   "id": "Alamat email"
+  },
+  "Get {0}": {
+   "zh-Hans": "获取 {0}",
+   "hi": "{0} पाएँ",
+   "es": "Descargar {0}",
+   "ar": "احصل على {0}",
+   "fr": "Obtenir {0}",
+   "bn": "{0} নিন",
+   "pt-BR": "Baixar o {0}",
+   "ru": "Скачать {0}",
+   "id": "Dapatkan {0}"
+  },
+  "Inbox": {
+   "zh-Hans": "收件箱",
+   "hi": "इनबॉक्स",
+   "es": "Bandeja de entrada",
+   "ar": "البريد الوارد",
+   "fr": "Boîte de réception",
+   "bn": "ইনবক্স",
+   "pt-BR": "Caixa de entrada",
+   "ru": "Входящие",
+   "id": "Kotak masuk"
+  },
+  "No unread mail": {
+   "zh-Hans": "没有未读邮件",
+   "hi": "कोई अपठित मेल नहीं",
+   "es": "No hay correo sin leer",
+   "ar": "لا بريد غير مقروء",
+   "fr": "Aucun courrier non lu",
+   "bn": "কোনো অপঠিত মেইল নেই",
+   "pt-BR": "Nenhum e-mail não lido",
+   "ru": "Нет непрочитанных писем",
+   "id": "Tidak ada email belum dibaca"
+  },
+  "Open {0}": {
+   "zh-Hans": "打开 {0}",
+   "hi": "{0} खोलें",
+   "es": "Abrir {0}",
+   "ar": "فتح {0}",
+   "fr": "Ouvrir {0}",
+   "bn": "{0} খুলুন",
+   "pt-BR": "Abrir o {0}",
+   "ru": "Открыть {0}",
+   "id": "Buka {0}"
+  },
+  "Sign-in refused — check the authorisation code": {
+   "zh-Hans": "登录被拒绝 — 请检查授权码",
+   "hi": "साइन-इन अस्वीकृत — प्राधिकरण कोड जाँचें",
+   "es": "Inicio de sesión rechazado — comprueba el código de autorización",
+   "ar": "رُفض تسجيل الدخول — تحقق من رمز التخويل",
+   "fr": "Connexion refusée — vérifiez le code d’autorisation",
+   "bn": "সাইন-ইন অস্বীকৃত — অনুমোদন কোড দেখুন",
+   "pt-BR": "Login recusado — confira o código de autorização",
+   "ru": "Вход отклонён — проверьте код авторизации",
+   "id": "Masuk ditolak — periksa kode otorisasi"
+  },
+  "Turn on IMAP in QQ Mail's settings and paste the 16-character authorisation code it gives you. Coucou only reads your unread count and subjects — it never sends, marks or deletes anything.": {
+   "zh-Hans": "在 QQ 邮箱设置中开启 IMAP，填入它给出的 16 位授权码。Coucou 只读取未读数量和主题——不会发送、标记或删除任何邮件。",
+   "hi": "QQ Mail की सेटिंग में IMAP चालू करें और उसका दिया 16-अक्षरों वाला प्राधिकरण कोड भरें। Coucou केवल अपठित संख्या और विषय पढ़ता है — कुछ भी भेजता, चिह्नित या हटाता नहीं।",
+   "es": "Activa IMAP en los ajustes de QQ Mail y pega el código de autorización de 16 caracteres que te da. Coucou solo lee tu número de no leídos y los asuntos: nunca envía, marca ni borra nada.",
+   "ar": "شغّل IMAP في إعدادات QQ Mail والصق رمز التخويل المكوّن من 16 حرفًا. لا يقرأ Coucou سوى عدد غير المقروء والموضوعات — ولا يرسل أو يعلّم أو يحذف أي شيء.",
+   "fr": "Activez IMAP dans les réglages de QQ Mail et collez le code d’autorisation à 16 caractères qu’il vous donne. Coucou lit seulement le nombre de non lus et les objets — il n’envoie, ne marque et ne supprime jamais rien.",
+   "bn": "QQ Mail-এর সেটিংসে IMAP চালু করে এটি দেওয়া ১৬ অক্ষরের অনুমোদন কোড বসান। Coucou কেবল অপঠিত সংখ্যা ও বিষয় পড়ে — কিছু পাঠায়, চিহ্নিত করে বা মোছে না।",
+   "pt-BR": "Ative o IMAP nos ajustes do QQ Mail e cole o código de autorização de 16 caracteres que ele fornece. O Coucou lê apenas a contagem de não lidos e os assuntos — nunca envia, marca ou apaga nada.",
+   "ru": "Включите IMAP в настройках QQ Mail и вставьте выданный им 16-значный код авторизации. Coucou читает только число непрочитанных и темы — он ничего не отправляет, не помечает и не удаляет.",
+   "id": "Aktifkan IMAP di pengaturan QQ Mail dan tempel kode otorisasi 16 karakter yang diberikannya. Coucou hanya membaca jumlah belum dibaca dan subjek — tidak pernah mengirim, menandai, atau menghapus apa pun."
+  },
+  "{0} not installed": {
+   "zh-Hans": "未安装 {0}",
+   "hi": "{0} इंस्टॉल नहीं है",
+   "es": "{0} no está instalado",
+   "ar": "{0} غير مثبت",
+   "fr": "{0} n’est pas installé",
+   "bn": "{0} ইনস্টল নেই",
+   "pt-BR": "{0} não está instalado",
+   "ru": "{0} не установлен",
+   "id": "{0} belum terpasang"
   }
  }
 }

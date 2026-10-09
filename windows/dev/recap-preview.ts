@@ -1,6 +1,7 @@
 // The weekly recap card in a real island, and the shared image with and
 // without project names, on the sample week of scripts/test-weekly-recap.swift.
 // `npm run dev`, then open /dev/recap-preview.html. Not shipped in the app.
+// DSH diff smoke-test marker: harmless preview-only edit.
 
 import "../src/style.css";
 import { Island } from "../src/island/island";

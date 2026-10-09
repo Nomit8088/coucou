@@ -109,12 +109,17 @@ export function fromNew(content: string, path: string): FileDiff {
  */
 export function buildFileDiff(tool: string, input: Record<string, unknown>): FileDiff | null {
   const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
-  const path = str(input.file_path);
+  // DSH uses path/oldText/newText; Claude Code uses canonical names.
+  const path = str(input.file_path) ?? str(input.path) ?? str(input.file) ?? str(input.filename);
+  const oldValue = (value: Record<string, unknown>) =>
+    str(value.old_string) ?? str(value.oldText) ?? str(value.old_text) ?? str(value.before);
+  const newValue = (value: Record<string, unknown>) =>
+    str(value.new_string) ?? str(value.newText) ?? str(value.new_text) ?? str(value.after);
   switch (tool) {
     case "Edit":
     case "edit": {
-      const oldText = str(input.old_string);
-      const newText = str(input.new_string);
+      const oldText = oldValue(input);
+      const newText = newValue(input);
       if (oldText == null || newText == null || path == null) return null;
       if (!oldText && !newText) return null;
       const d = fromEdit(oldText, newText, path);
@@ -130,8 +135,8 @@ export function buildFileDiff(tool: string, input: Record<string, unknown>): Fil
       for (const edit of edits) {
         if (!edit || typeof edit !== "object") continue;
         const e = edit as Record<string, unknown>;
-        const oldText = str(e.old_string);
-        const newText = str(e.new_string);
+        const oldText = oldValue(e);
+        const newText = newValue(e);
         if (oldText == null || newText == null) continue;
         const d = fromEdit(oldText, newText, path);
         added += d.added;

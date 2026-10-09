@@ -109,6 +109,8 @@ export const QUESTION_PICKER_H = 200;
  * clipped both.
  */
 export const DSH_SESSION_H = 200;
+/** Full-width editor-style diff detail. */
+export const DIFF_DETAIL_H = 264;
 
 /** The DSH pill's id — the only session the island can steer. */
 export const DSH_PILL_ID = "agent_dsh";

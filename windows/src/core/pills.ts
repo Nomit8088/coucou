@@ -1,7 +1,8 @@
 // Pill catalog for this personal Windows fork. IDs are contract values
 // (settings, hook routing, credentials). New IDs written here do not change:
-// agent_dsh, integration_gitlab. Official Mac catalog pills that this fork
-// does not use are absent on purpose — do not add them back for parity.
+// agent_dsh, integration_gitlab, integration_qqmusic. Official Mac catalog pills
+// that this fork does not use are absent on purpose — do not add them back for
+// parity.
 
 import type { AgentSource } from "./state";
 import { N_ } from "../i18n/i18n";
@@ -30,6 +31,12 @@ export interface PillDefinition {
   source: AgentSource;
   support: PillSupport;
   connect: PillConnect;
+  /**
+   * A music pill: the player's application id as Windows' media session reports
+   * it (SMTC's SourceAppUserModelId). `src-tauri/src/spotify.rs` follows the
+   * sessions of these pills, and `core/spotify.ts` is the one that reads it.
+   */
+  mediaApp?: string;
 }
 
 export type HostOs = "windows" | "linux";
@@ -49,10 +56,17 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("resend-api-key") },
   { id: "integration_gitlab", name: "GitLab", color: "#FC6D26", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("gitlab-token") },
-  // Spotify's MPRIS interface on the session bus (src-tauri/src/spotify.rs).
-  // Windows has nothing to read it from yet.
+  // Spotify's MPRIS interface on the session bus (src-tauri/src/spotify.rs), and
+  // its media session on Windows (the same file, SMTC).
   { id: "integration_spotify", name: "Spotify", color: "#1DB954", category: "service",
-    subtitle: N_("Integration"), source: "n8n", support: "linux", connect: none },
+    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: none, mediaApp: "Spotify.exe" },
+  // QQ Music on Windows, through the media session its PC client registers.
+  { id: "integration_qqmusic", name: "QQ Music", color: "#31C27C", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "windows", connect: none, mediaApp: "QQMusic.exe" },
+  // The mailbox: read over IMAP with the account's authorisation code, never a
+  // password, and never written to.
+  { id: "integration_qqmail", name: "QQ Mail", color: "#12B7F5", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("qqmail-auth-code") },
 ];
 
 /** The always-on pill unless the user picks another workspace tool. */

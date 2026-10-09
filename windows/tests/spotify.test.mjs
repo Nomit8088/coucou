@@ -8,8 +8,8 @@ import assert from "node:assert/strict";
 import { emit, sent } from "./tauri.mjs";
 import { installFakeDom } from "./fakedom.mjs";
 import {
-  IDLE_SPOTIFY, SPOTIFY_ID, Spotify, currentArtwork, desktopDances, formatTime, isAd, islandDances,
-  musicPlaying, spotifyPosition, volumeLevel, withPlaying,
+  IDLE_SPOTIFY, SPOTIFY_ID, Spotify, capsOf, currentArtwork, desktopDances, formatTime, isAd, islandDances,
+  musicPlaying, pillIdOf, spotifyPosition, volumeLevel, withPlaying,
 } from "../src/core/spotify.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
@@ -82,11 +82,20 @@ test("a cover shows only on the track it belongs to", () => {
 
 // ── When Mochi dances ─────────────────────────────────────────────────────────
 
-test("music counts only when it plays on a declared Spotify pill", () => {
+test("music counts only when it plays on the pill it says it is on", () => {
   assert.ok(musicPlaying(playing(), [SPOTIFY_ID]));
   assert.ok(!musicPlaying(playing(), ["integration_n8n"]));
   assert.ok(!musicPlaying(playing({ playing: false }), [SPOTIFY_ID]));
   assert.ok(!musicPlaying(playing({ track: null }), [SPOTIFY_ID]));
+  // A report that names QQ Music counts on that pill, and on no other.
+  const qq = playing({ pillId: "integration_qqmusic" });
+  assert.ok(musicPlaying(qq, ["integration_qqmusic"]));
+  assert.ok(!musicPlaying(qq, [SPOTIFY_ID]));
+  // Nothing named: Spotify, as every report did before.
+  assert.equal(pillIdOf(playing()), SPOTIFY_ID);
+  assert.equal(pillIdOf(qq), "integration_qqmusic");
+  assert.equal(pillIdOf(playing({ pillId: "integration_n8n" })), SPOTIFY_ID, "an unknown pill is no pill");
+  assert.deepEqual(capsOf(playing()), { volume: true, shuffle: true, repeat: true });
 });
 
 test("the island's Mochi dances by the Mac's rules", () => {
@@ -105,6 +114,13 @@ test("the island's Mochi dances by the Mac's rules", () => {
   assert.ok(!islandDances({ ...base, mode: "expanded" }));
   assert.ok(islandDances({ ...base, mode: "expanded", focusId: SPOTIFY_ID }));
   assert.ok(!islandDances({ ...base, mode: "expanded", focusId: SPOTIFY_ID, view: "prompt" }));
+  // With the music on another pill, that is the card he dances on.
+  assert.ok(islandDances({
+    ...base, mode: "expanded", focusId: "integration_qqmusic", musicPillId: "integration_qqmusic",
+  }));
+  assert.ok(!islandDances({
+    ...base, mode: "expanded", focusId: SPOTIFY_ID, musicPillId: "integration_qqmusic",
+  }));
 });
 
 test("Mochi on the desktop dances by the compact island's rules", () => {
@@ -214,6 +230,49 @@ test("the cover arrives on its own event", () => {
   emit("spotify", playing());
   emit("spotify-artwork", { artUrl: "https://i.scdn.co/image/abc", dataUrl: "data:image/png;base64,AA" });
   assert.equal(currentArtwork(), "data:image/png;base64,AA");
+});
+
+test("a report routes to the pill it names, and the card hides what the player cannot do", () => {
+  State.os = "windows";
+  State.settings = { ...DEFAULT_SETTINGS, activeIntegrations: ["integration_qqmusic"] };
+  State.loadIntegrationTasks();
+  Spotify.state = { ...IDLE_SPOTIFY };
+  emit("spotify", playing({
+    pillId: "integration_qqmusic",
+    caps: { volume: false, shuffle: false, repeat: false },
+  }));
+
+  const qq = State.tasks.find((t) => t.id === "integration_qqmusic");
+  assert.equal(qq.name, "Get Lucky");
+  assert.ok(State.spotifyPlaying, "declared, so the island dances");
+
+  // A media session has no volume, no shuffle and no repeat: those controls are
+  // not shown, where MPRIS would show them.
+  const card = buildSpotifyCard();
+  card.sync();
+  const [shuffle, , , , repeat] = card.el.querySelector("np-buttons").children;
+  assert.equal(shuffle.style.display, "none");
+  assert.equal(repeat.style.display, "none");
+  assert.equal(card.el.querySelector("np-volume").style.display, "none");
+  assert.match(card.el.textContent, /Get Lucky.*Daft Punk/);
+
+  // Back to a player that answers all three: they come back.
+  emit("spotify", playing({ pillId: "integration_qqmusic" }));
+  card.sync();
+  assert.equal(card.el.querySelector("np-buttons").children[0].style.display, "");
+  assert.equal(card.el.querySelector("np-volume").style.display, "");
+});
+
+test("the idle card names the player behind the report", () => {
+  State.os = "windows";
+  State.settings = { ...DEFAULT_SETTINGS, activeIntegrations: ["integration_qqmusic"] };
+  State.loadIntegrationTasks();
+  emit("spotify", { ...IDLE_SPOTIFY, pillId: "integration_qqmusic", installed: true });
+  const card = buildSpotifyCard();
+  card.sync();
+  assert.match(card.el.textContent, /QQ Music.*Integration.*Not playing.*Open QQ Music/);
+  card.el.find("BUTTON")[0].fire("click");
+  assert.ok(sent("spotify_open").some((call) => call.pillId === "integration_qqmusic"));
 });
 
 test("the card reads the player again each time it comes on screen", () => {

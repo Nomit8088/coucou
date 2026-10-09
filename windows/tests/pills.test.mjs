@@ -8,6 +8,7 @@ import {
   toggleDeclared,
 } from "../src/core/pills.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
+import { isMusicPill } from "../src/core/spotify.ts";
 
 test("the catalog is the personal fork set, with stable new ids", () => {
   assert.deepEqual(
@@ -19,14 +20,30 @@ test("the catalog is the personal fork set, with stable new ids", () => {
       ["integration_resend", "Resend", "#22C55E"],
       ["integration_gitlab", "GitLab", "#FC6D26"],
       ["integration_spotify", "Spotify", "#1DB954"],
+      ["integration_qqmusic", "QQ Music", "#31C27C"],
+      ["integration_qqmail", "QQ Mail", "#12B7F5"],
     ],
   );
   assert.equal(DEFAULT_MAIN_PILL, "agent_dsh");
   assert.equal(pillDefinition("integration_gitlab").connect.key, "gitlab-token");
-  assert.equal(pillDefinition("integration_spotify").support, "linux");
+  // Spotify is read over MPRIS on Linux and over a media session on Windows.
+  assert.equal(pillDefinition("integration_spotify").support, "yes");
+  // QQ Music's PC client only exists on Windows.
+  assert.equal(pillDefinition("integration_qqmusic").support, "windows");
+  assert.equal(pillDefinition("integration_qqmusic").mediaApp, "QQMusic.exe");
+  assert.equal(pillDefinition("integration_spotify").mediaApp, "Spotify.exe");
+  assert.equal(pillDefinition("integration_qqmail").connect.key, "qqmail-auth-code");
   for (const gone of ["integration_claude", "agent_cursor", "ai_anthropic", "integration_stripe", "integration_music"]) {
     assert.equal(pillDefinition(gone), undefined, gone);
   }
+});
+
+test("a music pill is one that follows a player, not one that takes a key", () => {
+  assert.ok(isMusicPill("integration_spotify"));
+  assert.ok(isMusicPill("integration_qqmusic"));
+  assert.ok(!isMusicPill("integration_qqmail"));
+  assert.ok(!isMusicPill("integration_github"));
+  assert.ok(!isMusicPill(null) && !isMusicPill(undefined));
 });
 
 test("IDs are unique", () => {

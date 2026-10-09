@@ -435,6 +435,27 @@ body {
   flex: 1 1 auto;
 }
 
+/* The editor detail uses the whole expanded island, like Claude Code's large
+   editing island, rather than leaving the agent list beside a narrow diff. */
+.overview.diff-open > .left {
+  flex: 1 1 100%;
+  width: 100%;
+}
+.overview.diff-open > .right {
+  display: none;
+}
+.overview.diff-open .left > .card {
+  border-radius: 22px;
+}
+.diff-path {
+  max-width: 42%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--dim-3);
+  font: 400 10px var(--mono);
+}
+
 .card-body {
   position: relative;
   z-index: 1;
@@ -678,8 +699,19 @@ body {
   color: var(--dim-3);
 }
 
+.diff-line .line-no {
+  flex: 0 0 34px;
+  padding-right: 8px;
+  text-align: right;
+  color: #4b4f58;
+  user-select: none;
+}
+.diff-line .new-no {
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
 .diff-line .sym {
-  flex: 0 0 12px;
+  flex: 0 0 18px;
+  padding-left: 7px;
   color: #454850;
 }
 

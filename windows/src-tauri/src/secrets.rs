@@ -23,6 +23,10 @@ pub const KNOWN_KEYS: &[&str] = &[
     "deepseek-api-key",
     "gitlab-url",
     "gitlab-token",
+    // QQ Mail: the mailbox's own address, and the 16-character authorisation
+    // code QQ's settings hand out for third-party clients (mail.rs).
+    "qqmail-address",
+    "qqmail-auth-code",
 ];
 
 /// Custom chat providers get one credential each: `chat-` plus a short id.

@@ -56,6 +56,7 @@ const OPEN_URLS: Record<string, string> = {
   integration_stripe: "https://dashboard.stripe.com/payments",
   integration_notion: "https://notion.so",
   integration_calcom: "https://app.cal.com/bookings",
+  integration_qqmail: "https://wx.mail.qq.com/",
 };
 
 /** IntegrationCardView.statusLabel on macOS. */
@@ -377,6 +378,36 @@ function n8nDetail(task: AgentTask, onBack: () => void): HTMLElement {
   );
 }
 
+// ── QQ Mail ───────────────────────────────────────────────────────────────────
+
+const QQMAIL_BLUE = "#12B7F5";
+/** The mailbox's web page: a row has no deep link to open instead. */
+const QQMAIL_URL = "https://wx.mail.qq.com/";
+
+/** The unseen count, and the newest of them — newest first, as mail reads. */
+function qqmailCard(): HTMLElement {
+  const d = get("integration_qqmail");
+  const unread = Number(d.unread ?? 0);
+  const messages = arr("integration_qqmail", "messages").slice().reverse();
+  const extra = h("span", { class: "int-total" }, h("i", { class: "pulse" }), h("span", { text: String(unread) }));
+  const rows = h("div", { class: "int-rows tight" });
+  if (messages.length === 0) {
+    rows.append(h("div", { class: "int-empty", text: t("No unread mail") }));
+  }
+  messages.slice(0, 3).forEach((m, i) => {
+    const cells: Node[] = [
+      h("span", { class: "int-name", text: String(m.from ?? "") }),
+      h("span", { class: "int-ago", text: timeAgo(m.date) }),
+    ];
+    if (i === 0 && m.subject) cells.push(h("span", { class: "int-sub", text: String(m.subject) }));
+    const row = listRow(QQMAIL_BLUE, i === 0, ...cells);
+    row.style.cursor = "pointer";
+    row.addEventListener("click", () => void Bridge.openUrl(QQMAIL_URL));
+    rows.append(row);
+  });
+  return h("div", { class: "int-card" }, header(QQMAIL_BLUE, "QQ Mail", t("Inbox"), extra), rows);
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 export interface IntegrationCardHooks {
@@ -404,6 +435,8 @@ export function hasIntegrationData(id: string): boolean {
     case "integration_notion":
       return arr(id, "pages").length > 0;
     case "integration_calcom":
+      return info.loaded;
+    case "integration_qqmail":
       return info.loaded;
     default:
       return false;
@@ -446,6 +479,8 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
       return notionCard();
     case "integration_calcom":
       return calcomCard();
+    case "integration_qqmail":
+      return qqmailCard();
     default:
       return idleCard(task, hooks.openSettings);
   }

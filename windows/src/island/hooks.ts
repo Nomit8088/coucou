@@ -246,6 +246,10 @@ function recordDiff(agentId: string, payload: HookPayload) {
   const diff = buildFileDiff(payload.tool_name ?? "", payload.tool_input ?? {});
   if (!diff) return;
   const id = State.appendSessionDiff(agentId, diff);
+  // DSH exposes complete edit payloads, so its finished edit can open the
+  // editor-style detail immediately instead of hiding the useful code preview
+  // behind the ticker. Set this before appendStep's synchronous notification.
+  if (agentId === "agent_dsh") State.showingDiffDetail = true;
   State.appendStep(agentId, makeDiffStep(fileName(diff.path), diff.added, diff.removed, id));
 }
 

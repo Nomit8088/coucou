@@ -22,6 +22,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["preserve_order"] }
 tokio = { version = "1", features = ["net", "io-util", "sync", "time", "rt"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# The QQ Mail pill's IMAP connection (mail.rs). Same TLS stack as reqwest's
+# rustls: the ring provider and the webpki roots are already in the lock, and
+# default features are off so no second provider (aws-lc) is pulled in.
+tokio-rustls = { version = "0.26", default-features = false, features = ["ring", "logging", "tls12"] }
+webpki-roots = "1"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
@@ -30,6 +35,12 @@ keyring = { version = "3", features = ["windows-native"] }
 webview2-com = "0.39"
 wv2_core = { package = "windows-core", version = "0.62" }
 windows = { version = "0.61", features = [
+  # The music pill: Windows' media sessions (SMTC), the track's thumbnail
+  # stream, and an MTA for the listener thread that watches them.
+  "Foundation",
+  "Foundation_Collections",
+  "Media_Control",
+  "Storage_Streams",
   "Win32_Foundation",
   "Win32_Security",
   "Win32_Security_Authorization",
@@ -40,6 +51,9 @@ windows = { version = "0.61", features = [
   "Win32_System_Pipes",
   "Win32_System_SystemInformation",
   "Win32_System_Threading",
+  "Win32_System_WinRT",
+  # ShellExecuteW starts (or brings forward) the player behind a music pill.
+  "Win32_UI_Shell",
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }

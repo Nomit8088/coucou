@@ -1,18 +1,19 @@
-// The Spotify pill and card — DOM ports of SpotifyPill / SpotifyCardView
+// The music pill and card — DOM ports of SpotifyPill / SpotifyCardView
 // (SpotifyViews.swift) and the shared now-playing pieces (NowPlayingViews.swift
 // and MusicControlButton). Sizes, colours and wording are the Mac's.
 //
-// What they show comes from src-tauri/src/spotify.rs (Linux, MPRIS) through
-// island/spotify.ts. A click changes the page's copy at once and Spotify
-// confirms it, as the Mac's controller does.
+// What they show comes from src-tauri/src/spotify.rs (MPRIS on Linux, SMTC on
+// Windows) through island/spotify.ts. A click changes the page's copy at once and
+// the player confirms it, as the Mac's controller does. Which pill they belong to
+// is the report's `pillId`, and the accent follows that pill's colour.
 
 import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
 import { State, type AgentTask } from "../core/state";
 import {
-  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, currentArtwork, formatTime, isAd, spotifyPosition, volumeLevel, withPlaying,
-  type SpotifyTrack,
+  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, capsOf, currentArtwork, formatTime, isAd, pillIdOf, spotifyPosition,
+  volumeLevel, withPlaying, type SpotifyTrack,
 } from "../core/spotify";
 import { createMiniBot } from "../mochi/minibots";
 import { pillDefinition } from "../core/pills";
@@ -173,6 +174,8 @@ class NowPlayingBar {
   private dragging = false;
   private fraction = 0;
   enabled = true;
+  /** Painted while the pointer is on the bar; the pill's colour. */
+  color = SPOTIFY_GREEN;
   private onChange: (f: number) => void;
   private onCommit: (f: number) => void;
 
@@ -230,12 +233,18 @@ class NowPlayingBar {
     this.paint();
   }
 
+  /** The pill this bar belongs to changed colour. */
+  setColor(color: string) {
+    this.color = color;
+    this.paint();
+  }
+
   private paint() {
     const active = this.active;
     this.el.classList.toggle("active", active);
     const pct = `${this.fraction * 100}%`;
     this.fill.style.width = pct;
-    this.fill.style.background = active ? SPOTIFY_GREEN : "#C5C8CD";
+    this.fill.style.background = active ? this.color : "#C5C8CD";
     this.knob.style.left = `clamp(0px, calc(${pct} - 4.5px), calc(100% - 9px))`;
   }
 }
@@ -250,24 +259,37 @@ function iconButton(icon: string, size: number, stroke: number, onClick: () => v
 export interface SpotifyCardHost {
   el: HTMLElement;
   sync(): void;
+  /** The pill on screen changed: repaint in its colour. */
+  setAccent(color: string): void;
 }
 
 /** SpotifyCardView: now playing, or the idle card (not playing / not installed). */
 export function buildSpotifyCard(): SpotifyCardHost {
-  const green = SPOTIFY_GREEN;
+  // Spotify's green until the island says which pill the card is showing.
+  let accent = SPOTIFY_GREEN;
+  /** The player's own name, and whether it is the one the Mac knows. */
+  const player = () => pillDefinition(pillIdOf())?.name ?? "Spotify";
+  const onSpotify = () => pillIdOf() === SPOTIFY_ID;
+  /** "Open Spotify" stays the Mac's string; another player says its own name. */
+  const openLabel = (installed: boolean) => {
+    if (onSpotify()) return installed ? t("Open Spotify") : t("Get Spotify");
+    const name = player();
+    return installed ? t("Open {0}", { 0: name }) : t("Get {0}", { 0: name });
+  };
 
   // Now playing: artwork row, progress row, controls row.
   const art = h("div", { class: "np-art" });
   const artImg = h("img", { alt: "", draggable: "false" }) as HTMLImageElement;
   const artNote = svg(ICONS.musicNote, 16);
-  artNote.style.color = `${green}b3`;
+  artNote.style.color = `${accent}b3`;
   art.append(artNote, artImg);
-  art.addEventListener("click", () => void Bridge.spotifyOpen());
+  art.addEventListener("click", () => void Bridge.spotifyOpen(pillIdOf()));
   const title = h("span", { class: "np-title" });
   const subtitle = h("div", { class: "np-sub" });
+  const titleDot = dot(accent, 6);
   const head = h("div", { class: "np-head" },
     art,
-    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, dot(green, 6), title), subtitle),
+    h("div", { class: "np-text" }, h("div", { class: "np-title-row" }, titleDot, title), subtitle),
   );
 
   let dragFraction: number | null = null;
@@ -309,11 +331,13 @@ export function buildSpotifyCard(): SpotifyCardHost {
   // Idle: the same layout as the other idle cards.
   const idleDot = dot("#22C55E", 5);
   const idleText = h("span");
-  const idleAction = h("button", { class: "link-btn", style: `color:${green}d9` });
-  idleAction.addEventListener("click", () => void Bridge.spotifyOpen());
+  const idleAction = h("button", { class: "link-btn", style: `color:${accent}d9` });
+  idleAction.addEventListener("click", () => void Bridge.spotifyOpen(pillIdOf()));
   const idleSub = h("span");
+  const idleName = h("b");
+  const idleHeadDot = dot(accent, 7);
   const idleEl = h("div", { class: "int-card" },
-    h("div", { class: "int-head" }, dot(green, 7), h("b", { text: "Spotify" }), idleSub),
+    h("div", { class: "int-head" }, idleHeadDot, idleName, idleSub),
     h("div", { class: "int-status" }, idleDot, idleText),
     h("div", { class: "int-actions" }, idleAction),
   );
@@ -365,7 +389,8 @@ export function buildSpotifyCard(): SpotifyCardHost {
     } else if (isAd(track)) {
       title.textContent = t("Advertisement");
     }
-    art.title = track.album ? t("{0} — open Spotify", { 0: track.album }) : t("Open Spotify");
+    art.title = !onSpotify() ? t("Open {0}", { 0: player() })
+      : track.album ? t("{0} — open Spotify", { 0: track.album }) : t("Open Spotify");
     const cover = currentArtwork(s);
     if (cover) {
       if (artImg.getAttribute("src") !== cover) artImg.setAttribute("src", cover);
@@ -378,9 +403,15 @@ export function buildSpotifyCard(): SpotifyCardHost {
     progress.enabled = !isAd(track) && track.duration > 0;
     paintProgress();
 
-    shuffle.style.color = s.shuffle ? green : "#6B7079";
+    // What the player can do: Windows' media session has no volume, and reports
+    // no shuffle or repeat, so those controls are not shown at all there.
+    const caps = capsOf(s);
+    shuffle.style.display = caps.shuffle ? "" : "none";
+    repeat.style.display = caps.repeat ? "" : "none";
+    volumeBox.style.display = caps.volume ? "" : "none";
+    shuffle.style.color = s.shuffle ? accent : "#6B7079";
     shuffle.title = s.shuffle ? t("Shuffle on") : t("Shuffle off");
-    repeat.style.color = s.repeat ? green : "#6B7079";
+    repeat.style.color = s.repeat ? accent : "#6B7079";
     repeat.title = s.repeat ? t("Repeat on") : t("Repeat off");
     prev.title = t("Previous");
     next.title = t("Next");
@@ -404,15 +435,28 @@ export function buildSpotifyCard(): SpotifyCardHost {
   }
 
   function syncIdle() {
-    const installed = Spotify.state.installed || Spotify.state.running;
+    const s = Spotify.state;
+    const name = player();
+    const installed = s.installed || s.running;
+    idleName.textContent = name;
+    idleSub.textContent = t(pillDefinition(pillIdOf(s))?.subtitle ?? N_("Integration"));
     idleDot.style.background = installed ? "#22C55E" : "#F4505E";
-    idleText.textContent = installed ? t("Not playing") : t("Spotify not installed");
-    idleAction.textContent = installed ? t("Open Spotify") : t("Get Spotify");
-    idleSub.textContent = t(pillDefinition(SPOTIFY_ID)?.subtitle ?? N_("Integration"));
+    idleText.textContent = installed
+      ? t("Not playing")
+      : onSpotify() ? t("Spotify not installed") : t("{0} not installed", { 0: name });
+    idleAction.textContent = openLabel(installed);
   }
 
   return {
     el,
+    setAccent(color: string) {
+      accent = color;
+      artNote.style.color = `${color}b3`;
+      titleDot.style.background = color;
+      idleHeadDot.style.background = color;
+      idleAction.style.color = `${color}d9`;
+      progress.setColor(color);
+    },
     sync() {
       const track = Spotify.state.track;
       const want = track ? "playing" : "idle";
