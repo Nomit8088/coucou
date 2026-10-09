@@ -445,6 +445,24 @@ function buildOverview(actions: ViewActions): ViewHost {
             text: `${t("Reminders")} ${State.scheduleInfo.active}`,
           }));
         }
+        // DSH permission preset (e.g. workspace-write). Clicking cycles to next available preset.
+        const preset = State.permissionPresets.get(task.id);
+        if (preset && preset.current) {
+          const pill = h("span", {
+            class: "ctx-pill preset-pill",
+            title: t("Permission mode (click to switch)"),
+            text: preset.current,
+            style: "cursor: pointer;",
+            onclick: () => {
+              const list = preset.available;
+              if (list.length < 2) return;
+              const idx = list.indexOf(preset.current);
+              const nextPreset = list[(idx + 1) % list.length];
+              void Bridge.dshSetPreset(nextPreset);
+            },
+          });
+          who.append(pill);
+        }
         if (task.steps.length > 1) {
           who.append(h("span", {
             class: "count",

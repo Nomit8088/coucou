@@ -251,6 +251,8 @@ class AppState {
   jobInfo = new Map<string, { running: number; total: number; label: string; progress: string }>();
   /** DSH's host-wide scheduled reminders (0 active until the plugin says). */
   scheduleInfo: { active: number; total: number; next: string } = { active: 0, total: 0, next: "" };
+  /** DSH permission presets per session: current preset name and available presets. */
+  permissionPresets = new Map<string, { current: string; available: string[] }>();
   /** A plan card is open in place of the overview's left card. */
   showingPlanDetail = false;
   /** Which one: the Codex card rather than Claude's. */

@@ -215,6 +215,14 @@ pub fn steer_file(name: &str, path: &str) -> bool {
     }))
 }
 
+/// Switch DSH permission preset for the current session.
+pub fn set_preset(preset: &str) -> bool {
+    send(&serde_json::json!({
+        "kind": "preset",
+        "preset": preset,
+    }))
+}
+
 fn send(payload: &serde_json::Value) -> bool {
     #[cfg(windows)]
     {

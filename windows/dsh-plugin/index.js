@@ -53,6 +53,13 @@ function toOneLine(text) {
   return text.replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
+function lastSegment(path) {
+  if (typeof path !== "string") return "";
+  const cleaned = path.replace(/[\\/]+$/, "");
+  const idx = Math.max(cleaned.lastIndexOf("\\"), cleaned.lastIndexOf("/"));
+  return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
+}
+
 function findCreateUserMessage() {
   const keys = Object.keys(module._cache ?? {});
   const hit = keys.find((key) => key.replaceAll("\\", "/").includes("/@deepseek-ai/dsh-llm/"));
@@ -174,6 +181,63 @@ export function apply(ctx, config) {
     });
   });
 
+  // The session store's own edges. `agent/*` already covers the pill, but a
+  // session can be restored from the store, or dropped for publication
+  // rollback, without an agent ever being created or disposed — and then
+  // nothing announced its folder.
+  ctx.on("session/created", (session) => {
+    const sid = session?.id ?? "";
+    if (!sid) return;
+    const cwd = session?.header?.cwd ?? "";
+    display(pipe, {
+      hook_event_name: "SessionStart",
+      session_id: String(sid),
+      coucou_agent: AGENT,
+      cwd,
+    });
+  });
+
+  ctx.on("session/disposed", (session) => {
+    const sid = session?.id ?? "";
+    if (!sid) return;
+    display(pipe, {
+      hook_event_name: "SessionEnd",
+      session_id: String(sid),
+      coucou_agent: AGENT,
+    });
+  });
+
+  // A file was read or found absent. DSH already reports the tool call itself;
+  // this is the only signal for a read the model made outside a visible tool
+  // step, and it stays a plain ticker line: nothing here changes a state.
+  ctx.on("fs/observed", (target, observation) => {
+    const path = target?.path ?? target?.targetKey ?? "";
+    if (!path) return;
+    const missing = observation?.kind === "absent";
+    display(pipe, {
+      hook_event_name: "Warning",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: missing ? `⚠ missing · ${lastSegment(path)}` : `Reads · ${lastSegment(path)}`,
+    });
+  });
+
+  // A session was archived and its running work is being stopped: the turn
+  // will not finish on its own, so the pill must not sit on "working" for ever.
+  ctx.on("workspace/session-stop", (request) => {
+    const sid = request?.sessionId ? String(request.sessionId) : "";
+    if (!sid) return;
+    turnOpen.delete(sid);
+    sawWork.delete(sid);
+    display(pipe, {
+      hook_event_name: "Stop",
+      session_id: sid,
+      coucou_agent: AGENT,
+      last_assistant_message: lastAssistant.get(sid) ?? "",
+    });
+  });
+
+
   // Context usage. Optional on purpose: `tokenMeter` and `sessionProjections`
   // are separate plugins, and a profile that does not load them must keep
   // working exactly as before — `ctx.inject` simply never runs the body then.
@@ -294,6 +358,39 @@ export function apply(ctx, config) {
     // No schedule service in this profile.
   }
 
+  // Permission presets management: report effective preset and allow switching via reverse pipe.
+  let presetsService = null;
+  const sendPreset = (session) => {
+    if (!presetsService || !session) return;
+    try {
+      const currentPreset = presetsService.current(session);
+      const names = presetsService.names ?? [];
+      display(pipe, {
+        hook_event_name: "PresetChanged",
+        session_id: sessionIdOf(session),
+        coucou_agent: AGENT,
+        preset: currentPreset,
+        presets: names,
+      });
+    } catch {}
+  };
+
+  try {
+    ctx.inject(["permissionPresets"], (permCtx) => {
+      presetsService = permCtx.permissionPresets;
+      ctx.on("agent/created", ({ agent }) => {
+        if (agent?.session) sendPreset(agent.session);
+      });
+      ctx.on("session/event", (session, event) => {
+        if (event?.type === "permission/preset") {
+          sendPreset(session);
+        }
+      });
+    });
+  } catch {
+    // Permission presets not installed in this profile.
+  }
+
   ctx.on("agent/pre-step", (payload, next) => {
     remember(payload?.agent);
     const sid = sessionIdOf(payload?.agent);
@@ -386,6 +483,23 @@ export function apply(ctx, config) {
       tool_input: cached?.arguments ?? exec?.arguments ?? {},
     });
     return next();
+  });
+
+  // Observe the frozen, lossless-JSON final outcome of every tool call.
+  // Provides a concise result status or error detail without leaking large payload.
+  ctx.on("tools/result", (exec, result) => {
+    if (!result) return;
+    if (result.isError) {
+      const errStr = errorText(result.error);
+      if (errStr && errStr !== "Agent error") {
+        display(pipe, {
+          hook_event_name: "Warning",
+          session_id: sessionIdOf(exec?.agent),
+          coucou_agent: AGENT,
+          message: `⚠ ${exec?.name ?? "tool"}: ${errStr}`,
+        });
+      }
+    }
   });
 
   ctx.on("agent/turn-stopping", (payload) => {
@@ -626,6 +740,20 @@ export function apply(ctx, config) {
         current.cancel({ kind: "user" });
       } catch {
         // A dead session is not an error the island should surface.
+      }
+      return;
+    }
+
+    // Switch the session's permission preset.
+    if (kind === "preset") {
+      const presetName = typeof msg.preset === "string" ? msg.preset.trim() : "";
+      if (presetName && presetsService && current?.session) {
+        try {
+          presetsService.set(current.session, presetName);
+          sendPreset(current.session);
+        } catch {
+          // Preset unknown or invalid.
+        }
       }
       return;
     }

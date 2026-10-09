@@ -436,6 +436,12 @@ fn dsh_steer_file(name: String, path: String) -> bool {
     dsh::steer_file(&name, &path)
 }
 
+/// Switches DSH permission preset for the current session.
+#[tauri::command]
+fn dsh_set_preset(preset: String) -> bool {
+    dsh::set_preset(&preset)
+}
+
 // ── Plan usage ────────────────────────────────────────────────────────────────
 
 /// The diff of putting the plan usage relay into (or taking it out of) the
@@ -770,6 +776,7 @@ pub fn run() {
             dsh_steer,
             dsh_cancel,
             dsh_steer_file,
+            dsh_set_preset,
             gitlab_refresh,
             status_line_preview,
             status_line_apply,

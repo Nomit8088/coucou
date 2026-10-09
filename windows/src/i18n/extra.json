@@ -2824,6 +2824,17 @@
    "ru": "Отправить в эту сессию…",
    "id": "Kirim ke sesi ini…"
   },
+  "Permission mode (click to switch)": {
+   "zh-Hans": "权限模式（点击切换）",
+   "hi": "अनुमति मोड (बदलने के लिए क्लिक करें)",
+   "es": "Modo de permisos (haz clic para cambiar)",
+   "ar": "وضع الأذونات (انقر للتبديل)",
+   "fr": "Mode d’autorisation (cliquer pour changer)",
+   "bn": "অনুমতি মোড (পরিবর্তন করতে ক্লিক করুন)",
+   "pt-BR": "Modo de permissão (clique para alternar)",
+   "ru": "Режим разрешений (нажмите для переключения)",
+   "id": "Mode izin (klik untuk beralih)"
+  },
   "Jobs": {
    "zh-Hans": "作业",
    "hi": "कार्य",

@@ -496,3 +496,56 @@ test("a profile with neither jobs nor schedule still works", async () => {
   assert.equal(written.some((e) => e.hook_event_name === "ScheduleChanged"), false);
   assert.equal(written[0].hook_event_name, "SessionStart");
 });
+
+test("tools/result reports failed tool details as a warning", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "tools/result", { name: "bash", agent: agent("s1") }, {
+    isError: true,
+    error: { message: "command not found: foobar" },
+  });
+  await waitFor(2, "Warning for tools/result");
+
+  const ev = written.find((e) => e.hook_event_name === "Warning" && e.message?.includes("foobar"));
+  assert.ok(ev, "warning was reported");
+  assert.equal(ev.message, "⚠ bash: command not found: foobar");
+});
+
+test("fs/observed reports missing files as warnings", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "fs/observed", { path: "C:\\dev\\missing.txt" }, { kind: "absent" });
+  await waitFor(2, "Warning for fs/observed");
+
+  const ev = written.find((e) => e.hook_event_name === "Warning" && e.message?.includes("missing.txt"));
+  assert.ok(ev, "warning was reported");
+  assert.equal(ev.message, "⚠ missing · missing.txt");
+});
+
+test("workspace/session-stop stops the running session", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "workspace/session-stop", { sessionId: "s1" });
+  await waitFor(2, "Stop for workspace/session-stop");
+
+  const ev = written.find((e) => e.hook_event_name === "Stop");
+  assert.ok(ev, "stop was emitted");
+  assert.equal(ev.session_id, "s1");
+});
+
+test("permissionPresets reports current preset on session start", async () => {
+  let presetSet = "";
+  const permService = {
+    current: () => "workspace-write",
+    names: ["workspace-write", "danger-full-access"],
+    set: (sess, name) => { presetSet = name; },
+  };
+  const { listeners } = await startPluginWith({ permissionPresets: permService });
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  await waitFor(2, "PresetChanged");
+
+  const ev = written.find((e) => e.hook_event_name === "PresetChanged");
+  assert.ok(ev, "preset changed was reported");
+  assert.equal(ev.preset, "workspace-write");
+  assert.deepEqual(ev.presets, ["workspace-write", "danger-full-access"]);
+});

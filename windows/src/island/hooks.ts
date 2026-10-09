@@ -78,6 +78,9 @@ interface HookPayload {
   reminders_active?: number;
   reminders_total?: number;
   reminders_next?: string;
+  /** PresetChanged (the DSH plugin): current permission preset and catalog. */
+  preset?: string;
+  presets?: string[];
 }
 
 const PROJECT_ALIASES: Record<string, string> = {
@@ -448,6 +451,19 @@ function handleHook(island: Island, payload: HookPayload) {
         total: typeof payload.reminders_total === "number" ? payload.reminders_total : 0,
         next: payload.reminders_next ?? "",
       };
+      State.notify();
+      break;
+    }
+
+    // DSH permission preset changed (e.g. workspace-write, danger-full-access).
+    case "PresetChanged": {
+      ensurePill();
+      if (typeof payload.preset === "string" && payload.preset) {
+        State.permissionPresets.set(agentId, {
+          current: payload.preset,
+          available: Array.isArray(payload.presets) ? payload.presets : [],
+        });
+      }
       State.notify();
       break;
     }
