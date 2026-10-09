@@ -197,7 +197,7 @@ impl Recap {
         }
         self.close_stale(now);
         let event = text(payload, "hook_event_name");
-        let agent = agent_id(payload);
+        let Some(agent) = agent_id(payload) else { return };
         let key = session_key(payload, &agent);
 
         match event {
@@ -300,7 +300,8 @@ impl Recap {
         if self.requests.len() >= MAX_REQUESTS {
             self.requests.clear();
         }
-        self.requests.insert(request_id.to_string(), agent_id(payload));
+        let Some(agent) = agent_id(payload) else { return };
+        self.requests.insert(request_id.to_string(), agent);
     }
 
     /// The request was handed back to the terminal: nothing to record.
@@ -310,10 +311,7 @@ impl Recap {
 
     /// A click on Allow or Deny.
     pub fn record_decision(&mut self, request_id: &str, decision: &str, now: i64) {
-        let agent = self
-            .requests
-            .remove(request_id)
-            .unwrap_or_else(|| "integration_claude".to_string());
+        let Some(agent) = self.requests.remove(request_id) else { return };
         if !self.history.prefs.enabled {
             return;
         }
@@ -472,19 +470,13 @@ fn text<'a>(payload: &'a Value, key: &str) -> &'a str {
 /// valid `coucou_agent` → `agent_<name>` (every agent the relay normalises,
 /// Claude Desktop included); otherwise Claude Code's own pill — Cursor's when
 /// it runs in Cursor's terminal, VS Code's else. "claude" is reserved.
-fn agent_id(payload: &Value) -> String {
+fn agent_id(payload: &Value) -> Option<String> {
     let raw = text(payload, "coucou_agent");
     let valid = !raw.is_empty()
         && raw.len() <= 24
         && raw != "claude"
         && raw.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
-    if valid {
-        format!("agent_{raw}")
-    } else if text(payload, "term_editor") == "cursor" {
-        "agent_cursor".to_string()
-    } else {
-        "integration_claude".to_string()
-    }
+    valid.then(|| format!("agent_{raw}"))
 }
 
 /// Concurrent sessions are tracked apart; one without an ID is keyed by its
@@ -784,7 +776,7 @@ mod tests {
     }
 
     fn event(name: &str, session: &str, extra: Value) -> Value {
-        let mut v = json!({ "hook_event_name": name, "session_id": session, "cwd": "/home/me/code/coucou" });
+        let mut v = json!({ "hook_event_name": name, "session_id": session, "cwd": "/home/me/code/coucou", "coucou_agent": "dsh" });
         if let (Some(obj), Value::Object(more)) = (v.as_object_mut(), extra) {
             obj.extend(more);
         }
@@ -814,7 +806,7 @@ mod tests {
 
         let view = r.view(0);
         assert_eq!(view.turns, vec![Turn {
-            agent: "integration_claude".into(),
+            agent: "agent_dsh".into(),
             project: "coucou".into(),
             start: T0,
             end: T0 + HOUR,
@@ -845,7 +837,7 @@ mod tests {
         r.observe(&event("Stop", "b", json!({ "coucou_agent": "gemini" })), T0 + 180);
         let turns = r.view(0).turns;
         assert_eq!(turns.len(), 2);
-        assert_eq!((turns[0].agent.as_str(), turns[0].commands_run), ("integration_claude", 0));
+        assert_eq!((turns[0].agent.as_str(), turns[0].commands_run), ("agent_dsh", 0));
         assert_eq!(turns[1].agent, "agent_gemini");
         assert_eq!(turns[1].project, "side-project");
         assert_eq!(turns[1].commands_run, 1);
@@ -855,19 +847,16 @@ mod tests {
     #[test]
     fn invalid_or_reserved_agent_tags_fall_back_to_claude_code() {
         for tag in ["claude", "Gemini", "has space", "a-very-long-agent-name-over-24"] {
-            assert_eq!(agent_id(&json!({ "coucou_agent": tag })), "integration_claude", "{tag}");
+            assert_eq!(agent_id(&json!({ "coucou_agent": tag })), None, "{tag}");
         }
-        assert_eq!(agent_id(&json!({ "coucou_agent": "codex" })), "agent_codex");
+        assert_eq!(agent_id(&json!({ "coucou_agent": "codex" })), Some("agent_codex".into()));
+        assert_eq!(agent_id(&json!({ "coucou_agent": "dsh" })), Some("agent_dsh".into()));
     }
 
     #[test]
-    fn a_turn_counts_for_the_pill_it_showed_on() {
-        // Claude Code in Cursor's terminal is the Cursor pill, as in hooks.ts.
-        assert_eq!(agent_id(&json!({ "term_editor": "cursor" })), "agent_cursor");
-        // An explicit agent wins over the terminal it runs in.
-        assert_eq!(agent_id(&json!({ "coucou_agent": "claude-desktop", "term_editor": "cursor" })), "agent_claude-desktop");
-        assert_eq!(agent_id(&json!({ "coucou_agent": "copilot" })), "agent_copilot");
-        assert_eq!(agent_id(&json!({})), "integration_claude");
+    fn a_turn_without_an_agent_is_not_counted() {
+        assert_eq!(agent_id(&json!({ "term_editor": "cursor" })), None);
+        assert_eq!(agent_id(&json!({})), None);
     }
 
     #[test]
@@ -895,9 +884,8 @@ mod tests {
         r.note_request("r4", &json!({}));
         r.forget_request("r4");
         let d = r.view(0).decisions;
-        assert_eq!(d.len(), 2);
+        assert_eq!(d.len(), 1);
         assert_eq!((d[0].agent.as_str(), d[0].decision.as_str()), ("agent_codex", "allow"));
-        assert_eq!((d[1].agent.as_str(), d[1].decision.as_str()), ("integration_claude", "deny"));
         assert!(r.requests.is_empty());
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -911,11 +899,11 @@ mod tests {
         let edge = T0 - WINDOW_SECS;
         for start in [old, edge, T0 - HOUR] {
             r.history.turns.push(Turn {
-                agent: "integration_claude".into(), project: "p".into(), start, end: start + 60,
+                agent: "agent_dsh".into(), project: "p".into(), start, end: start + 60,
                 files_changed: 0, lines_added: 0, lines_removed: 0, commands_run: 0, questions: 0,
             });
         }
-        r.history.decisions.push(Decision { agent: "integration_claude".into(), date: old, decision: "allow".into() });
+        r.history.decisions.push(Decision { agent: "agent_dsh".into(), date: old, decision: "allow".into() });
         r.prune(T0);
         r.save();
         assert_eq!(r.view(0).turns.iter().map(|t| t.start).collect::<Vec<_>>(), [edge, T0 - HOUR]);

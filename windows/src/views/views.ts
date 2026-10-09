@@ -565,8 +565,8 @@ function buildQuestion(actions: ViewActions): ViewHost {
   // between a mouse-down and a mouse-up would swallow the click.
   let rowKey = "";
 
-  const next = (question: string, answer: string | string[], total: number) => {
-    answers[question] = answer;
+  const next = (key: string, answer: string | string[], total: number) => {
+    answers[key] = answer;
     picked = new Set();
     index += 1;
     if (index >= total) actions.answer(answers);
@@ -616,7 +616,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
         const on = picked.has(option.label);
         const button = btn(option.label, on ? "primary" : "secondary", () => {
           if (!q.multiSelect) {
-            next(q.question, option.label, questions.length);
+            next(q.id || q.question, option.label, questions.length);
             return;
           }
           if (on) picked.delete(option.label);
@@ -628,7 +628,7 @@ function buildQuestion(actions: ViewActions): ViewHost {
       }
       if (q.multiSelect) {
         const done = btn(tl("Done"), "primary", () => {
-          if (picked.size > 0) next(q.question, [...picked], questions.length);
+          if (picked.size > 0) next(q.id || q.question, [...picked], questions.length);
         });
         if (picked.size === 0) done.classList.add("off");
         row.append(done);

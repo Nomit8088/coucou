@@ -7,6 +7,7 @@ mod claude;
 mod codex_plan;
 mod config_file;
 mod desktop;
+mod dsh;
 mod files;
 mod github;
 mod hooks;
@@ -346,25 +347,81 @@ fn hooks_apply(
 
 // ── Other agents' hooks and plugins ──────────────────────────────────────────
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ListedAgent {
+    id: String,
+    name: String,
+    installed: bool,
+    path: String,
+    hook_ready: bool,
+    approvals: bool,
+    note: String,
+}
+
 #[tauri::command]
-fn agent_hooks_list() -> Vec<agents::AgentStatus> {
-    agents::list()
+fn agent_hooks_list(shared: State<Shared>) -> Vec<ListedAgent> {
+    let settings = shared.settings.lock().unwrap().clone();
+    let dsh = dsh::status(&settings);
+    let mut out = vec![ListedAgent {
+        id: dsh.id.into(),
+        name: dsh.name.into(),
+        installed: dsh.installed,
+        path: dsh.path,
+        hook_ready: dsh.hook_ready,
+        approvals: dsh.approvals,
+        note: dsh.note,
+    }];
+    out.extend(agents::list().into_iter().map(|agent| ListedAgent {
+        id: agent.id.into(),
+        name: agent.name.into(),
+        installed: agent.installed,
+        path: agent.path,
+        hook_ready: agent.hook_ready,
+        approvals: agent.approvals,
+        note: agent.note,
+    }));
+    out
 }
 
 /// The diff the user has to look at before anything is written.
 #[tauri::command]
-fn agent_hooks_preview(agent: String, install: bool) -> Result<config_file::Plan, String> {
+fn agent_hooks_preview(shared: State<Shared>, agent: String, install: bool) -> Result<config_file::Plan, String> {
+    if agent == "dsh" {
+        let settings = shared.settings.lock().unwrap().clone();
+        return dsh::preview(&settings, install);
+    }
     agents::preview(&agent, install)
 }
 
 /// Only ever called from an explicit click in the settings window, with the
 /// fingerprint of the preview the user looked at.
 #[tauri::command]
-fn agent_hooks_apply(agent: String, install: bool, fingerprint: String) -> Result<String, String> {
-    let backups = agents::apply(&agent, install, &fingerprint)?;
+fn agent_hooks_apply(
+    shared: State<Shared>,
+    agent: String,
+    install: bool,
+    fingerprint: String,
+) -> Result<String, String> {
+    let backups = if agent == "dsh" {
+        let settings = shared.settings.lock().unwrap().clone();
+        dsh::apply(&settings, install, &fingerprint)?
+    } else {
+        agents::apply(&agent, install, &fingerprint)?
+    };
     let done = if install { "installed" } else { "removed" };
     log::line(format!("agent hooks {done} for {agent}"));
+    if agent == "dsh" {
+        log::line("restart DeepSeek Harness to load the plugin");
+    }
     Ok(backups)
+}
+
+/// Writes one steer line to the DSH plugin. False means the plugin is not
+/// listening; the island then uses its own chat and does not show an error.
+#[tauri::command]
+fn dsh_steer(text: String) -> bool {
+    dsh::steer(&text)
 }
 
 // ── Plan usage ────────────────────────────────────────────────────────────────
@@ -543,6 +600,11 @@ fn github_refresh(section: String) {
     integrations::github_refresh_if_stale(&section);
 }
 
+#[tauri::command]
+fn gitlab_refresh(app: AppHandle) {
+    integrations::gitlab_refresh_if_stale(&app);
+}
+
 /// Lets the island write to the same log as the Rust side.
 #[tauri::command]
 fn log_line(message: String) {
@@ -689,6 +751,8 @@ pub fn run() {
             agent_hooks_list,
             agent_hooks_preview,
             agent_hooks_apply,
+            dsh_steer,
+            gitlab_refresh,
             status_line_preview,
             status_line_apply,
             codex_plan_usage,

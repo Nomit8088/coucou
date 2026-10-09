@@ -16,8 +16,7 @@ import { parseClaudePlan, restorePlanUsage } from "../core/plan";
 import { setClaudePlanUsage, storedClaudePlanUsage } from "../views/usage";
 import { N_, t } from "../i18n/i18n";
 
-const CLAUDE_ID = "integration_claude";
-const CURSOR_ID = "agent_cursor";
+const DSH_ID = "agent_dsh";
 
 /** Clears the approval card if no decision was made before the hook gave up. */
 let pendingTimeout: number | null = null;
@@ -93,13 +92,22 @@ function lastPathComponent(p: string): string {
  */
 const TOOL_LABELS: Record<string, string> = {
   Bash: N_("Runs"),
+  bash: N_("Runs"),
+  pwsh: N_("Runs"),
   Read: N_("Reads"),
+  read: N_("Reads"),
   Write: N_("Writes"),
+  write: N_("Writes"),
   Edit: N_("Edits"),
+  edit: N_("Edits"),
   Glob: N_("Searches"),
+  glob: N_("Searches"),
   Grep: N_("Searches"),
+  grep: N_("Searches"),
   WebSearch: N_("Searches the web"),
+  web_search: N_("Searches the web"),
   WebFetch: N_("Fetches"),
+  web_fetch: N_("Fetches"),
   TodoWrite: N_("Tasks"),
   Task: N_("Agent"),
   LS: N_("Lists"),
@@ -162,7 +170,9 @@ function approvalTarget(tool: string, input: Record<string, unknown>): string {
  * as options to pick from. Anything it cannot is left to the terminal.
  */
 function askedQuestions(tool: string, input: Record<string, unknown>): AskedQuestion[] | null {
-  if (tool !== "AskUserQuestion" || !Array.isArray(input.questions)) return null;
+  // Claude Code's AskUserQuestion, or DSH's user-questions payload. DSH is not
+  // aliased onto AskUserQuestion: the tool name stays `user-questions`.
+  if ((tool !== "AskUserQuestion" && tool !== "user-questions") || !Array.isArray(input.questions)) return null;
   const out: AskedQuestion[] = [];
   for (const raw of input.questions as Record<string, unknown>[]) {
     const question = typeof raw?.question === "string" ? raw.question : "";
@@ -174,7 +184,9 @@ function askedQuestions(tool: string, input: Record<string, unknown>): AskedQues
       }));
     // A question cut short by the relay would be answered under the wrong text.
     if (!question || question.endsWith("…") || options.length < 2) return null;
-    out.push({ question, options, multiSelect: raw.multiSelect === true });
+    const id = typeof raw.id === "string" && raw.id ? raw.id : undefined;
+    const header = typeof raw.header === "string" ? raw.header : undefined;
+    out.push({ id, question, header, options, multiSelect: raw.multiSelect === true || raw.multi_select === true });
   }
   return out.length > 0 ? out : null;
 }
@@ -252,13 +264,14 @@ function handleHook(island: Island, payload: HookPayload) {
   const raw = lastPathComponent(cwd);
   const projectName = aliasProjectName(raw || "Session");
 
-  // Route to the right pill. Valid coucou_agent → dynamic "agent_<name>" pill.
-  // "claude" is reserved; absent or invalid → Claude Code's own pill: Cursor's
-  // when it runs in Cursor's terminal (Mac #120), VS Code's otherwise.
+  // No coucou_agent: discard. This fork does not keep a Claude Code pill.
   const validAgent = validateAgent(payload.coucou_agent);
-  const workspaceId = payload.term_editor === "cursor" ? CURSOR_ID : CLAUDE_ID;
-  const agentId = validAgent ? `agent_${validAgent}` : workspaceId;
-  const isExternalAgent = validAgent !== null;
+  if (!validAgent) {
+    if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
+    return;
+  }
+  const agentId = `agent_${validAgent}`;
+  const isExternalAgent = true;
   const sessionId = payload.session_id ?? "";
 
   /** Alerts force the island open; work events only reveal the compact island. */
@@ -478,7 +491,7 @@ function handleHook(island: Island, payload: HookPayload) {
       // Claude Code asking a question is not a permission to grant: the island
       // shows the options and sends back the one that was picked. Only Claude
       // Code asks questions this way.
-      const questions = isExternalAgent ? null : askedQuestions(tool, input);
+      const questions = validAgent === "dsh" || !isExternalAgent ? askedQuestions(tool, input) : null;
       const view = questions ? "question" : "approval";
       // The card always comes up, even over another pill or an island that is
       // already open: its pill comes to the front, and the one you were on

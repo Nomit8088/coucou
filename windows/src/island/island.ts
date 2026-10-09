@@ -594,6 +594,8 @@ export class Island {
         if (State.droppedFile?.path !== path) return;
         State.droppedFile = { name: file.name, path: file.path };
         State.promptContext = { kind: "file", name: file.name, path: file.path };
+        const dsh = State.focusTask?.id === "agent_dsh" && State.focusTask.sessionId;
+        if (dsh) void Bridge.dshSteer(`The user dropped a file.\nName: ${file.name}\nPath: ${file.path}`);
         State.notify();
       })
       .catch((err) => {

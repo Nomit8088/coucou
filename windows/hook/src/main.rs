@@ -50,7 +50,8 @@ mod statusline;
 
 /// The live diff needs the whole text of a file edit, once it has happened:
 /// PostToolUse of these tools keeps its edit strings far longer than the rest.
-const DIFF_TOOLS: &[&str] = &["Edit", "MultiEdit", "Write"];
+/// PascalCase is Codex / Claude Code; lowercase is DSH. Both stay.
+const DIFF_TOOLS: &[&str] = &["Edit", "MultiEdit", "Write", "edit", "write"];
 /// The `tool_input` keys holding the text being replaced or written.
 const DIFF_FIELDS: &[&str] = &["old_string", "new_string", "content"];
 /// Per edit string. The island stops diffing at 200 KB anyway (DiffEngine).
@@ -153,19 +154,12 @@ fn prepare(raw: &[u8], args: &Args, env: &dyn Fn(&str) -> Option<String>, cwd: &
     let mut payload = serde_json::from_slice::<Value>(raw).ok()?;
     let map = payload.as_object_mut()?;
 
-    // Which agent this hook was installed for, so the app routes it to the right
-    // pill. Absent means Claude Code, so existing hook commands keep working
-    // unchanged; invalid names are discarded by the app, not here. A Claude Code
-    // session started from the Claude desktop app is tagged `claude-desktop`.
-    if let Some(tag) = agent_tag(&args.agent, env) {
-        map.insert("coucou_agent".into(), Value::String(tag));
-    }
-    // Claude Code in Cursor's terminal goes on the Cursor pill (Mac #120).
-    if !map.contains_key("term_editor") {
-        if let Some(editor) = term_editor(env) {
-            map.insert("term_editor".into(), Value::String(editor.into()));
-        }
-    }
+    // Only an explicit `--agent` is forwarded. A hook with no coucou_agent
+    // (leftover Claude Code, Claude Desktop, Cursor terminal) is discarded.
+    let Some(tag) = agent_tag(&args.agent) else {
+        return None;
+    };
+    map.insert("coucou_agent".into(), Value::String(tag));
 
     let raw_event = map
         .get("hook_event_name")
@@ -218,21 +212,20 @@ fn add_terminal_context(map: &mut Map<String, Value>, env: &dyn Fn(&str) -> Opti
     }
 }
 
-/// The `coucou_agent` tag: `--agent` when given, otherwise `claude-desktop` for
-/// a Claude Code session started from the Claude desktop app, which says so in
-/// CLAUDE_CODE_ENTRYPOINT — the same rule as the Mac's relay (#191). Nothing
-/// for a plain Claude Code session.
-fn agent_tag(arg: &str, env: &dyn Fn(&str) -> Option<String>) -> Option<String> {
-    if !arg.is_empty() {
-        return Some(arg.to_string());
+/// The `coucou_agent` tag: only an explicit `--agent`. A plain Claude Code
+/// session, including one started from Claude Desktop, is not tagged and is
+/// not forwarded.
+fn agent_tag(arg: &str) -> Option<String> {
+    if arg.is_empty() {
+        return None;
     }
-    (env("CLAUDE_CODE_ENTRYPOINT").as_deref() == Some("claude-desktop"))
-        .then(|| "claude-desktop".to_string())
+    Some(arg.to_string())
 }
 
 /// `cursor` when the session runs in Cursor's integrated terminal. Cursor sets
 /// TERM_PROGRAM=vscode like VS Code does, so it is told apart by its own trace
 /// variable, or by its executable behind VS Code's git helper.
+#[cfg(test)]
 fn term_editor(env: &dyn Fn(&str) -> Option<String>) -> Option<&'static str> {
     if env("CURSOR_TRACE_ID").is_some_and(|v| !v.is_empty()) {
         return Some("cursor");
@@ -378,11 +371,9 @@ mod tests {
 
     #[test]
     fn claude_desktop_sessions_are_tagged_and_an_explicit_agent_wins() {
-        let desktop = env_of(&[("CLAUDE_CODE_ENTRYPOINT", "claude-desktop")]);
-        assert_eq!(agent_tag("", &desktop).as_deref(), Some("claude-desktop"));
-        assert_eq!(agent_tag("gemini", &desktop).as_deref(), Some("gemini"));
-        assert_eq!(agent_tag("", &env_of(&[("CLAUDE_CODE_ENTRYPOINT", "cli")])), None);
-        assert_eq!(agent_tag("", &env_of(&[])), None);
+        assert_eq!(agent_tag("").as_deref(), None);
+        assert_eq!(agent_tag("gemini").as_deref(), Some("gemini"));
+        assert_eq!(agent_tag("dsh").as_deref(), Some("dsh"));
     }
 
     #[test]
@@ -416,12 +407,9 @@ mod tests {
     }
 
     #[test]
-    fn claude_code_payloads_are_forwarded_as_they_are() {
-        let (v, ev) = run(r#"{"hook_event_name":"PreToolUse","tool_name":"Bash","cwd":"/p"}"#, "", "PreToolUse");
-        assert_eq!(ev.name, "PreToolUse");
-        assert!(v.get("coucou_agent").is_none());
-        assert_eq!(v["cwd"], "/p");
-        assert_eq!(v["tool_name"], "Bash");
+    fn a_hook_without_an_agent_is_not_forwarded() {
+        let args = Args { agent: String::new(), event: "PreToolUse".into() };
+        assert!(prepare(br#"{"hook_event_name":"PreToolUse","tool_name":"Bash"}"#, &args, &|_| None, "/p").is_none());
     }
 
     #[test]
@@ -448,10 +436,10 @@ mod tests {
     fn a_question_is_kept_whole_and_only_for_ask_user_question() {
         let long = "x".repeat(3000);
         let raw = format!(r#"{{"hook_event_name":"PermissionRequest","tool_name":"AskUserQuestion","tool_input":{{"questions":[{{"question":"{long}"}}]}}}}"#);
-        let (v, ev) = run(&raw, "", "");
+        let (v, ev) = run(&raw, "codex", "");
         assert_eq!(ev.question.unwrap()["questions"][0]["question"].as_str().unwrap().len(), 3000);
         assert!(v["tool_input"]["questions"][0]["question"].as_str().unwrap().ends_with('…'));
-        let (_, ev) = run(r#"{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"ls"}}"#, "", "");
+        let (_, ev) = run(r#"{"hook_event_name":"PermissionRequest","tool_name":"Bash","tool_input":{"command":"ls"}}"#, "codex", "");
         assert!(ev.question.is_none());
     }
 
@@ -472,12 +460,12 @@ mod tests {
         let big = "z".repeat(10_000);
         // Claude Code's finished Edit: kept whole.
         let raw = format!(r#"{{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{{"old_string":"{big}","new_string":"a"}}}}"#);
-        let (v, _) = run(&raw, "", "");
+        let (v, _) = run(&raw, "codex", "");
         assert_eq!(v["tool_input"]["old_string"].as_str().unwrap().len(), big.len());
         // The same edit before it happens, or an agent's event renamed onto
         // PreToolUse: the ordinary cap.
         let raw = format!(r#"{{"hook_event_name":"PreToolUse","tool_name":"Edit","tool_input":{{"old_string":"{big}"}}}}"#);
-        let (v, _) = run(&raw, "", "");
+        let (v, _) = run(&raw, "codex", "");
         assert!(v["tool_input"]["old_string"].as_str().unwrap().len() <= MAX_FIELD_LEN + 4);
         let raw = format!(r#"{{"hook_event_name":"BeforeTool","tool_name":"Edit","tool_input":{{"content":"{big}"}}}}"#);
         let (v, ev) = run(&raw, "gemini", "");

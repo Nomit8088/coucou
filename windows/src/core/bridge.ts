@@ -165,6 +165,9 @@ export const Bridge = {
   refreshIntegration: (id: string) => call<void>("refresh_integration", { id }),
   /** The GitHub card is on screen: refetch that part if it is stale. */
   githubRefresh: (section: "pulse" | "activity") => call<void>("github_refresh", { section }),
+  gitlabRefresh: () => call<void>("gitlab_refresh"),
+  /** False when the DSH plugin is not listening. The island then uses its own chat. */
+  dshSteer: (text: string) => call<boolean>("dsh_steer", { text }),
   /** Opens the configured n8n instance in the browser. */
   openN8n: () => call<void>("open_n8n"),
 

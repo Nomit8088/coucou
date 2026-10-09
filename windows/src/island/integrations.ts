@@ -18,6 +18,7 @@ export function registerIntegrationHandlers(island: Island) {
   void onEvent<GitHubEvent[]>("github-alerts", handleGitHubAlerts);
   void refreshConfigured();
   State.subscribe(refreshGitHubWhenShown);
+  State.subscribe(refreshGitLabWhenShown);
 }
 
 /**
@@ -38,6 +39,13 @@ export function handleGitHubAlerts(events: GitHubEvent[]) {
 }
 
 let gitHubShown = false;
+let gitLabShown = false;
+
+function refreshGitLabWhenShown() {
+  const shown = State.mode === "expanded" && State.focusTask?.id === "integration_gitlab";
+  if (shown && !gitLabShown) void Bridge.gitlabRefresh();
+  gitLabShown = shown;
+}
 
 /** The GitHub card just came on screen (focused, island opened): refresh it if stale. */
 function refreshGitHubWhenShown() {
@@ -60,14 +68,7 @@ export async function refreshConfigured() {
         configured = (await Bridge.secretPresent(def.connect.key)) ?? false;
         break;
       case "hooks":
-        // Without an answer from Rust (a plain browser), the Claude Code pill
-        // falls back to what the settings say about its hooks.
-        configured = hooks?.[def.id] ??
-          (def.id === "integration_claude" ? State.settings.hooksInstalled : false);
-        break;
-      case "server":
-        // A local model server counts once the chat is connected to it.
-        configured = State.settings[def.connect.field] !== "";
+        configured = hooks?.[def.id] ?? false;
         break;
       case "none":
         configured = true;

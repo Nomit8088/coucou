@@ -11,7 +11,7 @@ import { ICONS } from "./icons";
 import { renderMarkdown } from "./markdown";
 import { Bridge, onEvent, type ChatContext, type ModelInfo } from "../core/bridge";
 import {
-  activeModel, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
+  activeModel, ensureProviders, pickModel, providerDef, visibleProviders, withModel, type ProviderDef,
 } from "../core/providers";
 import { Sound } from "../core/sound";
 import { State, type ChatMessage } from "../core/state";
@@ -83,9 +83,14 @@ function buildPicker(onChange: () => void): Picker {
   let isOpen = false;
   let request = 0;
 
-  function drawChips() {
+  async function drawChips() {
     clear(chips);
-    for (const p of visibleProviders(State.settings)) {
+    const present: Record<string, boolean> = {};
+    for (const provider of ensureProviders(State.settings.chatProviders)) {
+      present[provider.keyName] = (await Bridge.secretPresent(provider.keyName)) ?? false;
+    }
+    const shown = visibleProviders(State.settings, present);
+    for (const p of shown) {
       const on = p.id === State.settings.chatProvider;
       const chip = h(
         "button",
@@ -283,6 +288,17 @@ export function buildPrompt(onHeightChange: () => void): ViewHost {
       State.chatHistory.length === 1 && file ? { kind: "file", name: file.name, path: file.path } : null;
 
     try {
+      const dsh = State.focusTask?.id === "agent_dsh" && State.focusTask.sessionId;
+      if (dsh) {
+        const fileNote = file ? `\n\nFile: ${file.name}\nPath: ${file.path}` : "";
+        const sent = await Bridge.dshSteer(`${query}${fileNote}`);
+        if (sent) {
+          State.chatHistory.push({ id: nextId++, role: "assistant", content: t("Sent to DeepSeek Harness.") });
+          State.stateOverride = null;
+          Sound.play("finish");
+          return;
+        }
+      }
       const reply = await Bridge.chatSend(query, context);
       State.chatHistory.push({ id: nextId++, role: "assistant", content: reply.text });
       State.stateOverride = null;

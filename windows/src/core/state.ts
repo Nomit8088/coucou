@@ -7,7 +7,7 @@ import {
   toggleDeclared, type HostOs, type PillDefinition,
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
-import type { ProviderId } from "./providers";
+import type { ChatProviderConfig } from "./providers";
 import type { FileDiff } from "./diff";
 import type { Bindings } from "./shortcuts";
 import { DEFAULT_OUTFIT, type Outfit } from "../mochi/wardrobe";
@@ -54,7 +54,10 @@ export interface ApprovalInfo {
 
 /** One question of an AskUserQuestion call. */
 export interface AskedQuestion {
+  /** DSH question id, when the request came from user-questions. */
+  id?: string;
   question: string;
+  header?: string;
   options: { label: string; description: string }[];
   multiSelect: boolean;
 }
@@ -120,8 +123,12 @@ export interface Settings {
   planRelayInstalled: boolean;
   /** Show the Codex plan pill in the island's header. */
   showCodexPlanInNotch: boolean;
-  /** Who the chat talks to (see core/providers.ts); picked in the chat view. */
-  chatProvider: ProviderId;
+  /** Who the chat talks to: a chatProviders id. */
+  chatProvider: string;
+  /** DeepSeek plus any OpenAI-compatible provider the user added. */
+  chatProviders: ChatProviderConfig[];
+  /** DeepSeek Harness profile directory. Empty means ~/.dsh/profiles/web. */
+  dshProfile: string;
   /** The model picked for each provider other than Anthropic, by provider id. */
   chatModels: Record<string, string>;
   /** Model server addresses once connected; empty means not connected. */
@@ -159,18 +166,18 @@ export const DEFAULT_SETTINGS: Settings = {
   autoCloseInterval: 15,
   openOnHover: false,
   absenceInterval: 180,
-  activeIntegrations: [
-    "integration_resend", "integration_n8n", "integration_vercel", "integration_github",
-  ],
+  activeIntegrations: ["integration_github", "integration_resend"],
   mainPill: DEFAULT_MAIN_PILL,
   screen: "primary",
   autostart: false,
   hooksInstalled: false,
-  model: "claude-opus-5",
+  model: "deepseek-chat",
   showPlanInNotch: false,
   planRelayInstalled: false,
   showCodexPlanInNotch: false,
-  chatProvider: "anthropic",
+  chatProvider: "deepseek",
+  chatProviders: [],
+  dshProfile: "",
   chatModels: {},
   ollamaUrl: "",
   lmstudioUrl: "",

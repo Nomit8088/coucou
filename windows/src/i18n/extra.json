@@ -45,17 +45,6 @@
    "ru": "Уже есть группа хуков «coucou», которую написал не Coucou, — Coucou её не трогал.",
    "id": "Sudah ada grup hook bernama “coucou” yang tidak ditulis Coucou — Coucou tidak menyentuhnya."
   },
-  "AI for the chat": {
-   "zh-Hans": "聊天用的 AI",
-   "hi": "चैट के लिए AI",
-   "es": "IA para el chat",
-   "ar": "الذكاء الاصطناعي للدردشة",
-   "fr": "IA pour le chat",
-   "bn": "চ্যাটের জন্য AI",
-   "pt-BR": "IA para o chat",
-   "ru": "ИИ для чата",
-   "id": "AI untuk obrolan"
-  },
   "API error {code}": {
    "zh-Hans": "API 错误 {code}",
    "hi": "API त्रुटि {code}",
@@ -661,17 +650,6 @@
    "ru": "Корона",
    "id": "Mahkota"
   },
-  "Custom server": {
-   "zh-Hans": "自定义服务器",
-   "hi": "कस्टम सर्वर",
-   "es": "Servidor personalizado",
-   "ar": "خادم مخصص",
-   "fr": "Serveur personnalisé",
-   "bn": "কাস্টম সার্ভার",
-   "pt-BR": "Servidor personalizado",
-   "ru": "Свой сервер",
-   "id": "Server kustom"
-  },
   "Default branch CI": {
    "zh-Hans": "默认分支 CI",
    "hi": "डिफ़ॉल्ट ब्रांच CI",
@@ -991,17 +969,6 @@
    "ru": "Установить хуки…",
    "id": "Pasang hooks…"
   },
-  "Install relay…": {
-   "zh-Hans": "安装中继…",
-   "hi": "रिले इंस्टॉल करें…",
-   "es": "Instalar relay…",
-   "ar": "تثبيت المُرحِّل…",
-   "fr": "Installer le relais…",
-   "bn": "রিলে ইনস্টল করুন…",
-   "pt-BR": "Instalar relay…",
-   "ru": "Установить ретранслятор…",
-   "id": "Pasang relay…"
-  },
   "Install the hooks to see your Claude Code sessions in the island and approve permissions without leaving what you are doing.": {
    "zh-Hans": "安装 hooks，即可在岛中查看 Claude Code 会话，并在不打断手头工作的情况下批准权限。",
    "hi": "आइलैंड में अपने Claude Code सत्र देखने और अपना काम छोड़े बिना अनुमतियाँ देने के लिए hooks इंस्टॉल करें।",
@@ -1024,17 +991,6 @@
    "ru": "Установить…",
    "id": "Pasang…"
   },
-  "Instance URL": {
-   "zh-Hans": "实例地址",
-   "hi": "इंस्टेंस URL",
-   "es": "URL de la instancia",
-   "ar": "عنوان المثيل",
-   "fr": "URL de l'instance",
-   "bn": "ইনস্ট্যান্স URL",
-   "pt-BR": "URL da instância",
-   "ru": "URL экземпляра",
-   "id": "URL instans"
-  },
   "Integration": {
    "zh-Hans": "集成",
    "hi": "एकीकरण",
@@ -1056,17 +1012,6 @@
    "pt-BR": "A integração não tem acesso",
    "ru": "У интеграции нет доступа",
    "id": "Integrasi tidak punya akses"
-  },
-  "Integration token": {
-   "zh-Hans": "集成令牌",
-   "hi": "इंटीग्रेशन टोकन",
-   "es": "Token de integración",
-   "ar": "رمز التكامل",
-   "fr": "Jeton d'intégration",
-   "bn": "ইন্টিগ্রেশন টোকেন",
-   "pt-BR": "Token de integração",
-   "ru": "Токен интеграции",
-   "id": "Token integrasi"
   },
   "Invalid API key (401)": {
    "zh-Hans": "API 密钥无效（401）",
@@ -1816,39 +1761,6 @@
    "ru": "Сбросы",
    "id": "Reset"
   },
-  "Restart Amp to load the plugin.": {
-   "zh-Hans": "重启 Amp 以加载插件。",
-   "hi": "प्लगइन लोड करने के लिए Amp फिर से शुरू करें।",
-   "es": "Reinicia Amp para cargar el plugin.",
-   "ar": "أعد تشغيل Amp لتحميل الإضافة.",
-   "fr": "Redémarre Amp pour charger le plugin.",
-   "bn": "প্লাগইন লোড করতে Amp আবার চালু করুন।",
-   "pt-BR": "Reinicie o Amp para carregar o plugin.",
-   "ru": "Перезапустите Amp, чтобы загрузить плагин.",
-   "id": "Mulai ulang Amp untuk memuat plugin."
-  },
-  "Restart Cursor to pick the hooks up.": {
-   "zh-Hans": "重启 Cursor 即可启用 hooks。",
-   "hi": "hooks लागू करने के लिए Cursor फिर से शुरू करें।",
-   "es": "Reinicia Cursor para que cargue los hooks.",
-   "ar": "أعد تشغيل Cursor لتفعيل الـ hooks.",
-   "fr": "Redémarre Cursor pour qu'il prenne les hooks.",
-   "bn": "hooks চালু করতে Cursor আবার চালু করুন।",
-   "pt-BR": "Reinicie o Cursor para carregar os hooks.",
-   "ru": "Перезапустите Cursor, чтобы хуки заработали.",
-   "id": "Mulai ulang Cursor agar hooks dimuat."
-  },
-  "Restart OpenCode to load the plugin.": {
-   "zh-Hans": "重启 OpenCode 以加载插件。",
-   "hi": "प्लगइन लोड करने के लिए OpenCode फिर से शुरू करें।",
-   "es": "Reinicia OpenCode para cargar el plugin.",
-   "ar": "أعد تشغيل OpenCode لتحميل الإضافة.",
-   "fr": "Redémarre OpenCode pour charger le plugin.",
-   "bn": "প্লাগইন লোড করতে OpenCode আবার চালু করুন।",
-   "pt-BR": "Reinicie o OpenCode para carregar o plugin.",
-   "ru": "Перезапустите OpenCode, чтобы загрузить плагин.",
-   "id": "Mulai ulang OpenCode untuk memuat plugin."
-  },
   "Result": {
    "zh-Hans": "结果",
    "hi": "परिणाम",
@@ -1958,17 +1870,6 @@
    "pt-BR": "Cachecol",
    "ru": "Шарф",
    "id": "Syal"
-  },
-  "Secret key": {
-   "zh-Hans": "私密密钥",
-   "hi": "सीक्रेट कुंजी",
-   "es": "Clave secreta",
-   "ar": "المفتاح السري",
-   "fr": "Clé secrète",
-   "bn": "সিক্রেট কী",
-   "pt-BR": "Chave secreta",
-   "ru": "Секретный ключ",
-   "id": "Kunci rahasia"
   },
   "Send Mochi to the desktop": {
    "zh-Hans": "把 Mochi 送到桌面",
@@ -2123,50 +2024,6 @@
    "pt-BR": "Mostra o uso do seu plano Codex (limite semanal e redefinições grátis restantes) no cabeçalho da ilha. O Coucou consulta a CLI do Codex (codex app-server) quando a aba aparece; nada é instalado. O Codex precisa estar conectado com o ChatGPT.",
    "ru": "Показывает использование тарифа Codex (недельный лимит и оставшиеся бесплатные сбросы) в заголовке острова. Coucou спрашивает Codex CLI (codex app-server), когда видна вкладка; ничего не устанавливается. В Codex нужно войти через ChatGPT.",
    "id": "Menampilkan pemakaian paket Codex Anda (batas mingguan dan sisa reset gratis) di header pulau. Coucou menanyakan Codex CLI (codex app-server) saat tab tampil; tidak ada yang dipasang. Codex harus masuk dengan ChatGPT."
-  },
-  "Start a new Antigravity conversation to pick the hooks up.": {
-   "zh-Hans": "开启新的 Antigravity 对话即可启用 hooks。",
-   "hi": "hooks लागू करने के लिए Antigravity में नई बातचीत शुरू करें।",
-   "es": "Abre una nueva conversación de Antigravity para que cargue los hooks.",
-   "ar": "ابدأ محادثة Antigravity جديدة لتفعيل الـ hooks.",
-   "fr": "Lance une nouvelle conversation Antigravity pour qu'elle prenne les hooks.",
-   "bn": "hooks চালু করতে Antigravity-তে নতুন কথোপকথন শুরু করুন।",
-   "pt-BR": "Inicie uma nova conversa no Antigravity para carregar os hooks.",
-   "ru": "Начните новый разговор в Antigravity, чтобы хуки заработали.",
-   "id": "Mulai percakapan Antigravity baru agar hooks dimuat."
-  },
-  "Start a new Copilot CLI session to pick the hooks up.": {
-   "zh-Hans": "开启新的 Copilot CLI 会话即可启用 hooks。",
-   "hi": "hooks लागू करने के लिए Copilot CLI का नया सत्र शुरू करें।",
-   "es": "Abre una nueva sesión de Copilot CLI para que cargue los hooks.",
-   "ar": "ابدأ جلسة Copilot CLI جديدة لتفعيل الـ hooks.",
-   "fr": "Lance une nouvelle session Copilot CLI pour qu'elle prenne les hooks.",
-   "bn": "hooks চালু করতে Copilot CLI-এর নতুন সেশন শুরু করুন।",
-   "pt-BR": "Inicie uma nova sessão do Copilot CLI para carregar os hooks.",
-   "ru": "Начните новую сессию Copilot CLI, чтобы хуки заработали.",
-   "id": "Mulai sesi Copilot CLI baru agar hooks dimuat."
-  },
-  "Start a new Gemini CLI session to pick the hooks up.": {
-   "zh-Hans": "开启新的 Gemini CLI 会话即可启用 hooks。",
-   "hi": "hooks लागू करने के लिए Gemini CLI का नया सत्र शुरू करें।",
-   "es": "Abre una nueva sesión de Gemini CLI para que cargue los hooks.",
-   "ar": "ابدأ جلسة Gemini CLI جديدة لتفعيل الـ hooks.",
-   "fr": "Lance une nouvelle session Gemini CLI pour qu'elle prenne les hooks.",
-   "bn": "hooks চালু করতে Gemini CLI-এর নতুন সেশন শুরু করুন।",
-   "pt-BR": "Inicie uma nova sessão do Gemini CLI para carregar os hooks.",
-   "ru": "Начните новую сессию Gemini CLI, чтобы хуки заработали.",
-   "id": "Mulai sesi Gemini CLI baru agar hooks dimuat."
-  },
-  "Start a new Muse Code session to pick the hooks up.": {
-   "zh-Hans": "开启新的 Muse Code 会话即可启用 hooks。",
-   "hi": "hooks लागू करने के लिए Muse Code का नया सत्र शुरू करें।",
-   "es": "Abre una nueva sesión de Muse Code para que cargue los hooks.",
-   "ar": "ابدأ جلسة Muse Code جديدة لتفعيل الـ hooks.",
-   "fr": "Lance une nouvelle session Muse Code pour qu'elle prenne les hooks.",
-   "bn": "hooks চালু করতে Muse Code-এর নতুন সেশন শুরু করুন।",
-   "pt-BR": "Inicie uma nova sessão do Muse Code para carregar os hooks.",
-   "ru": "Начните новую сессию Muse Code, чтобы хуки заработали.",
-   "id": "Mulai sesi Muse Code baru agar hooks dimuat."
   },
   "Start a new chat": {
    "zh-Hans": "开始新聊天",
@@ -2344,17 +2201,6 @@
    "ru": "Этот адрес — другой компьютер: ваши запросы отправляются туда.",
    "id": "Alamat ini adalah mesin lain: pertanyaan Anda dikirim ke sana."
   },
-  "This agent takes a plugin, not hook entries.": {
-   "zh-Hans": "此代理使用插件，而不是 hook 条目。",
-   "hi": "यह एजेंट प्लगइन लेता है, hook प्रविष्टियाँ नहीं।",
-   "es": "Este agente usa un plugin, no entradas de hooks.",
-   "ar": "يستخدم هذا الوكيل إضافة، لا إدخالات hooks.",
-   "fr": "Cet agent prend un plugin, pas des entrées de hooks.",
-   "bn": "এই এজেন্ট প্লাগইন নেয়, hook এন্ট্রি নয়।",
-   "pt-BR": "Este agente usa um plugin, não entradas de hooks.",
-   "ru": "Этот агент использует плагин, а не записи хуков.",
-   "id": "Agen ini memakai plugin, bukan entri hook."
-  },
   "This is exactly what changes for {name}. Nothing else is touched.": {
    "zh-Hans": "这正是 {name} 将发生的改动。其他内容不会被触碰。",
    "hi": "{name} के लिए ठीक यही बदलेगा। और कुछ नहीं छुआ जाता।",
@@ -2487,17 +2333,6 @@
    "ru": "Вторник",
    "id": "Selasa"
   },
-  "Turn it on once with `hermes plugins enable coucou`, then start a new Hermes session.": {
-   "zh-Hans": "先用 `hermes plugins enable coucou` 启用一次，然后开启新的 Hermes 会话。",
-   "hi": "इसे एक बार `hermes plugins enable coucou` से चालू करें, फिर Hermes का नया सत्र शुरू करें।",
-   "es": "Actívalo una vez con `hermes plugins enable coucou` y luego abre una nueva sesión de Hermes.",
-   "ar": "فعّله مرة واحدة بالأمر `hermes plugins enable coucou`، ثم ابدأ جلسة Hermes جديدة.",
-   "fr": "Active-le une fois avec `hermes plugins enable coucou`, puis lance une nouvelle session Hermes.",
-   "bn": "একবার `hermes plugins enable coucou` দিয়ে চালু করুন, তারপর Hermes-এর নতুন সেশন শুরু করুন।",
-   "pt-BR": "Ative uma vez com `hermes plugins enable coucou` e depois inicie uma nova sessão do Hermes.",
-   "ru": "Включите его один раз командой `hermes plugins enable coucou`, затем начните новую сессию Hermes.",
-   "id": "Aktifkan sekali dengan `hermes plugins enable coucou`, lalu mulai sesi Hermes baru."
-  },
   "Types “{char}”": {
    "zh-Hans": "输入“{char}”",
    "hi": "“{char}” टाइप करता है",
@@ -2530,17 +2365,6 @@
    "pt-BR": "Desinstalar hooks…",
    "ru": "Удалить хуки…",
    "id": "Copot hooks…"
-  },
-  "Uninstall relay…": {
-   "zh-Hans": "卸载中继…",
-   "hi": "रिले अनइंस्टॉल करें…",
-   "es": "Desinstalar relay…",
-   "ar": "إلغاء تثبيت المُرحِّل…",
-   "fr": "Désinstaller le relais…",
-   "bn": "রিলে আনইনস্টল করুন…",
-   "pt-BR": "Desinstalar relay…",
-   "ru": "Удалить ретранслятор…",
-   "id": "Copot relay…"
   },
   "Uninstall…": {
    "zh-Hans": "卸载…",
@@ -2806,17 +2630,6 @@
    "ru": "завершил",
    "id": "selesai"
   },
-  "installed": {
-   "zh-Hans": "已安装",
-   "hi": "इंस्टॉल है",
-   "es": "instalado",
-   "ar": "مثبَّت",
-   "fr": "installé",
-   "bn": "ইনস্টল আছে",
-   "pt-BR": "instalado",
-   "ru": "установлен",
-   "id": "terpasang"
-  },
   "is asking": {
    "zh-Hans": "在提问",
    "hi": "पूछ रहा है",
@@ -2871,17 +2684,6 @@
    "pt-BR": "nenhum repositório",
    "ru": "нет репозиториев",
    "id": "tidak ada repositori"
-  },
-  "not installed": {
-   "zh-Hans": "未安装",
-   "hi": "इंस्टॉल नहीं है",
-   "es": "no instalado",
-   "ar": "غير مثبَّت",
-   "fr": "non installé",
-   "bn": "ইনস্টল নেই",
-   "pt-BR": "não instalado",
-   "ru": "не установлен",
-   "id": "belum terpasang"
   },
   "passing": {
    "zh-Hans": "通过",
@@ -3360,6 +3162,215 @@
    "pt-BR": "Só um arquivo solto na ilha pode ser enviado com uma pergunta.",
    "ru": "С вопросом можно отправить только файл, перетащенный на остров.",
    "id": "Hanya file yang dijatuhkan ke pulau yang bisa dikirim bersama pertanyaan."
+  },
+  "Base URL": {
+   "zh-Hans": "基础 URL",
+   "hi": "बेस URL",
+   "es": "URL base",
+   "ar": "عنوان الأساس",
+   "fr": "URL de base",
+   "bn": "বেস URL",
+   "pt-BR": "URL base",
+   "ru": "Базовый URL",
+   "id": "URL dasar"
+  },
+  "Access token": {
+   "zh-Hans": "访问令牌",
+   "hi": "एक्सेस टोकन",
+   "es": "Token de acceso",
+   "ar": "رمز الوصول",
+   "fr": "Jeton d’accès",
+   "bn": "অ্যাক্সেস টোকেন",
+   "pt-BR": "Token de acesso",
+   "ru": "Токен доступа",
+   "id": "Token akses"
+  },
+  "Sent as PRIVATE-TOKEN. The card lists your open merge requests, reviews, and the default-branch pipeline.": {
+   "zh-Hans": "以 PRIVATE-TOKEN 发送。卡片只列出你的开放合并请求、待审和默认分支流水线。",
+   "hi": "PRIVATE-TOKEN के रूप में भेजा जाता है। कार्ड आपके खुले मर्ज अनुरोध, समीक्षा और डिफ़ॉल्ट शाखा पाइपलाइन दिखाता है।",
+   "es": "Se envía como PRIVATE-TOKEN. La tarjeta lista tus MR abiertas, revisiones y el pipeline de la rama predeterminada.",
+   "ar": "يُرسل كـ PRIVATE-TOKEN. تعرض البطاقة طلبات الدمج المفتوحة والمراجعات وخط أنابيب الفرع الافتراضي.",
+   "fr": "Envoyé en PRIVATE-TOKEN. La carte liste vos MR ouvertes, les revues et le pipeline de la branche par défaut.",
+   "bn": "PRIVATE-TOKEN হিসেবে পাঠানো হয়। কার্ডে খোলা মার্জ অনুরোধ, রিভিউ ও ডিফল্ট শাখার পাইপলাইন থাকে।",
+   "pt-BR": "Enviado como PRIVATE-TOKEN. O cartão lista seus MRs abertos, revisões e o pipeline do branch padrão.",
+   "ru": "Отправляется как PRIVATE-TOKEN. Карточка показывает ваши открытые MR, ревью и pipeline ветки по умолчанию.",
+   "id": "Dikirim sebagai PRIVATE-TOKEN. Kartu menampilkan MR terbuka, tinjauan, dan pipeline cabang bawaan."
+  },
+  "DeepSeek is built in. Add any OpenAI-compatible provider with a name, base URL, key and default model. Keys stay in the system keychain. Chat has no tools.": {
+   "zh-Hans": "内置 DeepSeek。可添加任意 OpenAI 兼容提供商（名称、URL、密钥、默认模型）。密钥只进系统凭据库。聊天没有工具。",
+   "hi": "DeepSeek अंतर्निहित है। नाम, URL, कुंजी और डिफ़ॉल्ट मॉडल के साथ कोई OpenAI-संगत प्रदाता जोड़ें। कुंजियाँ सिस्टम कीचेन में रहती हैं। चैट में कोई टूल नहीं।",
+   "es": "DeepSeek viene integrado. Añade cualquier proveedor compatible con OpenAI. Las claves quedan en el llavero. El chat no tiene herramientas.",
+   "ar": "DeepSeek مدمج. أضف أي مزود متوافق مع OpenAI. تبقى المفاتيح في سلسلة المفاتيح. الدردشة بلا أدوات.",
+   "fr": "DeepSeek est intégré. Ajoutez un fournisseur compatible OpenAI. Les clés restent dans le trousseau. Le chat n’a pas d’outils.",
+   "bn": "DeepSeek অন্তর্নির্মিত। OpenAI-সামঞ্জস্যপূর্ণ প্রদানকারী যোগ করুন। কী সিস্টেম কিচেইনে থাকে। চ্যাটে কোনো টুল নেই।",
+   "pt-BR": "O DeepSeek é interno. Adicione um provedor compatível com OpenAI. As chaves ficam no cofre do sistema. O chat não tem ferramentas.",
+   "ru": "DeepSeek встроен. Добавьте OpenAI-совместимого провайдера. Ключи остаются в системном хранилище. В чате нет инструментов.",
+   "id": "DeepSeek sudah ada. Tambahkan penyedia kompatibel OpenAI. Kunci tetap di keychain sistem. Obrolan tidak punya alat."
+  },
+  "Add provider": {
+   "zh-Hans": "添加提供商",
+   "hi": "प्रदाता जोड़ें",
+   "es": "Añadir proveedor",
+   "ar": "إضافة مزود",
+   "fr": "Ajouter un fournisseur",
+   "bn": "প্রদানকারী যোগ করুন",
+   "pt-BR": "Adicionar provedor",
+   "ru": "Добавить провайдера",
+   "id": "Tambah penyedia"
+  },
+  "Custom": {
+   "zh-Hans": "自定义",
+   "hi": "कस्टम",
+   "es": "Personalizado",
+   "ar": "مخصص",
+   "fr": "Personnalisé",
+   "bn": "কাস্টম",
+   "pt-BR": "Personalizado",
+   "ru": "Свой",
+   "id": "Kustom"
+  },
+  "DeepSeek Harness profile. Empty uses the web profile. Restart Harness after installing the plugin.": {
+   "zh-Hans": "DeepSeek Harness 的 profile。留空使用 web。安装插件后必须重启 Harness。",
+   "hi": "DeepSeek Harness प्रोफ़ाइल। खाली होने पर web प्रोफ़ाइल। प्लगइन लगाने के बाद Harness पुनरारंभ करें।",
+   "es": "Perfil de DeepSeek Harness. Vacío usa el perfil web. Reinicia Harness tras instalar el plugin.",
+   "ar": "ملف DeepSeek Harness. الفارغ يستخدم ملف web. أعد تشغيل Harness بعد تثبيت الإضافة.",
+   "fr": "Profil DeepSeek Harness. Vide = profil web. Redémarrez Harness après l’installation.",
+   "bn": "DeepSeek Harness প্রোফাইল। খালি থাকলে web। প্লাগইন ইনস্টলের পর Harness রিস্টার্ট করুন।",
+   "pt-BR": "Perfil do DeepSeek Harness. Vazio usa o perfil web. Reinicie o Harness depois de instalar o plugin.",
+   "ru": "Профиль DeepSeek Harness. Пусто — профиль web. После установки плагина перезапустите Harness.",
+   "id": "Profil DeepSeek Harness. Kosong memakai profil web. Mulai ulang Harness setelah memasang plugin."
+  },
+  "Profile path": {
+   "zh-Hans": "Profile 路径",
+   "hi": "प्रोफ़ाइल पथ",
+   "es": "Ruta del perfil",
+   "ar": "مسار الملف",
+   "fr": "Chemin du profil",
+   "bn": "প্রোফাইল পথ",
+   "pt-BR": "Caminho do perfil",
+   "ru": "Путь профиля",
+   "id": "Jalur profil"
+  },
+  "The address must use https://, or http:// on this computer.": {
+   "zh-Hans": "地址必须是 https://，或本机的 http://。",
+   "hi": "पता https:// होना चाहिए, या इस कंप्यूटर पर http://।",
+   "es": "La dirección debe ser https://, o http:// en este equipo.",
+   "ar": "يجب أن يستخدم العنوان https:// أو http:// على هذا الجهاز.",
+   "fr": "L’adresse doit être en https://, ou en http:// sur cet ordinateur.",
+   "bn": "ঠিকানা https:// হতে হবে, অথবা এই কম্পিউটারে http://।",
+   "pt-BR": "O endereço deve usar https://, ou http:// neste computador.",
+   "ru": "Адрес должен быть https:// или http:// на этом компьютере.",
+   "id": "Alamat harus https://, atau http:// di komputer ini."
+  },
+  "Name": {
+   "zh-Hans": "名称",
+   "hi": "नाम",
+   "es": "Nombre",
+   "ar": "الاسم",
+   "fr": "Nom",
+   "bn": "নাম",
+   "pt-BR": "Nome",
+   "ru": "Имя",
+   "id": "Nama"
+  },
+  "Default model": {
+   "zh-Hans": "默认模型",
+   "hi": "डिफ़ॉल्ट मॉडल",
+   "es": "Modelo predeterminado",
+   "ar": "النموذج الافتراضي",
+   "fr": "Modèle par défaut",
+   "bn": "ডিফল্ট মডেল",
+   "pt-BR": "Modelo padrão",
+   "ru": "Модель по умолчанию",
+   "id": "Model bawaan"
+  },
+  "Sent to DeepSeek Harness.": {
+   "zh-Hans": "已发给 DeepSeek Harness。",
+   "hi": "DeepSeek Harness को भेजा गया।",
+   "es": "Enviado a DeepSeek Harness.",
+   "ar": "أُرسل إلى DeepSeek Harness.",
+   "fr": "Envoyé à DeepSeek Harness.",
+   "bn": "DeepSeek Harness-এ পাঠানো হয়েছে।",
+   "pt-BR": "Enviado ao DeepSeek Harness.",
+   "ru": "Отправлено в DeepSeek Harness.",
+   "id": "Dikirim ke DeepSeek Harness."
+  },
+  "Merge requests": {
+   "zh-Hans": "合并请求",
+   "hi": "मर्ज अनुरोध",
+   "es": "Solicitudes de fusión",
+   "ar": "طلبات الدمج",
+   "fr": "Demandes de fusion",
+   "bn": "মার্জ অনুরোধ",
+   "pt-BR": "Solicitações de merge",
+   "ru": "Запросы на слияние",
+   "id": "Permintaan merge"
+  },
+  "My MRs": {
+   "zh-Hans": "我的 MR",
+   "hi": "मेरे MR",
+   "es": "Mis MR",
+   "ar": "طلباتي",
+   "fr": "Mes MR",
+   "bn": "আমার MR",
+   "pt-BR": "Meus MRs",
+   "ru": "Мои MR",
+   "id": "MR saya"
+  },
+  "Pipeline": {
+   "zh-Hans": "流水线",
+   "hi": "पाइपलाइन",
+   "es": "Pipeline",
+   "ar": "خط الأنابيب",
+   "fr": "Pipeline",
+   "bn": "পাইপলাইন",
+   "pt-BR": "Pipeline",
+   "ru": "Pipeline",
+   "id": "Pipeline"
+  },
+  "Unknown chat provider.": {
+   "zh-Hans": "未知的聊天提供商。",
+   "hi": "अज्ञात चैट प्रदाता।",
+   "es": "Proveedor de chat desconocido.",
+   "ar": "مزود دردشة غير معروف.",
+   "fr": "Fournisseur de chat inconnu.",
+   "bn": "অজানা চ্যাট প্রদানকারী।",
+   "pt-BR": "Provedor de chat desconhecido.",
+   "ru": "Неизвестный провайдер чата.",
+   "id": "Penyedia obrolan tidak dikenal."
+  },
+  "Restart DeepSeek Harness to load the plugin. The running process does not pick this up.": {
+   "zh-Hans": "重启 DeepSeek Harness 才能加载插件。正在运行的进程不会中途加载。",
+   "hi": "प्लगइन लोड करने के लिए DeepSeek Harness पुनरारंभ करें। चल रही प्रक्रिया इसे नहीं उठाती।",
+   "es": "Reinicia DeepSeek Harness para cargar el plugin. El proceso en marcha no lo carga.",
+   "ar": "أعد تشغيل DeepSeek Harness لتحميل الإضافة. العملية الجارية لا تلتقطها.",
+   "fr": "Redémarrez DeepSeek Harness pour charger le plugin. Le processus en cours ne le charge pas.",
+   "bn": "প্লাগইন লোড করতে DeepSeek Harness রিস্টার্ট করুন। চলমান প্রক্রিয়া এটি নেয় না।",
+   "pt-BR": "Reinicie o DeepSeek Harness para carregar o plugin. O processo em execução não o carrega.",
+   "ru": "Перезапустите DeepSeek Harness, чтобы загрузить плагин. Текущий процесс его не подхватит.",
+   "id": "Mulai ulang DeepSeek Harness untuk memuat plugin. Proses yang berjalan tidak memuatnya."
+  },
+  "The DSH plugin file wasn't written by Coucou — Coucou has not touched it.": {
+   "zh-Hans": "这个 DSH 插件文件不是 Coucou 写的，Coucou 没有改它。",
+   "hi": "यह DSH प्लगइन फ़ाइल Coucou ने नहीं लिखी — Coucou ने इसे नहीं छुआ।",
+   "es": "Coucou no escribió este archivo del plugin DSH y no lo ha tocado.",
+   "ar": "لم يكتب Coucou ملف إضافة DSH هذا ولم يلمسه.",
+   "fr": "Coucou n’a pas écrit ce fichier de plugin DSH et ne l’a pas touché.",
+   "bn": "এই DSH প্লাগইন ফাইল Coucou লেখেনি — Coucou এটি ছোঁয়নি।",
+   "pt-BR": "O Coucou não escreveu este arquivo do plugin DSH e não o alterou.",
+   "ru": "Coucou не писал этот файл плагина DSH и не трогал его.",
+   "id": "Coucou tidak menulis berkas plugin DSH ini dan tidak mengubahnya."
+  },
+  "The DSH plugin manifest wasn't written by Coucou — Coucou has not touched it.": {
+   "zh-Hans": "这个 DSH 插件清单不是 Coucou 写的，Coucou 没有改它。",
+   "hi": "यह DSH प्लगइन मेनिफेस्ट Coucou ने नहीं लिखा — Coucou ने इसे नहीं छुआ।",
+   "es": "Coucou no escribió este manifiesto del plugin DSH y no lo ha tocado.",
+   "ar": "لم يكتب Coucou بيان إضافة DSH هذا ولم يلمسه.",
+   "fr": "Coucou n’a pas écrit ce manifeste de plugin DSH et ne l’a pas touché.",
+   "bn": "এই DSH প্লাগইন ম্যানিফেস্ট Coucou লেখেনি — Coucou এটি ছোঁয়নি।",
+   "pt-BR": "O Coucou não escreveu este manifesto do plugin DSH e não o alterou.",
+   "ru": "Coucou не писал этот манифест плагина DSH и не трогал его.",
+   "id": "Coucou tidak menulis manifes plugin DSH ini dan tidak mengubahnya."
   }
  }
 }

@@ -111,7 +111,8 @@ export function buildFileDiff(tool: string, input: Record<string, unknown>): Fil
   const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
   const path = str(input.file_path);
   switch (tool) {
-    case "Edit": {
+    case "Edit":
+    case "edit": {
       const oldText = str(input.old_string);
       const newText = str(input.new_string);
       if (oldText == null || newText == null || path == null) return null;
@@ -141,7 +142,8 @@ export function buildFileDiff(tool: string, input: Record<string, unknown>): Fil
       if (added === 0 && removed === 0) return null;
       return { id: 0, path, added, removed, hunks, tooLarge, isNewFile: false };
     }
-    case "Write": {
+    case "Write":
+    case "write": {
       const content = str(input.content);
       if (path == null || !content) return null;
       const d = fromNew(content, path);

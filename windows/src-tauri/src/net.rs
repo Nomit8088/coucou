@@ -44,6 +44,18 @@ pub fn is_loopback_url(url: &Url) -> bool {
 /// sub-paths people paste (`/api`, `/v1`) go, and the loopback names become
 /// 127.0.0.1 — on Windows `localhost` may resolve to ::1 first while Ollama
 /// only listens on IPv4. Only http and https, and no `user:password@`.
+/// A chat provider base URL: https, or http only when it points at this machine.
+/// `/v1` is stripped the same way as a local server address, then put back by
+/// the OpenAI client.
+pub fn check_chat_base(raw: &str) -> Result<Url, String> {
+    let url = normalise_server_url(raw)?;
+    match url.scheme() {
+        "https" => Ok(url),
+        "http" if is_loopback_url(&url) => Ok(url),
+        _ => Err(t("The address must use https://, or http:// on this computer.")),
+    }
+}
+
 pub fn normalise_server_url(raw: &str) -> Result<Url, String> {
     let raw = raw.trim();
     if raw.is_empty() {

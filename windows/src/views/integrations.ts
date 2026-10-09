@@ -434,6 +434,8 @@ export function hasIntegrationData(id: string): boolean {
       return arr(id, "emails").length > 0;
     case "integration_github":
       return get(id).totalRepos != null || readPulse(get(id)) != null;
+    case "integration_gitlab":
+      return info.loaded;
     case "integration_stripe":
       return info.loaded;
     case "integration_notion":
@@ -471,6 +473,8 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
   switch (task.id) {
     case "integration_resend":
       return resendCard();
+    case "integration_gitlab":
+      return gitlabCard();
     case "integration_github":
       return githubCard();
     case "integration_stripe":
@@ -482,6 +486,34 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
     default:
       return idleCard(task, hooks.openSettings);
   }
+}
+
+function gitlabCard(): HTMLElement {
+  const mine = arr("integration_gitlab", "mine");
+  const review = arr("integration_gitlab", "review");
+  const pipelines = arr("integration_gitlab", "pipelines");
+  const root = h("div", { class: "int" }, header("#FC6D26", "GitLab", t("Merge requests")));
+  const section = (title: string, rows: Record<string, unknown>[]) => {
+    root.append(h("div", { class: "sub", text: title }));
+    if (rows.length === 0) {
+      root.append(h("div", { class: "hint", text: t("Nothing here") }));
+      return;
+    }
+    rows.forEach((row, i) => {
+      const label = String(row.title ?? row.status ?? row.project ?? "");
+      const line = listRow("#FC6D26", i === 0, h("span", { text: label }));
+      const url = typeof row.url === "string" ? row.url : "";
+      if (url) {
+        line.style.cursor = "pointer";
+        line.addEventListener("click", () => void Bridge.openUrl(url));
+      }
+      root.append(line);
+    });
+  };
+  section(t("My MRs"), mine);
+  section(t("To review"), review);
+  section(t("Pipeline"), pipelines);
+  return root;
 }
 
 export { clear };

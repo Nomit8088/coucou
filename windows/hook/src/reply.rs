@@ -8,11 +8,11 @@
 
 use serde_json::{json, Map, Value};
 
-/// The agents whose permission requests the island can answer: Claude Code
-/// (no `--agent`), Codex, Copilot CLI and Muse Code. Any decision for another
-/// agent is ignored here too, whatever the app sent.
+/// The agents whose permission requests the island can answer: Codex and DSH.
+/// Claude Code (no `--agent`) and every other agent are ignored here too,
+/// whatever the app sent. Nothing is ever allowed without a click.
 pub fn takes_decisions(agent: &str) -> bool {
-    matches!(agent, "" | "codex" | "copilot" | "muse")
+    matches!(agent, "codex" | "dsh")
 }
 
 /// Agents that read a JSON object on stdout after every hook and get `{}` —
@@ -133,7 +133,7 @@ mod tests {
     use super::*;
 
     const AGENTS: &[&str] = &[
-        "", "gemini", "antigravity", "cursor", "codex", "copilot", "muse", "opencode", "amp",
+        "", "gemini", "antigravity", "cursor", "codex", "dsh", "copilot", "muse", "opencode", "amp",
         "hermes", "claude-desktop", "my-tool",
     ];
     const EVENTS: &[&str] = &[
@@ -186,7 +186,8 @@ mod tests {
     fn each_agent_gets_its_own_reply_shape() {
         let allow = r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#;
         let deny = r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from Coucou"}}}"#;
-        for agent in ["", "codex"] {
+        assert!(stdout("", "PermissionRequest", Some("allow"), None).is_none());
+        for agent in ["codex", "dsh"] {
             assert_eq!(stdout(agent, "PermissionRequest", Some("allow"), None).unwrap(), allow);
             assert_eq!(stdout(agent, "PermissionRequest", Some("always"), None).unwrap(), allow);
             assert_eq!(stdout(agent, "PermissionRequest", Some("deny"), None).unwrap(), deny);
@@ -194,8 +195,8 @@ mod tests {
             assert_eq!(stdout(agent, "PreToolUse", None, None), None);
         }
         for agent in ["copilot", "muse"] {
-            assert_eq!(stdout(agent, "PermissionRequest", Some("allow"), None).unwrap(), r#"{"permissionDecision":"allow"}"#);
-            assert_eq!(stdout(agent, "PermissionRequest", Some("deny"), None).unwrap(), r#"{"permissionDecision":"deny"}"#);
+            // Removed from takes_decisions: a click is not turned into an allow.
+            assert_eq!(stdout(agent, "PermissionRequest", Some("allow"), None).as_deref(), if agent == "copilot" { Some(r#"{"permissionDecision":"ask"}"#) } else { None });
             assert_eq!(stdout(agent, "PreToolUse", None, None).unwrap(), "{}");
         }
         // Copilot is fail-closed: no decision is an explicit "ask", never silence.
@@ -241,14 +242,10 @@ mod tests {
         let question = json!({
             "questions": [{ "question": "Which one?", "options": [{ "label": "A" }, { "label": "B" }] }]
         });
-        let out = stdout("", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).unwrap();
-        let v: Value = serde_json::from_str(&out).unwrap();
-        let decision = &v["hookSpecificOutput"]["decision"];
-        assert_eq!(decision["behavior"], "allow");
-        assert_eq!(decision["updatedInput"]["questions"], question["questions"]);
-        assert_eq!(decision["updatedInput"]["answers"]["Which one?"], "B");
-        // Only Claude Code asks questions: an answer for anyone else is nothing.
+        // No Claude Code pill: an answer with no agent is not printed.
+        assert!(stdout("", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
         assert!(stdout("codex", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
+        assert!(stdout("dsh", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
     }
 
     #[test]

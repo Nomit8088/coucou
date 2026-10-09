@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use tauri::AppHandle;
 
 use crate::settings::Settings;
-use crate::{claude, local_chat, openai_compat, secrets};
+use crate::{local_chat, net, secrets};
 
 pub const ANTHROPIC: &str = "anthropic";
 
@@ -159,17 +159,35 @@ pub fn plain_question(first: bool, context: Option<&ChatContext>, query: &str) -
 
 /// The model chosen for `provider`, or its default.
 pub fn model_for(settings: &Settings, provider: &str) -> String {
-    if provider == ANTHROPIC {
-        let m = settings.model.trim();
-        return if m.is_empty() { claude::DEFAULT_MODEL.to_string() } else { m.to_string() };
+    if let Some(saved) = settings.chat_models.get(provider).map(|m| m.trim().to_string()).filter(|m| !m.is_empty()) {
+        return saved;
     }
     settings
-        .chat_models
-        .get(provider)
-        .map(|m| m.trim().to_string())
+        .chat_providers
+        .iter()
+        .find(|p| p.id == provider)
+        .map(|p| p.default_model.clone())
         .filter(|m| !m.is_empty())
-        .or_else(|| openai_compat::provider(provider).map(|p| p.default_model.to_string()))
-        .unwrap_or_default()
+        .unwrap_or_else(|| "deepseek-chat".into())
+}
+
+fn compat_server(settings: &Settings, provider: &str) -> Result<local_chat::Server, String> {
+    let spec = settings
+        .chat_providers
+        .iter()
+        .find(|p| p.id == provider)
+        .ok_or_else(|| crate::i18n::t("Unknown chat provider."))?;
+    let url = net::check_chat_base(&spec.base_url)?;
+    let key = secrets::get(&spec.key_name).filter(|k| !k.trim().is_empty());
+    if key.is_none() && !net::is_loopback_url(&url) {
+        return Err(crate::i18n::t("No API key — add it in Settings."));
+    }
+    Ok(local_chat::Server {
+        id: spec.id.clone(),
+        name: spec.name.clone(),
+        url: url.as_str().trim_end_matches('/').to_string(),
+        key,
+    })
 }
 
 /// A file rides along only if it is one of Coucou's own copies of a dropped
@@ -207,35 +225,16 @@ pub async fn send(
     let context = context.map(checked_context).transpose()?;
     let provider = settings.chat_provider.as_str();
     let model = model_for(settings, provider);
-    if provider == ANTHROPIC || provider.is_empty() {
-        return claude::send(chat, &model, query, context).await;
-    }
-    if let Some(p) = openai_compat::provider(provider) {
-        return openai_compat::send(chat, p, &model, query, context).await;
-    }
-    if let Some(server) = local_chat::server(settings, provider) {
-        return local_chat::send(app, chat, &server, &model, query, context).await;
-    }
-    Err(format!("Unknown chat provider: {provider}"))
+    let server = compat_server(settings, provider)?;
+    local_chat::send(app, chat, &server, &model, query, context).await
 }
 
 /// The models `provider` offers. Asked only when the user opens the picker on
 /// that provider, and only once it has a key (or, for a local server, an
 /// address): nothing is sent anywhere before that.
 pub async fn models(settings: &Settings, provider: &str) -> Result<Vec<ModelInfo>, String> {
-    let no_key = || crate::i18n::t("No API key — add it in Settings.");
-    if provider == ANTHROPIC {
-        let key = secrets::get(claude::KEY).ok_or_else(no_key)?;
-        return claude::models(&key).await;
-    }
-    if let Some(p) = openai_compat::provider(provider) {
-        let key = secrets::get(p.key).ok_or_else(no_key)?;
-        return openai_compat::models(p, &key).await;
-    }
-    if let Some(server) = local_chat::server(settings, provider) {
-        return local_chat::models(&server).await;
-    }
-    Err(format!("Unknown chat provider: {provider}"))
+    let server = compat_server(settings, provider)?;
+    local_chat::models(&server).await
 }
 
 #[cfg(test)]
@@ -332,15 +331,10 @@ mod tests {
     #[test]
     fn the_model_comes_from_the_settings_or_the_provider_default() {
         let mut s = Settings::default();
-        assert_eq!(model_for(&s, "anthropic"), claude::DEFAULT_MODEL);
-        assert_eq!(model_for(&s, "openai"), openai_compat::provider("openai").unwrap().default_model);
-        assert_eq!(model_for(&s, "ollama"), "");
-        s.chat_models.insert("openai".into(), " gpt-x ".into());
-        s.chat_models.insert("ollama".into(), "llama3.2".into());
-        s.model = "claude-haiku-4-5".into();
-        assert_eq!(model_for(&s, "openai"), "gpt-x");
-        assert_eq!(model_for(&s, "ollama"), "llama3.2");
-        assert_eq!(model_for(&s, "anthropic"), "claude-haiku-4-5");
+        assert_eq!(model_for(&s, "deepseek"), "deepseek-chat");
+        assert_eq!(model_for(&s, "missing"), "deepseek-chat");
+        s.chat_models.insert("deepseek".into(), " deepseek-reasoner ".into());
+        assert_eq!(model_for(&s, "deepseek"), "deepseek-reasoner");
     }
 
     #[test]

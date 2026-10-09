@@ -69,6 +69,10 @@ pub struct Settings {
     /// Mochi on the desktop: whether he lives there, and his spot. Owned by
     /// the Rust side (desktop.rs) — what a webview sends back is ignored.
     pub desktop_mochi: DesktopMochiPref,
+    /// DeepSeek Harness profile directory. Empty means ~/.dsh/profiles/web.
+    pub dsh_profile: String,
+    /// Island chat providers. DeepSeek is always present; extras are OpenAI-compatible.
+    pub chat_providers: Vec<ChatProviderConfig>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -89,7 +93,47 @@ pub struct DesktopSpot {
 }
 
 fn default_model() -> String {
-    crate::claude::DEFAULT_MODEL.to_string()
+    "deepseek-chat".to_string()
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChatProviderConfig {
+    pub id: String,
+    pub name: String,
+    pub base_url: String,
+    pub key_name: String,
+    pub default_model: String,
+    pub builtin: bool,
+}
+
+pub fn deepseek_provider() -> ChatProviderConfig {
+    ChatProviderConfig {
+        id: "deepseek".into(),
+        name: "DeepSeek".into(),
+        base_url: "https://api.deepseek.com/v1".into(),
+        key_name: "deepseek-api-key".into(),
+        default_model: "deepseek-chat".into(),
+        builtin: true,
+    }
+}
+
+pub fn ensure_chat_providers(list: &mut Vec<ChatProviderConfig>) {
+    if let Some(existing) = list.iter_mut().find(|p| p.id == "deepseek") {
+        existing.builtin = true;
+        existing.key_name = "deepseek-api-key".into();
+        if existing.name.trim().is_empty() {
+            existing.name = "DeepSeek".into();
+        }
+        if existing.base_url.trim().is_empty() {
+            existing.base_url = "https://api.deepseek.com/v1".into();
+        }
+        if existing.default_model.trim().is_empty() {
+            existing.default_model = "deepseek-chat".into();
+        }
+    } else {
+        list.insert(0, deepseek_provider());
+    }
 }
 
 impl Default for Settings {
@@ -100,13 +144,8 @@ impl Default for Settings {
             auto_close_interval: 15.0,
             open_on_hover: false,
             absence_interval: 180.0,
-            active_integrations: vec![
-                "integration_resend".into(),
-                "integration_n8n".into(),
-                "integration_vercel".into(),
-                "integration_github".into(),
-            ],
-            main_pill: "integration_claude".into(),
+            active_integrations: vec!["integration_github".into(), "integration_resend".into()],
+            main_pill: "agent_dsh".into(),
             screen: "primary".into(),
             autostart: false,
             hooks_installed: false,
@@ -114,7 +153,7 @@ impl Default for Settings {
             show_plan_in_notch: false,
             plan_relay_installed: false,
             show_codex_plan_in_notch: false,
-            chat_provider: crate::chat::ANTHROPIC.into(),
+            chat_provider: "deepseek".into(),
             chat_models: BTreeMap::new(),
             ollama_url: String::new(),
             lmstudio_url: String::new(),
@@ -124,6 +163,8 @@ impl Default for Settings {
             pill_colors: BTreeMap::new(),
             language: String::new(),
             desktop_mochi: DesktopMochiPref::default(),
+            dsh_profile: String::new(),
+            chat_providers: vec![deepseek_provider()],
         }
     }
 }
@@ -182,7 +223,18 @@ fn parse(bytes: &[u8]) -> Option<Settings> {
         return None;
     };
     let whole = serde_json::from_value(Value::Object(fields.clone()));
-    Some(whole.unwrap_or_else(|_| salvage(fields)))
+    Some(finish(whole.unwrap_or_else(|_| salvage(fields))))
+}
+
+fn finish(mut settings: Settings) -> Settings {
+    ensure_chat_providers(&mut settings.chat_providers);
+    if settings.chat_provider.trim().is_empty() || settings.chat_provider == "anthropic" {
+        settings.chat_provider = "deepseek".into();
+    }
+    if settings.model.trim().is_empty() || settings.model.starts_with("claude-") {
+        settings.model = "deepseek-chat".into();
+    }
+    settings
 }
 
 /// Settings from the fields of a settings.json that does not load as a whole.
@@ -404,7 +456,7 @@ mod tests {
 }"##;
 
     fn custom() -> Value {
-        serde_json::from_str(CUSTOM).unwrap()
+        shown(&serde_json::from_str(CUSTOM).unwrap())
     }
 
     /// `CUSTOM` with one key replaced, or removed when `value` is `None`.
@@ -486,7 +538,7 @@ mod tests {
     fn a_file_from_before_the_model_setting_keeps_everything_else() {
         let loaded = shown(&parse(&custom_with("model", None)).unwrap());
         let mut expected = custom();
-        expected["model"] = json!(crate::claude::DEFAULT_MODEL);
+        expected["model"] = json!("deepseek-chat");
         assert_eq!(loaded, expected);
     }
 
@@ -804,6 +856,8 @@ mod tests {
                 "pillColors",
                 "language",
                 "desktopMochi",
+                "dshProfile",
+                "chatProviders",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

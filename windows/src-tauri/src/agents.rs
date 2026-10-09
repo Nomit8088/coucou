@@ -92,42 +92,16 @@ type JsonChange = Box<dyn Fn(&Value) -> Result<Option<Value>, String>>;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Agent {
-    Gemini,
-    Antigravity,
-    Cursor,
     Codex,
-    Copilot,
-    Muse,
-    OpenCode,
-    Amp,
-    Hermes,
 }
 
 impl Agent {
-    pub const ALL: &'static [Agent] = &[
-        Agent::Codex,
-        Agent::Copilot,
-        Agent::Muse,
-        Agent::Gemini,
-        Agent::Antigravity,
-        Agent::Cursor,
-        Agent::OpenCode,
-        Agent::Amp,
-        Agent::Hermes,
-    ];
+    pub const ALL: &'static [Agent] = &[Agent::Codex];
 
-    /// The `--agent` name; the pill is `agent_<id>` (PillCatalog.swift).
+    /// The `--agent` name; the pill is `agent_<id>`.
     pub fn id(self) -> &'static str {
         match self {
-            Agent::Gemini => "gemini",
-            Agent::Antigravity => "antigravity",
-            Agent::Cursor => "cursor",
             Agent::Codex => "codex",
-            Agent::Copilot => "copilot",
-            Agent::Muse => "muse",
-            Agent::OpenCode => "opencode",
-            Agent::Amp => "amp",
-            Agent::Hermes => "hermes",
         }
     }
 
@@ -138,19 +112,7 @@ impl Agent {
     /// The files this agent's install touches, under `home`.
     fn files(self, home: &Path) -> Vec<PathBuf> {
         match self {
-            Agent::Gemini => vec![home.join(".gemini").join("settings.json")],
-            Agent::Antigravity => vec![home.join(".gemini").join("config").join("hooks.json")],
-            Agent::Cursor => vec![home.join(".cursor").join("hooks.json")],
             Agent::Codex => vec![home.join(".codex").join("hooks.json")],
-            Agent::Copilot => vec![home.join(".copilot").join("hooks").join("coucou.json")],
-            Agent::Muse => vec![home.join(".config").join("muse").join("settings.json")],
-            // OpenCode and Amp read ~/.config on Windows too.
-            Agent::OpenCode => vec![home.join(".config").join("opencode").join("plugins").join("coucou.js")],
-            Agent::Amp => vec![home.join(".config").join("amp").join("plugins").join("coucou.ts")],
-            Agent::Hermes => {
-                let dir = home.join(".hermes").join("plugins").join("coucou");
-                vec![dir.join("__init__.py"), dir.join("plugin.yaml")]
-            }
         }
     }
 
@@ -168,14 +130,9 @@ impl Agent {
 
     /// For an agent that loads a plugin rather than running hook commands, the
     /// contents of each of its files (same order as `files`).
-    fn plugin(self, relay: &Relay) -> Option<Vec<String>> {
-        // A JSON string is also a valid JavaScript, TypeScript and Python one.
-        let hook = serde_json::to_string(&relay.exe).unwrap_or_default();
+    fn plugin(self, _relay: &Relay) -> Option<Vec<String>> {
         match self {
-            Agent::OpenCode => Some(vec![OPENCODE_PLUGIN.replace("{HOOK}", &hook)]),
-            Agent::Amp => Some(vec![AMP_PLUGIN.replace("{HOOK}", &hook)]),
-            Agent::Hermes => Some(vec![HERMES_PLUGIN.replace("{HOOK}", &hook), HERMES_PLUGIN_YAML.to_string()]),
-            _ => None,
+            Agent::Codex => None,
         }
     }
 
@@ -184,54 +141,10 @@ impl Agent {
     /// front, so the change itself is pure.
     fn json_change(self, relay: &Relay, install: bool) -> JsonChange {
         match (self, install) {
-            (Agent::Gemini, false) => Box::new(|v| groups_uninstall(v, "gemini").map(Some)),
-            (Agent::Gemini, true) => {
-                let commands: Vec<(String, String, u64)> = GEMINI_EVENTS
-                    .iter()
-                    .map(|(event, said, timeout)| {
-                        let command = relay.command(Shell::PowerShell, &format!("--agent gemini {said}"));
-                        (event.to_string(), command, *timeout)
-                    })
-                    .collect();
-                Box::new(move |v| gemini_install(v, &commands).map(Some))
-            }
-            (Agent::Antigravity, false) => Box::new(|v| antigravity_uninstall(v).map(Some)),
-            (Agent::Antigravity, true) => {
-                let block = antigravity_block(relay);
-                Box::new(move |v| antigravity_install(v, &block).map(Some))
-            }
-            (Agent::Cursor, false) => Box::new(|v| groups_uninstall(v, "cursor").map(Some)),
-            (Agent::Cursor, true) => {
-                let command = relay.command(Shell::Cmd, "--agent cursor");
-                Box::new(move |v| cursor_install(v, &command).map(Some))
-            }
             (Agent::Codex, false) => Box::new(|v| groups_uninstall(v, "codex").map(Some)),
             (Agent::Codex, true) => {
                 let command = relay.command(Shell::Cmd, "--agent codex");
                 Box::new(move |v| codex_install(v, &command).map(Some))
-            }
-            (Agent::Copilot, false) => Box::new(copilot_uninstall),
-            (Agent::Copilot, true) => {
-                let entries: Vec<(String, Value)> = COPILOT_EVENTS
-                    .iter()
-                    .map(|(event, timeout)| (event.to_string(), copilot_entry(relay, event, *timeout)))
-                    .collect();
-                Box::new(move |v| copilot_install(v, &entries).map(Some))
-            }
-            (Agent::Muse, false) => Box::new(|v| groups_uninstall(v, "muse").map(Some)),
-            (Agent::Muse, true) => {
-                let commands: Vec<(String, String, u64)> = MUSE_EVENTS
-                    .iter()
-                    .map(|(event, seconds)| {
-                        let command = relay.command(Shell::Cmd, &format!("--agent muse {event}"));
-                        (event.to_string(), command, seconds * 1000)
-                    })
-                    .collect();
-                Box::new(move |v| muse_install(v, &commands).map(Some))
-            }
-            // Plugins are whole files (see `plugin`), never merged into JSON.
-            (Agent::OpenCode | Agent::Amp | Agent::Hermes, _) => {
-                Box::new(|_| Err(crate::i18n::t("This agent takes a plugin, not hook entries.")))
             }
         }
     }
@@ -240,9 +153,6 @@ impl Agent {
     /// file we cannot read just reads as "not installed".
     fn installed(self, home: &Path) -> bool {
         let files = self.files(home);
-        if matches!(self, Agent::OpenCode | Agent::Amp | Agent::Hermes) {
-            return std::fs::read_to_string(&files[0]).is_ok_and(|text| is_our_plugin(&text));
-        }
         let json = || {
             config_file::read(&files[0])
                 .ok()
@@ -251,23 +161,14 @@ impl Agent {
                 .unwrap_or_else(|| json!({}))
         };
         match self {
-            Agent::Gemini => groups_have_ours(&json(), "gemini"),
-            Agent::Antigravity => json().get("coucou").is_some_and(antigravity_is_ours),
-            Agent::Cursor => groups_have_ours(&json(), "cursor"),
             Agent::Codex => groups_have_ours(&json(), "codex"),
-            Agent::Copilot => json()
-                .get("hooks")
-                .and_then(Value::as_object)
-                .is_some_and(|h| h.values().filter_map(Value::as_array).flatten().any(copilot_entry_is_ours)),
-            Agent::Muse => groups_have_ours(&json(), "muse"),
-            Agent::OpenCode | Agent::Amp | Agent::Hermes => false,
         }
     }
 
     /// Whether the island can answer this agent's permission requests. Must
     /// match `takes_decisions` in the relay (hook/src/reply.rs).
     fn approvals(self) -> bool {
-        matches!(self, Agent::Codex | Agent::Copilot | Agent::Muse)
+        matches!(self, Agent::Codex)
     }
 }
 
@@ -278,15 +179,7 @@ impl Agent {
 impl Agent {
     pub fn name(self) -> &'static str {
         match self {
-            Agent::Gemini => "Gemini CLI",
-            Agent::Antigravity => "Antigravity",
-            Agent::Cursor => "Cursor Agent",
             Agent::Codex => "Codex",
-            Agent::Copilot => "GitHub Copilot CLI",
-            Agent::Muse => "Muse Code",
-            Agent::OpenCode => "OpenCode",
-            Agent::Amp => "Amp",
-            Agent::Hermes => "Hermes Agent",
         }
     }
 
@@ -294,15 +187,7 @@ impl Agent {
     fn note(self) -> String {
         use crate::i18n::t;
         match self {
-            Agent::Gemini => t("Start a new Gemini CLI session to pick the hooks up."),
-            Agent::Antigravity => t("Start a new Antigravity conversation to pick the hooks up."),
-            Agent::Cursor => t("Restart Cursor to pick the hooks up."),
             Agent::Codex => t("Codex runs new hooks only once you trust them: start Codex and review them once with /hooks."),
-            Agent::Copilot => t("Start a new Copilot CLI session to pick the hooks up."),
-            Agent::Muse => t("Start a new Muse Code session to pick the hooks up."),
-            Agent::OpenCode => t("Restart OpenCode to load the plugin."),
-            Agent::Amp => t("Restart Amp to load the plugin."),
-            Agent::Hermes => t("Turn it on once with `hermes plugins enable coucou`, then start a new Hermes session."),
         }
     }
 }
@@ -357,12 +242,6 @@ pub fn apply(id: &str, install: bool, fingerprint: &str) -> Result<String, Strin
 
 fn apply_in(agent: Agent, home: &Path, relay: &Relay, install: bool, fingerprint: &str) -> Result<String, String> {
     let backups = config_file::apply(&agent.edits(home, relay, install), fingerprint)?;
-    // Hermes loads every folder under plugins/: an empty `coucou` one goes too.
-    if agent == Agent::Hermes && !install {
-        if let Some(dir) = agent.files(home)[0].parent() {
-            let _ = std::fs::remove_dir(dir);
-        }
-    }
     Ok(backups.iter().map(|p| p.display().to_string()).collect::<Vec<_>>().join("\n"))
 }
 
@@ -1012,110 +891,6 @@ mod tests {
     }
 
     #[test]
-    fn gemini_keeps_foreign_hooks_and_removes_only_its_own() {
-        let existing = r#"{"theme":"dark","hooks":{"BeforeTool":[{"matcher":"other","hooks":[{"type":"command","command":"custom.exe"}]}]}}"#;
-        let (home, installed, removed) = round_trip(Agent::Gemini, Some(existing));
-        assert_eq!(installed["theme"], "dark");
-        let before_tool = installed["hooks"]["BeforeTool"].as_array().unwrap();
-        assert_eq!(before_tool.len(), 2);
-        assert_eq!(before_tool[0]["matcher"], "other");
-        assert_eq!(before_tool[1]["matcher"], "*");
-        assert_eq!(before_tool[1]["hooks"][0]["timeout"], 5000);
-        let cmd = before_tool[1]["hooks"][0]["command"].as_str().unwrap();
-        assert!(cmd.ends_with("--agent gemini PreToolUse"), "{cmd}");
-        assert!(installed["hooks"]["AfterModel"].is_null());
-        assert_eq!(removed.unwrap(), serde_json::from_str::<Value>(existing).unwrap());
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn installing_twice_leaves_one_entry_per_event() {
-        let once = gemini_install(&json!({}), &[("BeforeTool".into(), "'x/coucou-hook' --agent gemini PreToolUse".into(), 5000)]).unwrap();
-        let twice = gemini_install(&once, &[("BeforeTool".into(), "'y/coucou-hook' --agent gemini PreToolUse".into(), 5000)]).unwrap();
-        assert_eq!(twice["hooks"]["BeforeTool"].as_array().unwrap().len(), 1);
-    }
-
-    #[test]
-    fn unexpected_types_are_refused_for_every_json_agent() {
-        for agent in Agent::ALL {
-            let home = scratch(&format!("odd-{}", agent.id()));
-            let file = agent.files(&home)[0].clone();
-            if file.extension().is_some_and(|e| e == "json") {
-                std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-                let shaped: &[&str] = match agent {
-                    Agent::Antigravity => &[r#"{"coucou":"nope"}"#],
-                    _ => &[r#"{"hooks":"nope"}"#, r#"{"hooks":[1]}"#],
-                };
-                for odd in shaped.iter().copied().chain(["[1,2]", "{ broken", "\"text\""]) {
-                    std::fs::write(&file, odd).unwrap();
-                    let edits = agent.edits(&home, &linux(), true);
-                    assert!(config_file::preview(&edits).is_err(), "{agent:?} accepted {odd}");
-                    assert_eq!(std::fs::read_to_string(&file).unwrap(), odd);
-                }
-            }
-            let _ = std::fs::remove_dir_all(home);
-        }
-    }
-
-    #[test]
-    fn antigravity_gets_its_own_named_group_and_nothing_else_changes() {
-        let existing = r#"{"my-guard":{"PreToolUse":[{"matcher":"run_command","hooks":[{"command":"/bin/guard"}]}]}}"#;
-        let (home, installed, removed) = round_trip(Agent::Antigravity, Some(existing));
-        assert_eq!(installed["my-guard"]["PreToolUse"][0]["matcher"], "run_command");
-        let ours = &installed["coucou"];
-        for event in ANTIGRAVITY_TOOL_EVENTS {
-            assert_eq!(ours[event][0]["matcher"], "*");
-            let cmd = ours[event][0]["hooks"][0]["command"].as_str().unwrap();
-            assert!(cmd.ends_with(&format!("--agent antigravity {event}")), "{cmd}");
-        }
-        for event in ANTIGRAVITY_LIFECYCLE_EVENTS {
-            assert_eq!(ours[event][0]["timeout"], 10);
-            assert!(ours[event][0]["command"].as_str().unwrap().contains(MARKER));
-        }
-        assert_eq!(removed.unwrap(), serde_json::from_str::<Value>(existing).unwrap());
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn a_coucou_group_someone_else_wrote_is_neither_replaced_nor_removed() {
-        let theirs = json!({ "coucou": { "Stop": [{ "command": "/bin/notify" }] } });
-        assert!(antigravity_install(&theirs, &antigravity_block(&linux())).is_err());
-        assert_eq!(antigravity_uninstall(&theirs).unwrap(), theirs);
-    }
-
-    #[test]
-    fn on_windows_antigravity_runs_the_relay_path_quoted_only_when_needed() {
-        let block = antigravity_block(&windows(WIN));
-        assert_eq!(block["Stop"][0]["command"], format!("{WIN} --agent antigravity Stop"));
-        let block = antigravity_block(&windows(WIN_SPACE));
-        assert_eq!(block["Stop"][0]["command"], format!("\"{WIN_SPACE}\" --agent antigravity Stop"));
-    }
-
-    #[test]
-    fn cursor_uses_its_native_format_and_keeps_the_users_hooks() {
-        let existing = r#"{"version":1,"hooks":{"afterFileEdit":[{"command":"./format.sh"}],"stop":[{"command":"./notify.sh"}]}}"#;
-        let (home, installed, removed) = round_trip(Agent::Cursor, Some(existing));
-        assert_eq!(installed["version"], 1);
-        for event in CURSOR_EVENTS {
-            let last = installed["hooks"][event].as_array().unwrap().last().unwrap().clone();
-            assert!(last["command"].as_str().unwrap().ends_with("--agent cursor"), "{event}");
-        }
-        assert_eq!(installed["hooks"]["stop"][0]["command"], "./notify.sh");
-        assert_eq!(installed["hooks"]["afterFileEdit"][0]["command"], "./format.sh");
-        assert_eq!(removed.unwrap(), serde_json::from_str::<Value>(existing).unwrap());
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn a_new_cursor_file_gets_its_version() {
-        let after = cursor_install(&json!({}), "'x/coucou-hook' --agent cursor").unwrap();
-        assert_eq!(after["version"], 1);
-        // A version the user set is theirs.
-        let after = cursor_install(&json!({ "version": 2 }), "c").unwrap();
-        assert_eq!(after["version"], 2);
-    }
-
-    #[test]
     fn codex_hooks_match_the_macs_and_leave_the_rest_alone() {
         let existing = r#"{"description":"mine","hooks":{"PreToolUse":[{"matcher":"Bash","hooks":[{"type":"command","command":"guard.sh"}]}]}}"#;
         let (home, installed, removed) = round_trip(Agent::Codex, Some(existing));
@@ -1136,120 +911,5 @@ mod tests {
     fn on_windows_codex_gets_a_command_cmd_can_run() {
         let after = codex_install(&json!({}), &windows(WIN_SPACE).command(Shell::Cmd, "--agent codex")).unwrap();
         assert_eq!(after["hooks"]["Stop"][0]["hooks"][0]["command"], format!("\"{WIN_SPACE}\" --agent codex"));
-    }
-
-    #[test]
-    fn copilot_gets_a_file_of_its_own_which_goes_when_coucou_leaves() {
-        let (home, installed, removed) = round_trip(Agent::Copilot, None);
-        assert_eq!(installed["version"], 1);
-        for (event, timeout) in COPILOT_EVENTS {
-            let entry = &installed["hooks"][event][0];
-            assert_eq!(entry["timeoutSec"], *timeout);
-            assert!(entry["bash"].as_str().unwrap().ends_with(&format!("--agent copilot {event}")));
-            // No PowerShell line on Linux.
-            assert!(entry.get("powershell").is_none());
-        }
-        assert!(removed.is_none(), "the file should be gone");
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn copilot_keeps_what_someone_else_added_to_the_file() {
-        let existing = r#"{"version":1,"hooks":{"sessionStart":[{"type":"command","bash":"echo hi","timeoutSec":5}]}}"#;
-        let (home, installed, removed) = round_trip(Agent::Copilot, Some(existing));
-        assert_eq!(installed["hooks"]["sessionStart"].as_array().unwrap().len(), 2);
-        assert_eq!(removed.unwrap(), serde_json::from_str::<Value>(existing).unwrap());
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn on_windows_copilot_gets_a_powershell_line_too() {
-        let entry = copilot_entry(&windows(WIN), "preToolUse", 10);
-        assert_eq!(entry["powershell"], format!("& '{WIN}' --agent copilot preToolUse"));
-        assert_eq!(
-            entry["bash"],
-            "\"C:/Users/me/AppData/Local/Coucou/bin/coucou-hook.exe\" --agent copilot preToolUse"
-        );
-    }
-
-    #[test]
-    fn muse_hooks_use_milliseconds_and_a_schema_version_for_a_new_file() {
-        let (home, installed, removed) = round_trip(Agent::Muse, None);
-        assert_eq!(installed["schema_version"], 1);
-        assert_eq!(installed["hooks"]["PermissionRequest"][0]["hooks"][0]["timeout"], 120_000);
-        assert_eq!(installed["hooks"]["PreToolUse"][0]["matcher"], "*");
-        assert!(installed["hooks"]["Stop"][0]["hooks"][0]["command"].as_str().unwrap().ends_with("--agent muse Stop"));
-        // Only Coucou's hooks go; the file and its schema_version stay.
-        assert_eq!(removed.unwrap(), json!({ "schema_version": 1 }));
-        let _ = std::fs::remove_dir_all(home);
-
-        let existing = r#"{"model":"m","hooks":{"Stop":[{"matcher":"*","hooks":[{"type":"command","command":"say done"}]}]}}"#;
-        let (home, installed, removed) = round_trip(Agent::Muse, Some(existing));
-        assert!(installed.get("schema_version").is_none());
-        assert_eq!(removed.unwrap(), serde_json::from_str::<Value>(existing).unwrap());
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn only_codex_copilot_and_muse_take_approvals() {
-        let with: Vec<&str> = Agent::ALL.iter().filter(|a| a.approvals()).map(|a| a.id()).collect();
-        assert_eq!(with, ["codex", "copilot", "muse"]);
-    }
-
-    #[test]
-    fn plugins_call_the_relay_directly_and_go_away_whole() {
-        for agent in [Agent::OpenCode, Agent::Amp, Agent::Hermes] {
-            let home = scratch(&format!("plugin-{}", agent.id()));
-            let relay = linux();
-            let plan = config_file::preview(&agent.edits(&home, &relay, true)).unwrap();
-            apply_in(agent, &home, &relay, true, &plan.fingerprint).unwrap();
-            assert!(agent.installed(&home), "{agent:?}");
-            let main = std::fs::read_to_string(&agent.files(&home)[0]).unwrap();
-            // The relay itself, at this machine's path, as a string literal: no
-            // shell, no macOS path.
-            assert!(main.contains(r#""/home/me/.local/share/coucou/bin/coucou-hook""#), "{agent:?}");
-            assert!(!main.contains("/bin/sh") && !main.contains("nb-hook"), "{agent:?}");
-            assert!(main.contains(&format!("'--agent', '{}'", agent.id())), "{agent:?}");
-            // Never a verdict for the agent.
-            assert!(!main.contains("action: 'allow'") && !main.contains("register_approval_transport"));
-
-            let plan = config_file::preview(&agent.edits(&home, &relay, false)).unwrap();
-            apply_in(agent, &home, &relay, false, &plan.fingerprint).unwrap();
-            assert!(!agent.installed(&home));
-            for file in agent.files(&home) {
-                assert!(!file.exists(), "{}", file.display());
-            }
-            let _ = std::fs::remove_dir_all(home);
-        }
-    }
-
-    #[test]
-    fn a_plugin_file_coucou_did_not_write_is_left_alone() {
-        let home = scratch("plugin-foreign");
-        let file = Agent::OpenCode.files(&home)[0].clone();
-        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
-        std::fs::write(&file, "export const Mine = async () => ({});\n").unwrap();
-        for install in [true, false] {
-            let err = config_file::preview(&Agent::OpenCode.edits(&home, &linux(), install)).unwrap_err();
-            assert!(err.contains("wasn't written by Coucou"), "{err}");
-        }
-        assert_eq!(std::fs::read_to_string(&file).unwrap(), "export const Mine = async () => ({});\n");
-        let _ = std::fs::remove_dir_all(home);
-    }
-
-    #[test]
-    fn a_windows_path_is_a_valid_string_in_every_plugin() {
-        let plugins = Agent::Hermes.plugin(&windows(WIN_SPACE)).unwrap();
-        let literal = serde_json::to_string(WIN_SPACE).unwrap();
-        assert!(plugins[0].contains(&format!("HOOK = {literal}")));
-        assert!(literal.contains(r"C:\\Users\\Jane O'Neil"));
-        // plugin.yaml is ours too, so removing it is allowed.
-        assert!(is_our_plugin(&plugins[1]));
-    }
-
-    #[test]
-    fn another_tools_entry_for_an_event_with_the_wrong_shape_is_refused() {
-        let odd = json!({ "hooks": { "BeforeTool": { "matcher": "x" } } });
-        assert!(gemini_install(&odd, &[("BeforeTool".into(), "c".into(), 1)]).is_err());
     }
 }

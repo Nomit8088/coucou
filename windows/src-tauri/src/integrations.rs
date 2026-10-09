@@ -64,14 +64,10 @@ pub fn set_paused(on: bool) {
 
 /// Spawns every poller with the macOS delays and intervals.
 pub fn start(app: AppHandle) {
-    spawn(app.clone(), "integration_n8n", 3, 15, poll_n8n);
-    spawn(app.clone(), "integration_vercel", 5, 30, poll_vercel);
-    spawn(app.clone(), "integration_stripe", 6, 30, poll_stripe);
     spawn(app.clone(), "integration_resend", 6, 60, poll_resend);
     spawn(app.clone(), "integration_github", 7, 300, poll_github);
     spawn_github_loops(app.clone());
-    spawn(app.clone(), "integration_calcom", 8, 300, poll_calcom);
-    spawn(app, "integration_notion", 9, 300, poll_notion);
+    spawn(app, "integration_gitlab", 8, 60, poll_gitlab);
 }
 
 /// True when the user has this integration switched on in settings.
@@ -109,17 +105,13 @@ where
 /// One-shot refresh from the Refresh buttons in the island.
 pub async fn poll_once(app: AppHandle, id: &str) {
     match id {
-        "integration_stripe" => poll_stripe(app).await,
         "integration_github" => {
             wake_github_pulse();
             github_refresh_if_stale("activity");
             poll_github(app).await
         }
-        "integration_vercel" => poll_vercel(app).await,
-        "integration_n8n" => poll_n8n(app).await,
         "integration_resend" => poll_resend(app).await,
-        "integration_notion" => poll_notion(app).await,
-        "integration_calcom" => poll_calcom(app).await,
+        "integration_gitlab" => poll_gitlab(app).await,
         _ => {}
     }
 }
@@ -1002,6 +994,161 @@ fn fmt_value(v: &Value) -> String {
         Value::Array(a) => format!("[{}]", a.len()),
         Value::Object(_) => "{…}".into(),
         other => other.to_string(),
+    }
+}
+
+// ── GitLab (enterprise) ───────────────────────────────────────────────────────
+
+struct GitlabCache {
+    fetched_at: u64,
+    running: bool,
+}
+
+static GITLAB: Mutex<GitlabCache> = Mutex::new(GitlabCache { fetched_at: 0, running: false });
+
+fn gitlab_base() -> Option<(reqwest::Url, String)> {
+    let raw = secrets::get("gitlab-url")?;
+    let token = secrets::get("gitlab-token").filter(|t| !t.trim().is_empty())?;
+    let url = reqwest::Url::parse(raw.trim()).ok()?;
+    if url.host_str().is_none() {
+        return None;
+    }
+    let ok = url.scheme() == "https" || (url.scheme() == "http" && crate::net::is_loopback_url(&url));
+    if !ok || !url.username().is_empty() {
+        return None;
+    }
+    let mut origin = url;
+    origin.set_path("");
+    origin.set_query(None);
+    origin.set_fragment(None);
+    Some((origin, token))
+}
+
+fn gitlab_link(base: &reqwest::Url, web_url: Option<&str>, fallback_path: &str) -> String {
+    if let Some(web_url) = web_url {
+        if let Ok(parsed) = reqwest::Url::parse(web_url) {
+            if parsed.host_str() == base.host_str() {
+                return web_url.to_string();
+            }
+        }
+    }
+    let mut url = base.clone();
+    url.set_path(fallback_path);
+    url.to_string()
+}
+
+async fn gitlab_get(base: &reqwest::Url, token: &str, path: &str) -> Option<Value> {
+    let url = format!("{}{}", base.as_str().trim_end_matches('/'), path);
+    let response = client()
+        .get(url)
+        .header("PRIVATE-TOKEN", token)
+        .header("Accept", "application/json")
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    response.json().await.ok()
+}
+
+fn gitlab_mrs(base: &reqwest::Url, list: Option<&Value>) -> Vec<Value> {
+    list.and_then(Value::as_array)
+        .map(|items| {
+            items.iter().take(8).filter_map(|mr| {
+                let iid = mr.get("iid").and_then(Value::as_i64)?;
+                let title = mr.get("title").and_then(Value::as_str).unwrap_or("");
+                let project = mr.get("references").and_then(|r| r.get("full")).and_then(Value::as_str).unwrap_or("");
+                Some(json!({
+                    "iid": iid,
+                    "title": title,
+                    "project": project,
+                    "url": gitlab_link(base, mr.get("web_url").and_then(Value::as_str), &format!("/-/merge_requests/{iid}")),
+                    "updatedAt": mr.get("updated_at").and_then(Value::as_str).unwrap_or(""),
+                }))
+            }).collect()
+        })
+        .unwrap_or_default()
+}
+
+async fn poll_gitlab(app: AppHandle) {
+    poll_gitlab_force(&app, false).await;
+}
+
+async fn poll_gitlab_force(app: &AppHandle, force: bool) {
+    if PAUSED.load(Ordering::Relaxed) || !enabled(app, "integration_gitlab") {
+        return;
+    }
+    let Some((base, token)) = gitlab_base() else { return };
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    {
+        let cache = GITLAB.lock().unwrap();
+        let interval = if cache.running { 60 } else { 300 };
+        if !force && cache.fetched_at != 0 && now.saturating_sub(cache.fetched_at) < interval {
+            return;
+        }
+    }
+    let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=8").await;
+    let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=8").await;
+    if review.is_none() {
+        review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
+    }
+    let projects = gitlab_get(&base, &token, "/api/v4/projects?membership=true&simple=true&order_by=last_activity_at&sort=desc&per_page=5").await;
+    let mut pipelines = Vec::new();
+    let mut running = false;
+    if let Some(list) = projects.as_ref().and_then(Value::as_array) {
+        if let Some(project) = list.first() {
+            let id = project.get("id").and_then(Value::as_i64).unwrap_or(0);
+            let branch = project.get("default_branch").and_then(Value::as_str).unwrap_or("main");
+            let name = project.get("path_with_namespace").and_then(Value::as_str).unwrap_or("");
+            if id > 0 {
+                let path = format!("/api/v4/projects/{id}/pipelines?ref={branch}&per_page=3");
+                if let Some(rows) = gitlab_get(&base, &token, &path).await.and_then(|v| v.as_array().cloned()) {
+                    for row in rows.into_iter().take(3) {
+                        let status = row.get("status").and_then(Value::as_str).unwrap_or("");
+                        if status == "running" || status == "pending" {
+                            running = true;
+                        }
+                        let pid = row.get("id").and_then(Value::as_i64).unwrap_or(0);
+                        pipelines.push(json!({
+                            "id": pid,
+                            "status": status,
+                            "ref": row.get("ref").and_then(Value::as_str).unwrap_or(branch),
+                            "project": name,
+                            "url": gitlab_link(&base, row.get("web_url").and_then(Value::as_str), &format!("/{name}/-/pipelines/{pid}")),
+                        }));
+                    }
+                }
+            }
+        }
+    }
+    {
+        let mut cache = GITLAB.lock().unwrap();
+        cache.fetched_at = now;
+        cache.running = running;
+    }
+    emit(app, IntegrationUpdate {
+        id: "integration_gitlab",
+        data: json!({
+            "mine": gitlab_mrs(&base, mine.as_ref()),
+            "review": gitlab_mrs(&base, review.as_ref()),
+            "pipelines": pipelines,
+            "host": base.as_str().trim_end_matches('/'),
+        }),
+        error: None,
+        event: None,
+    });
+}
+
+pub fn gitlab_refresh_if_stale(app: &AppHandle) {
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
+    let stale = {
+        let cache = GITLAB.lock().unwrap();
+        cache.fetched_at == 0 || now.saturating_sub(cache.fetched_at) >= 60
+    };
+    if stale {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { poll_gitlab_force(&app, true).await });
     }
 }
 

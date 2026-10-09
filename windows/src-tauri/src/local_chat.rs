@@ -81,8 +81,8 @@ fn key_for(stored: &str, url: &Url) -> Option<String> {
 
 /// A model server as the settings describe it.
 pub struct Server {
-    pub id: &'static str,
-    pub name: &'static str,
+    pub id: String,
+    pub name: String,
     /// As stored: empty until the user connects it.
     pub url: String,
     pub key: Option<String>,
@@ -99,7 +99,7 @@ pub fn server(settings: &Settings, id: &str) -> Option<Server> {
         }
         _ => return None,
     };
-    Some(Server { id, name, url: url.clone(), key })
+    Some(Server { id: id.to_string(), name: name.to_string(), url: url.clone(), key })
 }
 
 /// The usual address of a server on this machine; none for "custom". Ollama's
@@ -127,7 +127,7 @@ fn unreachable(url: &Url) -> String {
 
 fn base_url(server: &Server) -> Result<Url, String> {
     if server.url.trim().is_empty() {
-        return Err(tf("Connect {name} in Settings → Local models first.", &[("name", &t(server.name))]));
+        return Err(tf("Connect {name} in Settings → Local models first.", &[("name", &t(&server.name))]));
     }
     net::normalise_server_url(&server.url)
 }
@@ -161,7 +161,7 @@ pub async fn models(server: &Server) -> Result<Vec<ModelInfo>, String> {
     let url = base_url(server)?;
     let models = list(&url, server.key.as_deref()).await?;
     if models.is_empty() {
-        return Err(tf("No models yet. Download one in {name} first.", &[("name", &t(server.name))]));
+        return Err(tf("No models yet. Download one in {name} first.", &[("name", &t(&server.name))]));
     }
     Ok(models.into_iter().map(|id| ModelInfo { label: id.clone(), id }).collect())
 }
@@ -266,7 +266,7 @@ pub async fn send(
     if model.is_empty() {
         return Err(t("Pick a model above the chat box first."));
     }
-    let turn = chat.begin(server.id);
+    let turn = chat.begin(&server.id);
     let user = json!({ "role": "user", "content": user_text(turn.first, context.as_ref(), &query) });
     let body = request_body(model, &chat::system_prompt(false), &turn.history, &user);
 

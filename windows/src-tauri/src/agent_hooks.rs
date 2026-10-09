@@ -52,17 +52,14 @@ fn read_json(path: &PathBuf) -> Value {
 
 /// Pill ID → connected, for every hook-driven pill.
 pub fn status() -> HashMap<String, bool> {
-    let claude = claude_hooks_present(&read_json(&crate::hooks::settings_path()));
     let mut out = HashMap::new();
-    out.insert("integration_claude".to_string(), claude);
     for agent in crate::agents::list() {
         out.insert(format!("agent_{}", agent.id), agent.installed);
     }
-    // The Cursor pill also carries Claude Code run in Cursor's terminal, which
-    // Claude Code's own hooks report.
-    if claude {
-        out.insert("agent_cursor".to_string(), true);
-    }
+    out.insert(
+        "agent_dsh".to_string(),
+        crate::dsh::installed_at(&crate::dsh::profile_dir(&crate::settings::load())),
+    );
     out
 }
 

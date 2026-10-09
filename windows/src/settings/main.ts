@@ -4,7 +4,7 @@
 
 import "./settings.css";
 import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
-import { CUSTOM_SERVER_KEY, providerDef, urlExposure } from "../core/providers";
+import { CUSTOM_SERVER_KEY, ensureProviders, newProviderId, providerDef, urlAllowed, urlExposure } from "../core/providers";
 import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
@@ -279,27 +279,7 @@ function planSection(status: HookStatus): HTMLElement {
       }
     });
     body.append(
-      h("div", {
-        class: "hint",
-        text: PLAN_SETTINGS_TEXT.claude,
-      }),
-      h("div", { class: "row" }, h("label", { text: PLAN_SETTINGS_TEXT.showClaude }), sw),
-      h("div", { class: "row" },
-        h("label", { text: t("Relay") }),
-        statusDot(status.planRelayInstalled),
-        h("span", { class: "hint", text: status.planRelayInstalled ? t("installed") : t("not installed") }),
-        status.planRelayInstalled
-          ? h("button", {
-              class: "danger",
-              text: t("Uninstall relay…"),
-              onclick: () => void reviewChange(body, STATUS_LINE_CHANGE, false, redraw, () => void rebuild()),
-            })
-          : h("button", {
-              class: "primary",
-              text: t("Install relay…"),
-              onclick: () => void reviewChange(body, STATUS_LINE_CHANGE, true, redraw, () => void rebuild()),
-            }),
-      ),
+      // Codex only. Claude plan usage is not part of this fork.
       // Codex: nothing to install, Coucou asks the Codex CLI when the pill shows.
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.codex }),
       h("div", { class: "row" },
@@ -755,26 +735,17 @@ interface IntegrationDef {
 }
 
 const INTEGRATIONS: IntegrationDef[] = [
-  { id: "integration_stripe", name: "Stripe", color: "#0570DE",
-    fields: [{ key: "stripe-api-key", label: N_("Secret key"), placeholder: "sk_live_…", secret: true }] },
   { id: "integration_github", name: "GitHub", color: "#F4505E",
     fields: [{ key: "github-token", label: N_("Token"), placeholder: "ghp_…", secret: true }],
     hint: N_("Classic token with the repo scope, or fine-grained with read access to Pull requests, Commit statuses and Actions.") },
-  { id: "integration_vercel", name: "Vercel", color: "#7C5CFF",
-    fields: [{ key: "vercel-token", label: N_("Token"), placeholder: "…", secret: true }] },
-  { id: "integration_n8n", name: "n8n", color: "#F29B38",
-    fields: [
-      { key: "n8n-url", label: N_("Instance URL"), placeholder: "https://n8n.example.com", secret: false },
-      { key: "n8n-api-key", label: N_("API key"), placeholder: "…", secret: true },
-    ] },
   { id: "integration_resend", name: "Resend", color: "#22C55E",
     fields: [{ key: "resend-api-key", label: N_("API key"), placeholder: "re_…", secret: true }] },
-  { id: "integration_notion", name: "Notion", color: "#8C8C8C",
-    fields: [{ key: "notion-api-key", label: N_("Integration token"), placeholder: "ntn_…", secret: true }] },
-  { id: "integration_calcom", name: "Cal.com", color: "#C9956A",
-    fields: [{ key: "calcom-api-key", label: N_("API key"), placeholder: "cal_…", secret: true }] },
-  // Nothing to enter: Spotify is read over D-Bus (Linux only, see core/pills.ts).
-  { id: "integration_spotify", name: "Spotify", color: "#1DB954", fields: [] },
+  { id: "integration_gitlab", name: "GitLab", color: "#FC6D26",
+    fields: [
+      { key: "gitlab-url", label: N_("Base URL"), placeholder: "https://gitlab.company.com", secret: false },
+      { key: "gitlab-token", label: N_("Access token"), placeholder: "glpat-…", secret: true },
+    ],
+    hint: N_("Sent as PRIVATE-TOKEN. The card lists your open merge requests, reviews, and the default-branch pipeline.") },
 ];
 
 const MAX_ACTIVE = MAX_DECLARED;
@@ -1359,12 +1330,9 @@ async function render() {
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
-    claudeSection(status),
     agentsSection(agents),
     planSection(status),
-    apiSection(hasKey),
-    chatProvidersSection(chatKeys, keyChanged),
-    localSection(customKey),
+    personalChatSection(chatKeys, keyChanged),
     activePillsSection(connected),
     integrationsSection(present),
     generalSection(),
@@ -1377,3 +1345,115 @@ async function render() {
 }
 
 void main();
+
+function personalChatSection(present: Record<string, boolean>, keyChanged: (key: string, on: boolean) => void): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
+  const section = h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: t("Chat providers") })),
+    h("div", { class: "hint", text: t("DeepSeek is built in. Add any OpenAI-compatible provider with a name, base URL, key and default model. Keys stay in the system keychain. Chat has no tools.") }),
+    body,
+  );
+  const redraw = () => {
+    clear(body);
+    settings.chatProviders = ensureProviders(settings.chatProviders);
+    for (const provider of settings.chatProviders) {
+      body.append(providerRow(provider, present, keyChanged, redraw));
+    }
+    body.append(h("button", { class: "primary", text: t("Add provider"), onclick: () => {
+      settings.chatProviders = [...ensureProviders(settings.chatProviders), {
+        id: newProviderId(),
+        name: t("Custom"),
+        baseUrl: "https://",
+        keyName: "",
+        defaultModel: "",
+        builtin: false,
+      }];
+      const added = settings.chatProviders[settings.chatProviders.length - 1];
+      added.keyName = `chat-${added.id}`;
+      void save();
+      redraw();
+    }}));
+    const profile = h("input", {
+      value: settings.dshProfile,
+      placeholder: "%USERPROFILE%\\.dsh\\profiles\\web",
+      style: "flex:1 1 auto;min-width:0",
+    }) as HTMLInputElement;
+    profile.addEventListener("change", () => {
+      settings.dshProfile = profile.value.trim();
+      void save();
+    });
+    body.append(
+      h("div", { class: "hint", text: t("DeepSeek Harness profile. Empty uses the web profile. Restart Harness after installing the plugin.") }),
+      h("div", { class: "row" }, h("label", { text: t("Profile path") }), profile),
+    );
+  };
+  redraw();
+  return section;
+}
+
+function providerRow(
+  provider: import("../core/providers").ChatProviderConfig,
+  present: Record<string, boolean>,
+  keyChanged: (key: string, on: boolean) => void,
+  redraw: () => void,
+): HTMLElement {
+  const name = h("input", { value: provider.name, disabled: provider.builtin ? "true" : undefined }) as HTMLInputElement;
+  const url = h("input", { value: provider.baseUrl, placeholder: "https://api.example.com/v1" }) as HTMLInputElement;
+  const model = h("input", { value: provider.defaultModel, placeholder: "model-id" }) as HTMLInputElement;
+  const key = h("input", { type: "password", placeholder: present[provider.keyName] ? "••••••••" : t("API key") }) as HTMLInputElement;
+  const save = () => {
+    provider.name = provider.builtin ? "DeepSeek" : name.value.trim() || provider.name;
+    provider.baseUrl = url.value.trim();
+    provider.defaultModel = model.value.trim() || provider.defaultModel;
+    if (!urlAllowed(provider.baseUrl)) {
+      StateNote(t("The address must use https://, or http:// on this computer."));
+      return;
+    }
+    const idx = settings.chatProviders.findIndex((p) => p.id === provider.id);
+    if (idx >= 0) settings.chatProviders[idx] = { ...provider };
+    void saveSettings();
+  };
+  name.addEventListener("change", save);
+  url.addEventListener("change", save);
+  model.addEventListener("change", save);
+  const row = h("div", { style: "display:flex;flex-direction:column;gap:6px" },
+    h("div", { class: "row" }, h("label", { text: t("Name") }), name),
+    h("div", { class: "row" }, h("label", { text: t("Base URL") }), url),
+    h("div", { class: "row" }, h("label", { text: t("Default model") }), model),
+    h("div", { class: "row" }, h("label", { text: t("API key") }), key, h("button", { class: "primary", text: t("Save"), onclick: () => {
+      const value = key.value.trim();
+      if (!value) return;
+      void Bridge.secretSet(provider.keyName, value).then(() => {
+        present[provider.keyName] = true;
+        key.value = "";
+        keyChanged(provider.keyName, true);
+        save();
+      });
+    }})),
+  );
+  if (!provider.builtin) {
+    row.append(h("button", { class: "danger", text: t("Remove"), onclick: () => {
+      settings.chatProviders = settings.chatProviders.filter((p) => p.id !== provider.id);
+      if (settings.chatProvider === provider.id) settings.chatProvider = "deepseek";
+      void Bridge.secretClear(provider.keyName);
+      void saveSettings();
+      redraw();
+    }}));
+  }
+  return row;
+}
+
+function StateNote(message: string): void {
+  window.alert(message);
+}
+
+async function saveSettings(): Promise<void> {
+  await save();
+}
+
+void claudeSection;
+void apiSection;
+void localSection;
+void chatProvidersSection;

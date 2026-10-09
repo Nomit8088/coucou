@@ -1,70 +1,88 @@
-// Who the chat can talk to — the island's side of chat.rs. The Mac's
-// ChatProvider (IslandTypes.swift) plus OpenRouter and any OpenAI-compatible
-// server. Pure data and helpers, so they can be tested without a webview.
+// Island chat providers: built-in DeepSeek plus OpenAI-compatible servers the
+// user adds. Keys stay in the credential store; this module only knows the
+// entry name.
 
 import type { Settings } from "./state";
-import { N_ } from "../i18n/i18n";
 
-export type ProviderId =
-  | "anthropic" | "openai" | "google" | "openrouter"
-  | "ollama" | "lmstudio" | "custom";
+export interface ChatProviderConfig {
+  id: string;
+  name: string;
+  baseUrl: string;
+  keyName: string;
+  defaultModel: string;
+  builtin: boolean;
+}
 
 export interface ProviderDef {
-  id: ProviderId;
-  /** Shown on the chip in the chat's model picker. */
+  id: string;
   name: string;
   accent: string;
-  /** Credential store entry of its key; null for the model servers. */
   key: string | null;
-  /** Settings field holding a model server's address. */
-  urlField: "ollamaUrl" | "lmstudioUrl" | "customUrl" | null;
+  urlField: null;
   defaultModel: string;
-  /** When the saved model is not offered, the first one containing this is picked. */
   prefer: string | null;
+  baseUrl: string;
+  builtin: boolean;
 }
 
-export const PROVIDERS: readonly ProviderDef[] = [
-  { id: "anthropic", name: "Anthropic", accent: "#E07950", key: "anthropic-api-key", urlField: null, defaultModel: "claude-opus-5", prefer: "opus" },
-  { id: "google", name: "Google", accent: "#4285F4", key: "google-api-key", urlField: null, defaultModel: "gemini-2.0-flash", prefer: "flash" },
-  { id: "openai", name: "OpenAI", accent: "#10A37F", key: "openai-api-key", urlField: null, defaultModel: "gpt-4o", prefer: "mini" },
-  { id: "openrouter", name: "OpenRouter", accent: "#6467F2", key: "openrouter-api-key", urlField: null, defaultModel: "openrouter/auto", prefer: null },
-  { id: "ollama", name: "Ollama", accent: "#FACC15", key: null, urlField: "ollamaUrl", defaultModel: "", prefer: null },
-  { id: "lmstudio", name: "LM Studio", accent: "#A3E635", key: null, urlField: "lmstudioUrl", defaultModel: "", prefer: null },
-  { id: "custom", name: N_("Custom server"), accent: "#C0C4CC", key: null, urlField: "customUrl", defaultModel: "", prefer: null },
-];
+export const DEEPSEEK: ChatProviderConfig = {
+  id: "deepseek",
+  name: "DeepSeek",
+  baseUrl: "https://api.deepseek.com/v1",
+  keyName: "deepseek-api-key",
+  defaultModel: "deepseek-chat",
+  builtin: true,
+};
 
-/** Credential store entry of the custom server's optional key. */
-export const CUSTOM_SERVER_KEY = "openai-compatible-key";
-
-export function providerDef(id: string): ProviderDef {
-  return PROVIDERS.find((p) => p.id === id) ?? PROVIDERS[0];
+export function ensureProviders(list: ChatProviderConfig[] | undefined): ChatProviderConfig[] {
+  const out = [...(list ?? [])];
+  const existing = out.find((p) => p.id === "deepseek");
+  if (!existing) out.unshift({ ...DEEPSEEK });
+  else {
+    existing.builtin = true;
+    existing.keyName = DEEPSEEK.keyName;
+    if (!existing.name.trim()) existing.name = DEEPSEEK.name;
+    if (!existing.baseUrl.trim()) existing.baseUrl = DEEPSEEK.baseUrl;
+    if (!existing.defaultModel.trim()) existing.defaultModel = DEEPSEEK.defaultModel;
+  }
+  return out;
 }
 
-/** The model the chat uses for the active provider. */
+export function providerDef(id: string, settings?: Settings): ProviderDef {
+  const found = ensureProviders(settings?.chatProviders).find((p) => p.id === id) ?? DEEPSEEK;
+  return {
+    id: found.id,
+    name: found.name,
+    accent: found.id === "deepseek" ? "#4D6BFE" : "#10A37F",
+    key: found.keyName,
+    urlField: null,
+    defaultModel: found.defaultModel,
+    prefer: found.id === "deepseek" ? "chat" : null,
+    baseUrl: found.baseUrl,
+    builtin: found.builtin,
+  };
+}
+
 export function activeModel(settings: Settings): string {
-  const p = providerDef(settings.chatProvider);
-  if (p.id === "anthropic") return settings.model || p.defaultModel;
+  const p = providerDef(settings.chatProvider, settings);
   return settings.chatModels[p.id] || p.defaultModel;
 }
 
-/** `settings` with `model` picked for `provider`. */
-export function withModel(settings: Settings, provider: ProviderId, model: string): Settings {
-  if (provider === "anthropic") return { ...settings, model };
-  return { ...settings, chatModels: { ...settings.chatModels, [provider]: model } };
+export function withModel(settings: Settings, provider: string, model: string): Settings {
+  return { ...settings, chatProvider: provider, chatModels: { ...settings.chatModels, [provider]: model } };
 }
 
-/**
- * The chips of the picker: every cloud provider (one without a key says so
- * when picked), and a model server once it is connected — or while it is the
- * active one, so the picker never hides where the chat goes.
- */
-export function visibleProviders(settings: Settings): ProviderDef[] {
-  return PROVIDERS.filter(
-    (p) => !p.urlField || settings[p.urlField] !== "" || settings.chatProvider === p.id,
-  );
+/** Chips: a provider appears only when it has a URL and a stored key (or is loopback http). */
+export function visibleProviders(settings: Settings, present: Record<string, boolean> = {}): ProviderDef[] {
+  return ensureProviders(settings.chatProviders)
+    .filter((p) => {
+      if (!p.baseUrl.trim()) return false;
+      if (present[p.keyName]) return true;
+      return isLoopbackHttp(p.baseUrl);
+    })
+    .map((p) => providerDef(p.id, settings));
 }
 
-/** The model to keep once the list arrives: the saved one if offered, else a sensible one. */
 export function pickModel(provider: ProviderDef, offered: string[], current: string): string | null {
   if (offered.length === 0) return null;
   if (offered.includes(current)) return current;
@@ -73,9 +91,6 @@ export function pickModel(provider: ProviderDef, offered: string[], current: str
   return offered.includes(provider.defaultModel) ? provider.defaultModel : offered[0];
 }
 
-// ── Where an address points ───────────────────────────────────────────────────
-
-/** Mirrors net.rs: this machine, by name or address. */
 export function isLoopbackHost(host: string): boolean {
   const h = host.replace(/^\[|\]$/g, "").toLowerCase();
   if (h === "localhost" || h.endsWith(".localhost")) return true;
@@ -83,24 +98,46 @@ export function isLoopbackHost(host: string): boolean {
   return h === "0.0.0.0" || h === "::1" || h === "::" || h === "::ffff:127.0.0.1" || h === "::ffff:7f00:1";
 }
 
-/**
- * Where a server address sends what you type: this machine, another one over
- * https, another one in clear text (http), or nowhere valid. An empty field
- * means the usual address on this machine.
- */
+export function isLoopbackHttp(raw: string): boolean {
+  try {
+    const url = new URL(raw.trim());
+    return url.protocol === "http:" && isLoopbackHost(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+export function urlAllowed(raw: string): boolean {
+  const text = raw.trim();
+  if (!text) return false;
+  try {
+    const url = new URL(text);
+    if (url.username || url.password || !url.hostname) return false;
+    if (url.protocol === "https:") return true;
+    return url.protocol === "http:" && isLoopbackHost(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+/** Kept so older settings helpers still type-check. Not used for chat. */
+export const CUSTOM_SERVER_KEY = "openai-compatible-key";
+
 export type Exposure = "local" | "remote" | "remote-http" | "invalid";
 
 export function urlExposure(raw: string): Exposure {
   const text = raw.trim();
   if (!text) return "local";
-  let url: URL;
-  try {
-    url = new URL(text.includes("://") ? text : `http://${text}`);
-  } catch {
-    return "invalid";
-  }
-  if (url.protocol !== "http:" && url.protocol !== "https:") return "invalid";
-  if (!url.hostname || url.username || url.password) return "invalid";
-  if (isLoopbackHost(url.hostname)) return "local";
-  return url.protocol === "https:" ? "remote" : "remote-http";
+  if (!urlAllowed(text)) return text.startsWith("http:") ? "remote-http" : "invalid";
+  if (isLoopbackHttp(text) || isLoopbackHost(safeHost(text))) return "local";
+  return text.startsWith("https:") ? "remote" : "remote-http";
+}
+
+function safeHost(raw: string): string {
+  try { return new URL(raw).hostname; } catch { return ""; }
+}
+
+export function newProviderId(): string {
+  const n = Math.random().toString(36).slice(2, 10);
+  return `c-${n}`.slice(0, 24);
 }

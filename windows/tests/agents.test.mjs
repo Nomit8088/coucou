@@ -7,12 +7,11 @@ import {
   APPROVAL_AGENTS, KNOWN_AGENTS, agentColor, agentName, validateAgent,
 } from "../src/island/agents.ts";
 
-test("known agents carry the Mac's names and colours", () => {
-  assert.equal(agentName("gemini"), "Gemini CLI");
-  assert.equal(agentColor("gemini"), "#8AB4F8");
-  assert.equal(agentName("copilot"), "Copilot CLI");
+test("known agents carry the fork's names and colours", () => {
+  assert.equal(agentName("dsh"), "DeepSeek");
+  assert.equal(agentColor("dsh"), "#4D6BFE");
+  assert.equal(agentName("codex"), "Codex");
   assert.equal(agentColor("codex"), "#2DD4BF");
-  assert.equal(agentColor("cursor"), "#C0C4CC");
   for (const [id, { color }] of Object.entries(KNOWN_AGENTS)) {
     assert.equal(validateAgent(id), id, id);
     assert.match(color, /^#[0-9A-F]{6}$/, id);
@@ -34,5 +33,5 @@ test("the agent tag is checked the Mac's way, and claude is reserved", () => {
 
 test("approval cards are for the agents the relay answers, no one else", () => {
   // Must match takes_decisions() in hook/src/reply.rs.
-  assert.deepEqual([...APPROVAL_AGENTS].sort(), ["codex", "copilot", "muse"]);
+  assert.deepEqual([...APPROVAL_AGENTS].sort(), ["codex", "dsh"]);
 });
