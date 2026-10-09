@@ -196,6 +196,26 @@ pub fn apply(settings: &crate::settings::Settings, install: bool, fingerprint: &
 /// One line for the reverse pipe. Failure means DSH is not listening; the
 /// caller falls back to the island chat and does not surface an error.
 pub fn steer(text: &str) -> bool {
+    send(&serde_json::json!({ "kind": "steer", "text": text }))
+}
+
+/// Stops the turn DSH is running. False means the plugin is not listening.
+pub fn cancel() -> bool {
+    send(&serde_json::json!({ "kind": "cancel" }))
+}
+
+/// A dropped file, as the prompt text that carries it. The path only: Coucou
+/// never inlines a file's contents into another tool, and DSH reads it itself
+/// with its own tools and its own sandbox rules.
+pub fn steer_file(name: &str, path: &str) -> bool {
+    let question = if name.trim().is_empty() { path } else { name };
+    send(&serde_json::json!({
+        "kind": "steer",
+        "text": format!("I dropped a file: {question}\n{path}"),
+    }))
+}
+
+fn send(payload: &serde_json::Value) -> bool {
     #[cfg(windows)]
     {
         use std::io::Write;
@@ -204,15 +224,14 @@ pub fn steer(text: &str) -> bool {
             Ok(file) => file,
             Err(_) => return false,
         };
-        let mut line = text.replace(['\r', '\n'], " ");
-        let payload = serde_json::json!({ "text": line }).to_string();
-        line = payload;
+        // One line: the plugin reads up to the first newline.
+        let mut line = payload.to_string().replace(['\r', '\n'], " ");
         line.push('\n');
         file.write_all(line.as_bytes()).is_ok()
     }
     #[cfg(not(windows))]
     {
-        let _ = text;
+        let _ = payload;
         false
     }
 }

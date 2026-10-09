@@ -130,6 +130,55 @@ test("a failed tool call and subagents leave their own steps", () => {
   assert.equal(task().state, "working");
 });
 
+test("a subagent step says what it is when the plugin names it", () => {
+  // The DSH plugin sends a workflow phase or a narration line as `message`.
+  dsh({ hook_event_name: "SubagentStart", message: "▸ Research" });
+  dsh({ hook_event_name: "SubagentStop", message: "✔ review · 3 agents" });
+  assert.deepEqual(task().steps, ["▸ Research", "✔ review · 3 agents"]);
+});
+
+test("a warning is a ticker line, never the red state", () => {
+  // A failed model request the loop will retry: the session carries on.
+  dsh({ hook_event_name: "Warning", message: "⚠ Request failed" });
+  assert.equal(task().state, "idle");
+  assert.deepEqual(task().steps, ["⚠ Request failed"]);
+  assert.deepEqual(asked, []);
+  // An empty one leaves no blank step.
+  dsh({ hook_event_name: "Warning", message: "" });
+  assert.deepEqual(task().steps, ["⚠ Request failed"]);
+});
+
+test("a streaming preview replaces itself and never grows the ticker", () => {
+  dsh({ hook_event_name: "StreamingText", message: "The relay is" });
+  assert.equal(task().liveLine, "The relay is");
+  dsh({ hook_event_name: "StreamingText", message: "The relay is a worker" });
+  // Still no step: the preview is not history.
+  assert.deepEqual(task().steps, []);
+  assert.equal(task().liveLine, "The relay is a worker");
+  // A real step supersedes it.
+  dsh({ hook_event_name: "PreToolUse", tool_name: "pwsh", tool_input: { command: "ls" } });
+  assert.equal(task().liveLine, null);
+  assert.deepEqual(task().steps, ["Runs · ls"]);
+});
+
+test("the streaming preview is cleared when the turn ends", () => {
+  dsh({ hook_event_name: "StreamingText", message: "half an answer" });
+  dsh({ hook_event_name: "Stop", last_assistant_message: "The whole answer." });
+  assert.equal(task().liveLine, null);
+  assert.equal(task().finalLine, "The whole answer.");
+});
+
+test("context usage is kept per pill, and only when there are tokens", () => {
+  dsh({ hook_event_name: "ContextUsage", used_tokens: 42_000, context_window: 100_000 });
+  assert.deepEqual(State.contextUsage.get(DSH), {
+    tokens: 42_000, window: 100_000, updatedAt: State.contextUsage.get(DSH).updatedAt,
+  });
+  // Nothing measured yet: no entry is invented.
+  dsh({ hook_event_name: "ContextUsage", used_tokens: 0, context_window: 100_000 });
+  assert.equal(State.contextUsage.size, 1);
+  assert.equal(State.contextUsage.get(CODEX), undefined);
+});
+
 test("a notification is a rate limit, a question, or nothing", () => {
   dsh({ hook_event_name: "Notification", message: "Just so you know." });
   assert.equal(task().state, "idle");

@@ -2824,6 +2824,39 @@
    "ru": "Отправить в эту сессию…",
    "id": "Kirim ke sesi ini…"
   },
+  "Context": {
+   "zh-Hans": "上下文",
+   "hi": "संदर्भ",
+   "es": "Contexto",
+   "ar": "السياق",
+   "fr": "Contexte",
+   "bn": "প্রসঙ্গ",
+   "pt-BR": "Contexto",
+   "ru": "Контекст",
+   "id": "Konteks"
+  },
+  "Context used": {
+   "zh-Hans": "已用上下文",
+   "hi": "प्रयुक्त संदर्भ",
+   "es": "Contexto usado",
+   "ar": "السياق المستخدم",
+   "fr": "Contexte utilisé",
+   "bn": "ব্যবহৃত প্রসঙ্গ",
+   "pt-BR": "Contexto usado",
+   "ru": "Использовано контекста",
+   "id": "Konteks terpakai"
+  },
+  "Stop the turn": {
+   "zh-Hans": "停止本轮",
+   "hi": "यह चरण रोकें",
+   "es": "Detener el turno",
+   "ar": "إيقاف الدور",
+   "fr": "Arrêter le tour",
+   "bn": "এই পালা থামান",
+   "pt-BR": "Parar o turno",
+   "ru": "Остановить ход",
+   "id": "Hentikan giliran"
+  },
   "DeepSeek Harness is not listening.": {
    "zh-Hans": "DeepSeek Harness 没有在监听。",
    "hi": "DeepSeek Harness सुन नहीं रहा।",

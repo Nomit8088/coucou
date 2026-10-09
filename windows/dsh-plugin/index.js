@@ -12,6 +12,10 @@ export const name = "coucou";
 const AGENT = "dsh";
 const CONNECT_MS = 400;
 const DECISION_MS = 110_000;
+/** Shortest gap between two streaming preview lines: the island repaints on each. */
+const STREAM_MS = 350;
+/** Shortest gap between two context-usage readings: it moves slowly. */
+const USAGE_MS = 5_000;
 
 function textOf(content) {
   if (typeof content === "string") return content;
@@ -25,6 +29,28 @@ function textOf(content) {
 function sessionIdOf(agent) {
   const id = agent?.id ?? agent?.session?.id ?? agent?.session?.header?.id ?? "";
   return typeof id === "string" ? id : String(id ?? "");
+}
+
+/** The one line an unknown error is worth. Never the whole stack: the island shows one line. */
+function errorText(error) {
+  if (typeof error === "string") return error;
+  const message = error?.message ?? error?.reason;
+  if (typeof message === "string" && message.trim()) return message.trim();
+  return "Agent error";
+}
+
+/** A model-request failure, as the loop reports it before it retries or gives up. */
+function failureText(failure) {
+  if (typeof failure === "string") return failure;
+  const message = failure?.message ?? failure?.reason ?? failure?.kind;
+  if (typeof message === "string" && message.trim()) return message.trim();
+  return "Request failed";
+}
+
+/** One line, short enough for the island's ticker row. */
+function toOneLine(text) {
+  if (typeof text !== "string") return "";
+  return text.replace(/\s+/g, " ").trim().slice(0, 120);
 }
 
 function findCreateUserMessage() {
@@ -107,8 +133,17 @@ export function apply(ctx, config) {
   const steerPipe = typeof config?.steerPipe === "string" ? config.steerPipe : "";
   const calls = new Map();
   const lastAssistant = new Map();
+  /** Sessions whose turn is open: a Stop edge is still owed for them. */
+  const turnOpen = new Set();
+  /** The agent of each live session, so a session event finds its own agent. */
+  const agentsBySession = new Map();
+  /** Last time each session's usage was read, so a slow gauge is not re-read. */
+  const usageState = new Map();
+  /** Sessions that have run a tool since their turn opened. */
+  const sawWork = new Set();
+  /** Reads a session's context pressure; null until `ctx.inject` has run. */
+  let readPressure = null;
   let current = null;
-
   const remember = (agent) => {
     if (!agent || agent.origin === "subagent") return;
     current = agent;
@@ -117,6 +152,7 @@ export function apply(ctx, config) {
   ctx.on("agent/created", ({ agent }) => {
     remember(agent);
     const sid = sessionIdOf(agent);
+    agentsBySession.set(sid, agent);
     display(pipe, {
       hook_event_name: "SessionStart",
       session_id: sid,
@@ -127,6 +163,9 @@ export function apply(ctx, config) {
 
   ctx.on("agent/disposed", ({ agent }) => {
     const sid = sessionIdOf(agent);
+    agentsBySession.delete(sid);
+    usageState.delete(sid);
+    sawWork.delete(sid);
     if (current && sessionIdOf(current) === sid) current = null;
     display(pipe, {
       hook_event_name: "SessionEnd",
@@ -135,13 +174,59 @@ export function apply(ctx, config) {
     });
   });
 
+  // Context usage. Optional on purpose: `tokenMeter` and `sessionProjections`
+  // are separate plugins, and a profile that does not load them must keep
+  // working exactly as before — `ctx.inject` simply never runs the body then.
+  const reportUsage = (agent) => {
+    if (!agent || typeof readPressure !== "function") return;
+    const sid = sessionIdOf(agent);
+    const now = Date.now();
+    if (now - (usageState.get(sid) ?? 0) < USAGE_MS) return;
+    usageState.set(sid, now);
+    let reading;
+    try {
+      reading = readPressure(agent);
+    } catch {
+      return;
+    }
+    if (!reading || !reading.tokens) return;
+    display(pipe, {
+      hook_event_name: "ContextUsage",
+      session_id: sid,
+      coucou_agent: AGENT,
+      used_tokens: reading.tokens,
+      context_window: reading.window ?? 0,
+    });
+  };
+
+  try {
+    ctx.inject(["tokenMeter", "sessionProjections"], (meterCtx) => {
+      readPressure = (agent) => {
+        const session = agent?.session;
+        if (!session) return null;
+        const pressure = meterCtx.sessionProjections.stateOf(session, "contextPressure");
+        // The projection is the cheap read and usually has what we need; the
+        // full measure() replays the surface, so it is only a fallback.
+        if (pressure?.pressureTokens) {
+          return { tokens: pressure.pressureTokens, window: pressure.contextWindow ?? 0 };
+        }
+        const measured = meterCtx.tokenMeter.measure(session);
+        return { tokens: measured?.totalTokens ?? 0, window: pressure?.contextWindow ?? 0 };
+      };
+    });
+  } catch {
+    // No meter in this profile: the island simply has no usage pill.
+  }
+
   ctx.on("agent/pre-step", (payload, next) => {
     remember(payload?.agent);
+    const sid = sessionIdOf(payload?.agent);
+    turnOpen.add(sid);
     const text = (payload?.messages ?? []).map((message) => textOf(message?.content)).filter(Boolean).join("\n");
     if (text.trim()) {
       display(pipe, {
         hook_event_name: "UserPromptSubmit",
-        session_id: sessionIdOf(payload.agent),
+        session_id: sid,
         coucou_agent: AGENT,
         prompt: text,
       });
@@ -151,13 +236,55 @@ export function apply(ctx, config) {
 
   ctx.on("session/event", (session, event) => {
     if (event?.type !== "assistant/message") return;
+    const sid = session?.id ?? sessionIdOf(session);
     const text = textOf(event.data?.message?.content ?? event.data?.content);
-    if (text.trim()) lastAssistant.set(session?.id ?? sessionIdOf(session), text);
+    if (text.trim()) lastAssistant.set(sid, text);
+    // The meter is per session: report for this session's own agent, not
+    // whichever one happened to be remembered last.
+    reportUsage(agentsBySession.get(sid) ?? current);
+  });
+
+  // The answer as it is being written. Throttled: the island repaints on every
+  // event, and a token-by-token feed would be thousands of them. The line is
+  // short (the island shows one row) and is only ever a preview — the whole
+  // answer comes with Stop.
+  const streamState = new Map();
+  ctx.on("agent/assistant-stream", ({ agent, frame }) => {
+    const sid = sessionIdOf(agent);
+    if (frame?.type === "start") {
+      streamState.set(sid, { text: "", lastSent: 0 });
+      return;
+    }
+    if (frame?.type === "end") {
+      streamState.delete(sid);
+      return;
+    }
+    if (frame?.type !== "chunk") return;
+    const state = streamState.get(sid) ?? { text: "", lastSent: 0 };
+    streamState.set(sid, state);
+    const chunk = frame.chunk;
+    if (chunk?.type === "text-delta" && typeof chunk.text === "string") {
+      state.text += chunk.text;
+    } else {
+      return;
+    }
+    const now = Date.now();
+    if (now - state.lastSent < STREAM_MS) return;
+    state.lastSent = now;
+    const line = state.text.replace(/\s+/g, " ").trim().slice(-120);
+    if (!line) return;
+    display(pipe, {
+      hook_event_name: "StreamingText",
+      session_id: sid,
+      coucou_agent: AGENT,
+      message: line,
+    });
   });
 
   ctx.on("tools/pre-execute", (exec, next) => {
     const callId = exec?.callId ? String(exec.callId) : "";
     if (callId) calls.set(callId, { name: exec.name, arguments: exec.arguments ?? {} });
+    sawWork.add(sessionIdOf(exec?.agent));
     display(pipe, {
       hook_event_name: "PreToolUse",
       session_id: sessionIdOf(exec?.agent),
@@ -171,25 +298,146 @@ export function apply(ctx, config) {
 
   ctx.on("tools/post-execute", (exec, result, next) => {
     const cached = calls.get(String(exec?.callId ?? ""));
+    const failed = result?.isError === true;
     display(pipe, {
-      hook_event_name: "PostToolUse",
+      // A failed tool is its own canonical event: the relay drops `tool_response`
+      // (it can be a whole file), so sending PostToolUse with a flag never
+      // reached the island and a failed tool looked like a successful one.
+      hook_event_name: failed ? "PostToolUseFailure" : "PostToolUse",
       session_id: sessionIdOf(exec?.agent),
       coucou_agent: AGENT,
       tool_name: exec?.name ?? "",
       tool_input: cached?.arguments ?? exec?.arguments ?? {},
-      tool_response: result?.isError ? { error: true } : undefined,
     });
     return next();
   });
 
   ctx.on("agent/turn-stopping", (payload) => {
     const sid = sessionIdOf(payload?.agent);
+    turnOpen.delete(sid);
+    sawWork.delete(sid);
     const text = lastAssistant.get(sid) ?? "";
     display(pipe, {
       hook_event_name: "Stop",
       session_id: sid,
       coucou_agent: AGENT,
       last_assistant_message: text,
+    });
+  });
+
+  // The turn errored, terminally. Without this the island stayed on "working"
+  // for ever: the island has had an error state since day one, nothing fed it.
+  ctx.on("agent/error", (payload) => {
+    const sid = sessionIdOf(payload?.agent);
+    turnOpen.delete(sid);
+    sawWork.delete(sid);
+    display(pipe, {
+      hook_event_name: "StopFailure",
+      session_id: sid,
+      coucou_agent: AGENT,
+      message: errorText(payload?.error),
+    });
+  });
+
+  // One failed model request. The loop may still retry it (dsh-llm-retry owns
+  // that decision), so this is a ticker line and never the red state: a red
+  // Mochi for a request that succeeded on the second try would be a lie.
+  ctx.on("agent/request-error", (payload, next) => {
+    display(pipe, {
+      hook_event_name: "Warning",
+      session_id: sessionIdOf(payload?.agent),
+      coucou_agent: AGENT,
+      message: `⚠ ${failureText(payload?.failure)}`,
+    });
+    return next();
+  });
+
+  // The driver went idle without a turn-stopping edge (a cancellation, a crash
+  // in a tool's own await). The pill would otherwise never leave "working".
+  // Only for a turn that actually did something: a pre-step the loop rejected
+  // (plan mode does this) opens and closes a "turn" that never ran, and a
+  // finished card for it would be noise.
+  ctx.on("agent/status", ({ agent, status }) => {
+    if (status !== "idle") return;
+    const sid = sessionIdOf(agent);
+    if (!turnOpen.has(sid)) return;
+    turnOpen.delete(sid);
+    if (!sawWork.has(sid)) return;
+    sawWork.delete(sid);
+    display(pipe, {
+      hook_event_name: "Stop",
+      session_id: sid,
+      coucou_agent: AGENT,
+      last_assistant_message: lastAssistant.get(sid) ?? "",
+    });
+  });
+
+  // Context compaction failed: the session carries on, but its context is now
+  // bigger than it should be. A line, not an error state.
+  ctx.on("compaction/summary-error", (payload) => {
+    display(pipe, {
+      hook_event_name: "Warning",
+      session_id: sessionIdOf(payload?.session ?? current),
+      coucou_agent: AGENT,
+      message: `⚠ compaction failed: ${errorText(payload?.error)}`,
+    });
+  });
+
+  // The DeepSeek sign-in is gone: every further request will fail until the
+  // user signs in again, so this one is worth the red state.
+  ctx.on("deepseek-account/session-expired", () => {
+    display(pipe, {
+      hook_event_name: "StopFailure",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: "DeepSeek sign-in expired",
+    });
+  });
+
+  // A workflow run: the phase titles and narration lines become ticker steps,
+  // so a long multi-agent run reads as progress instead of one silent wait.
+  // The child agents inside it report on their own; this is the script's frame.
+  ctx.on("workflow/start", (info) => {
+    const name = info?.meta?.name ?? "workflow";
+    display(pipe, {
+      hook_event_name: "SubagentStart",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: `▶ ${name}`,
+    });
+  });
+
+  ctx.on("workflow/phase", (info, title) => {
+    if (!title) return;
+    display(pipe, {
+      hook_event_name: "SubagentStart",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: `▸ ${title}`,
+    });
+  });
+
+  ctx.on("workflow/log", (info, message) => {
+    const line = toOneLine(message);
+    if (!line) return;
+    display(pipe, {
+      hook_event_name: "SubagentStart",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: line,
+    });
+  });
+
+  ctx.on("workflow/end", (info, result) => {
+    const name = info?.meta?.name ?? "workflow";
+    const done = result?.stopReason === "completed";
+    display(pipe, {
+      hook_event_name: "SubagentStop",
+      session_id: sessionIdOf(current),
+      coucou_agent: AGENT,
+      message: done
+        ? `✔ ${name} · ${result?.agentsStarted ?? 0} agents`
+        : `✗ ${name}: ${result?.error ?? result?.stopReason ?? "failed"}`,
     });
   });
 
@@ -293,11 +541,24 @@ export function apply(ctx, config) {
     } catch {
       return;
     }
+    if (!current) return;
+    const kind = typeof msg.kind === "string" ? msg.kind : "steer";
+
+    // Stop the turn that is running. `user` is the honest cause: a human asked.
+    if (kind === "cancel") {
+      try {
+        current.cancel({ kind: "user" });
+      } catch {
+        // A dead session is not an error the island should surface.
+      }
+      return;
+    }
+
     const text = typeof msg.text === "string" ? msg.text : "";
-    if (!text.trim() || !current || typeof current.steer !== "function") return;
+    if (!text.trim()) return;
     const message = await userMessage(text);
     try {
-      current.steer(message);
+      if (typeof current.steer === "function") current.steer(message);
     } catch {
       // A dead session is not an error the island should surface.
     }

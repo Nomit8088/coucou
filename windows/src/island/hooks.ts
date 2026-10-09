@@ -66,6 +66,9 @@ interface HookPayload {
   term_editor?: string;
   /** StatusLine (the plan usage relay): Claude Code's 5-hour and weekly limits. */
   rate_limits?: unknown;
+  /** ContextUsage (the DSH plugin): the session's context pressure and window. */
+  used_tokens?: number;
+  context_window?: number;
 }
 
 const PROJECT_ALIASES: Record<string, string> = {
@@ -381,6 +384,39 @@ function handleHook(island: Island, payload: HookPayload) {
       State.appendStep(agentId, t("⚠ failed"));
       break;
 
+    // A recoverable problem the session carries on through: a failed model
+    // request the loop will retry, a compaction that did not summarise. The
+    // state stays what it was — a red Mochi for something that then succeeded
+    // would be a lie — and the line goes in the ticker so it is not silent.
+    case "Warning": {
+      ensurePill();
+      const text = toOneLine(payload.message ?? "");
+      if (text) State.appendStep(agentId, text);
+      break;
+    }
+
+    // The answer as it is written. It replaces itself in place instead of
+    // growing the ticker: a preview, never a step. The whole answer still
+    // arrives with Stop.
+    case "StreamingText": {
+      const task = State.tasks.find((x) => x.id === agentId);
+      if (!task) break;
+      task.liveLine = payload.message ?? null;
+      State.notify();
+      break;
+    }
+
+    // How full the session's context is, from DSH's own token meter. Shown on
+    // the session card; a profile without the meter never sends it.
+    case "ContextUsage": {
+      ensurePill();
+      const tokens = typeof payload.used_tokens === "number" ? payload.used_tokens : 0;
+      const window = typeof payload.context_window === "number" ? payload.context_window : 0;
+      if (tokens > 0) State.contextUsage.set(agentId, { tokens, window, updatedAt: Date.now() });
+      State.notify();
+      break;
+    }
+
     case "Notification": {
       const message = payload.message ?? "";
       const lower = message.toLowerCase();
@@ -403,6 +439,9 @@ function handleHook(island: Island, payload: HookPayload) {
       // agents report their last words the same way (Hermes, Codex) or as
       // `message`.
       const finalText = toOneLine(payload.last_assistant_message ?? payload.message ?? "");
+      const stopping = State.tasks.find((x) => x.id === agentId);
+      // The turn is over: whatever was streaming is superseded by the answer.
+      if (stopping) stopping.liveLine = null;
       if (finalText) {
         State.appendStep(agentId, finalText);
         const t = State.tasks.find((x) => x.id === agentId);
@@ -453,11 +492,13 @@ function handleHook(island: Island, payload: HookPayload) {
       break;
 
     case "SubagentStart":
-      State.appendStep(agentId, t("+ subagent"));
+      // The plugin sends what the subagent is — a provider, a workflow phase,
+      // a narration line. Only a payload with nothing in it gets the old text.
+      State.appendStep(agentId, toOneLine(payload.message ?? "") || t("+ subagent"));
       break;
 
     case "SubagentStop":
-      State.appendStep(agentId, t("• subagent done"));
+      State.appendStep(agentId, toOneLine(payload.message ?? "") || t("• subagent done"));
       break;
 
     case "PermissionRequest": {

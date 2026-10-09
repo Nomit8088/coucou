@@ -217,8 +217,10 @@ async fn handle(app: AppHandle, mut pipe: impl Relay) {
     crate::recap::observe(&app, &payload);
 
     if event != "PermissionRequest" {
-        // The status line relay calls in with every Claude Code update: not log-worthy.
-        if event != "StatusLine" {
+        // The status line relay calls in with every Claude Code update, and the
+        // DSH plugin streams a preview line a few times a second: neither is
+        // log-worthy, and logging the stream would bury the events that are.
+        if event != "StatusLine" && event != "StreamingText" {
             log::line(format!("hook {event}"));
         }
         let _ = app.emit_to(WINDOW_LABEL, "hook", payload);

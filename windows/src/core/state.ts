@@ -39,6 +39,12 @@ export interface AgentTask {
   sessionId?: string | null;
   /** Claude's final message after Stop, one line; cleared when a new turn starts. */
   finalLine?: string | null;
+  /**
+   * The answer as it is being written, one short line. A preview only: it is
+   * replaced in place and never pushed into `steps`, so a token-by-token feed
+   * cannot grow the ticker's history. Cleared at the next step or turn end.
+   */
+  liveLine?: string | null;
 }
 
 export interface ApprovalInfo {
@@ -231,6 +237,13 @@ class AppState {
   planUsage: PlanUsage | null = null;
   /** Codex's limits, from `codex app-server` (null until it has answered). */
   codexPlanUsage: CodexPlanUsage | null = null;
+  /**
+   * The DSH session's context pressure, by pill, as the plugin reported it:
+   * how many tokens the request now carries and the window it must fit in.
+   * Empty until the plugin reports one — a profile without the token meter
+   * simply never fills it.
+   */
+  contextUsage = new Map<string, { tokens: number; window: number; updatedAt: number }>();
   /** A plan card is open in place of the overview's left card. */
   showingPlanDetail = false;
   /** Which one: the Codex card rather than Claude's. */
@@ -343,6 +356,9 @@ class AppState {
     if (t.steps.length > 20) t.steps.shift();
     t.stepIndex = t.steps.length - 1;
     t.stepSeq = newest + 1;
+    // A real step supersedes the streaming preview: the row goes back to
+    // showing steps, and the next preview line starts a new one.
+    t.liveLine = null;
     this.notify();
   }
 

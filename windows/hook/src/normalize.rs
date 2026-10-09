@@ -184,6 +184,16 @@ mod tests {
     }
 
     #[test]
+    fn the_plugin_events_pass_through_untouched() {
+        // The DSH plugin names these itself; they are canon, not another
+        // agent's alias. Renaming them would silently drop them at the island.
+        for same in ["Warning", "StreamingText", "PostToolUseFailure", "StopFailure"] {
+            assert_eq!(event(same), same);
+            assert_eq!(refine(same, &obj(json!({}))), same);
+        }
+    }
+
+    #[test]
     fn antigravity_and_gemini_tool_calls_become_tool_name_and_input() {
         let mut m = obj(json!({
             "conversationId": "conv-1",

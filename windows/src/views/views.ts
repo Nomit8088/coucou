@@ -16,6 +16,7 @@ import { pillDefinition, sessionSubtitle } from "../core/pills";
 import {
   PlanCard, buildPlanPill, claudePillVisible, codexPillVisible, planCardOpen, refreshCodexPlanUsage,
 } from "./usage";
+import { planColor } from "../core/plan";
 import { buildDiffCard } from "./diff";
 import { lastTextStep } from "../core/diff";
 import { Bridge } from "../core/bridge";
@@ -191,7 +192,11 @@ function buildOverview(actions: ViewActions): ViewHost {
     spellcheck: "false",
   }) as HTMLInputElement;
   const steerSend = h("button", { class: "send-btn", title: tl("Send") }, svg(ICONS.arrowUp, 11));
-  const steerBar = h("div", { class: "chat-bar steer-bar" }, steerInput, steerSend);
+  // Stops the turn DSH is running. Only shown while there is something to stop:
+  // a Stop button on an idle session stops nothing.
+  const steerStop = h("button", { class: "send-btn stop-btn", title: tl("Stop the turn") }, svg(ICONS.pause, 11));
+  steerStop.style.display = "none";
+  const steerBar = h("div", { class: "chat-bar steer-bar" }, steerInput, steerStop, steerSend);
   steerBar.style.display = "none";
   let steerBusy = false;
   async function steer() {
@@ -212,6 +217,15 @@ function buildOverview(actions: ViewActions): ViewHost {
     steerInput.placeholder = t("DeepSeek Harness is not listening.");
     steerInput.value = "";
   }
+  steerStop.addEventListener("click", async () => {
+    if (steerBusy) return;
+    steerBusy = true;
+    steerStop.disabled = true;
+    const sent = await Bridge.dshCancel();
+    steerBusy = false;
+    steerStop.disabled = false;
+    if (!sent) steerInput.placeholder = t("DeepSeek Harness is not listening.");
+  });
   steerSend.addEventListener("click", () => void steer());
   steerInput.addEventListener("keydown", (e) => {
     const key = (e as KeyboardEvent).key;
@@ -383,6 +397,8 @@ function buildOverview(actions: ViewActions): ViewHost {
         // Only a live DSH session can be steered; every other session shows
         // its ticker alone.
         steerBar.style.display = task.id === "agent_dsh" && task.sessionId ? "" : "none";
+        // Stop only makes sense while the driver is actually running.
+        steerStop.style.display = task.state === "working" || task.state === "thinking" ? "" : "none";
         clear(who);
         // The agent's name is already the pill's: the label says what kind of
         // pill it is, as on the Mac (PillDefinition.sessionSubtitle).
@@ -391,6 +407,23 @@ function buildOverview(actions: ViewActions): ViewHost {
           h("span", { class: "name", text: task.name }),
           h("span", { class: "tool", text: t(sessionSubtitle(task.id)) }),
         );
+        // DSH's own context pressure, when its token meter reported one. The
+        // percentage is only meaningful against a window: without one the raw
+        // count is shown, never a made-up ratio.
+        const usage = State.contextUsage.get(task.id);
+        if (usage && usage.tokens > 0) {
+          const text = usage.window > 0
+            ? `${Math.round((usage.tokens / usage.window) * 100)}%`
+            : `${Math.round(usage.tokens / 1000)}k`;
+          const pct = usage.window > 0 ? (usage.tokens / usage.window) * 100 : 0;
+          const pill = h("span", {
+            class: "ctx-pill",
+            title: tl("Context used"),
+            text: `${t("Context")} ${text}`,
+          });
+          pill.style.color = planColor(usage.window > 0 ? Math.min(100, pct) : null);
+          who.append(pill);
+        }
         if (task.steps.length > 1) {
           who.append(h("span", {
             class: "count",

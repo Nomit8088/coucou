@@ -132,6 +132,9 @@ export class Ticker {
   private displayIndex = -1;
   /** True once Claude has finished: the final message holds still. */
   private still = false;
+  /** The live streaming preview on the current row, and what it replaced. */
+  private live: string | null = null;
+  private beforeLive: string | null = null;
 
   /** `onDiffTap` receives the diff id of a clicked diff row. */
   constructor(onDiffTap?: (diffId: number) => void) {
@@ -188,6 +191,21 @@ export class Ticker {
     this.displayIndex = newest;
     if (this.queue.length > MAX_QUEUE) {
       this.queue = this.queue.slice(-MAX_QUEUE);
+    }
+
+    // The answer being written, on the current row while it is the newest thing
+    // there is. It never enters the queue or `steps`: the row goes back to the
+    // step it was showing the moment a real step arrives or the turn ends.
+    const live = task?.liveLine ?? null;
+    if (this.startMs == null && this.queue.length === 0 && this.live !== live) {
+      this.live = live;
+      if (live) {
+        this.beforeLive = this.b.text;
+        setText(this.b, live);
+      } else if (this.beforeLive != null) {
+        setText(this.b, this.beforeLive);
+        this.beforeLive = null;
+      }
     }
   }
 

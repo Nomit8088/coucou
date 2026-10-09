@@ -266,6 +266,25 @@ export class Island {
     // the header, which stays visible on top of it exactly as on macOS.
     this.uploadCanvas = new UploadCanvas({
       ask: () => {
+        // A live DSH session in front: the file goes to that session, over the
+        // reverse pipe. Coucou sends the path only — DSH reads the file itself,
+        // under its own sandbox rules — and never turns it into an island chat
+        // message, which would answer with an API that cannot see the folder.
+        const focus = State.tasks.find((task) => task.id === State.focusId);
+        if (focus?.id === "agent_dsh" && focus.sessionId && State.droppedFile) {
+          const file = State.droppedFile;
+          void Bridge.dshSteerFile(file.name, file.path).then((sent) => {
+            if (sent) {
+              this.discardDrop();
+              this.setView(State.defaultView());
+              return;
+            }
+            // Not listening: fall back to the island chat, as the prompt does.
+            State.promptContext = { kind: "file", name: file.name, path: file.path };
+            this.setView("prompt");
+          });
+          return;
+        }
         State.promptContext = State.droppedFile
           ? { kind: "file", name: State.droppedFile.name, path: State.droppedFile.path }
           : null;

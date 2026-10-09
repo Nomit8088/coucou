@@ -168,6 +168,10 @@ export const Bridge = {
   gitlabRefresh: () => call<void>("gitlab_refresh"),
   /** False when the DSH plugin is not listening. The island then uses its own chat. */
   dshSteer: (text: string) => call<boolean>("dsh_steer", { text }),
+  /** Stops the turn DSH is running. False when the plugin is not listening. */
+  dshCancel: () => call<boolean>("dsh_cancel"),
+  /** Sends a dropped file to the DSH session as its path, never its contents. */
+  dshSteerFile: (name: string, path: string) => call<boolean>("dsh_steer_file", { name, path }),
   /** Opens the configured n8n instance in the browser. */
   openN8n: () => call<void>("open_n8n"),
 

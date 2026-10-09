@@ -424,6 +424,18 @@ fn dsh_steer(text: String) -> bool {
     dsh::steer(&text)
 }
 
+/// Stops the turn DSH is running. False means the plugin is not listening.
+#[tauri::command]
+fn dsh_cancel() -> bool {
+    dsh::cancel()
+}
+
+/// Sends a dropped file to the DSH session as its path, never its contents.
+#[tauri::command]
+fn dsh_steer_file(name: String, path: String) -> bool {
+    dsh::steer_file(&name, &path)
+}
+
 // ── Plan usage ────────────────────────────────────────────────────────────────
 
 /// The diff of putting the plan usage relay into (or taking it out of) the
@@ -756,6 +768,8 @@ pub fn run() {
             agent_hooks_preview,
             agent_hooks_apply,
             dsh_steer,
+            dsh_cancel,
+            dsh_steer_file,
             gitlab_refresh,
             status_line_preview,
             status_line_apply,
