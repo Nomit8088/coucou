@@ -2824,6 +2824,39 @@
    "ru": "Отправить в эту сессию…",
    "id": "Kirim ke sesi ini…"
   },
+  "Jobs": {
+   "zh-Hans": "作业",
+   "hi": "कार्य",
+   "es": "Tareas",
+   "ar": "المهام",
+   "fr": "Tâches",
+   "bn": "কাজ",
+   "pt-BR": "Tarefas",
+   "ru": "Задачи",
+   "id": "Tugas"
+  },
+  "Background jobs": {
+   "zh-Hans": "后台作业",
+   "hi": "पृष्ठभूमि कार्य",
+   "es": "Tareas en segundo plano",
+   "ar": "المهام في الخلفية",
+   "fr": "Tâches en arrière-plan",
+   "bn": "পটভূমির কাজ",
+   "pt-BR": "Tarefas em segundo plano",
+   "ru": "Фоновые задачи",
+   "id": "Tugas latar belakang"
+  },
+  "Reminders": {
+   "zh-Hans": "提醒",
+   "hi": "अनुस्मारक",
+   "es": "Recordatorios",
+   "ar": "التذكيرات",
+   "fr": "Rappels",
+   "bn": "অনুস্মারক",
+   "pt-BR": "Lembretes",
+   "ru": "Напоминания",
+   "id": "Pengingat"
+  },
   "Context": {
    "zh-Hans": "上下文",
    "hi": "संदर्भ",

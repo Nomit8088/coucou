@@ -218,6 +218,82 @@ export function apply(ctx, config) {
     // No meter in this profile: the island simply has no usage pill.
   }
 
+  // Background jobs and scheduled reminders, sent as they change. Both services
+  // are optional the same way the meter is: a profile that does not load them
+  // keeps working, it just has nothing to report.
+  const sendJobs = (jobsService, sessionId) => {
+    if (!sessionId) return;
+    let jobs;
+    try {
+      jobs = jobsService.list(sessionId);
+    } catch {
+      return;
+    }
+    const all = jobs ?? [];
+    const live = all.filter((job) => job.status === "running" || job.status === "stopping");
+    const last = all.find((job) => job.status === "failed") ?? all[all.length - 1];
+    display(pipe, {
+      hook_event_name: "JobsChanged",
+      session_id: sessionId,
+      coucou_agent: AGENT,
+      jobs_running: live.length,
+      jobs_total: all.length,
+      // Only the producer's own label and progress line: never a job's output.
+      jobs_label: last ? `${last.status} · ${last.label}` : "",
+      jobs_progress: live[0]?.progress ?? "",
+    });
+  };
+
+  try {
+    ctx.inject(["jobs"], (jobsCtx) => {
+      // One subscription for the whole process, filtered by owner on the way
+      // out: `{ owners: 'all' }` is the only filter that needs no session.
+      try {
+        const off = jobsCtx.jobs.events.subscribe({ owners: "all" }, (event) => {
+          const owner = event?.job?.owner ?? event?.owner;
+          if (owner) sendJobs(jobsCtx.jobs, owner);
+        });
+        if (typeof off === "function") ctx.effect(() => off);
+      } catch {
+        // No event stream: the snapshot on each status change still lands.
+      }
+      ctx.on("agent/created", ({ agent }) => sendJobs(jobsCtx.jobs, sessionIdOf(agent)));
+      ctx.on("agent/status", ({ agent }) => sendJobs(jobsCtx.jobs, sessionIdOf(agent)));
+    });
+  } catch {
+    // No job registry in this profile.
+  }
+
+  try {
+    ctx.inject(["schedule"], (scheduleCtx) => {
+      const sendSchedule = async () => {
+        let entries;
+        try {
+          entries = await scheduleCtx.schedule.catalog();
+        } catch {
+          return;
+        }
+        const all = entries ?? [];
+        const active = all.filter((entry) => entry.status === "active");
+        const next = active
+          .map((entry) => entry.scheduledAt)
+          .filter((at) => typeof at === "string")
+          .sort()[0] ?? "";
+        display(pipe, {
+          hook_event_name: "ScheduleChanged",
+          session_id: sessionIdOf(current),
+          coucou_agent: AGENT,
+          reminders_active: active.length,
+          reminders_total: all.length,
+          reminders_next: next,
+        });
+      };
+      ctx.on("schedule/changed", () => void sendSchedule());
+    });
+  } catch {
+    // No schedule service in this profile.
+  }
+
   ctx.on("agent/pre-step", (payload, next) => {
     remember(payload?.agent);
     const sid = sessionIdOf(payload?.agent);

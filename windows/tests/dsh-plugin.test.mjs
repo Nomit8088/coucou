@@ -392,3 +392,107 @@ test("no meter in the profile means no usage event, and no crash", async () => {
   assert.equal(written.some((e) => e.hook_event_name === "ContextUsage"), false);
   assert.equal(written.some((e) => e.hook_event_name === "SessionStart"), true);
 });
+
+/** `loadPlugin` plus an `inject` that actually runs the bodies it is given. */
+function loadPluginWith(services) {
+  const listeners = new Map();
+  const ctx = {
+    on(name, fn) {
+      const list = listeners.get(name) ?? [];
+      list.push(fn);
+      listeners.set(name, list);
+      return () => {};
+    },
+    effect() {
+      return () => {};
+    },
+    inject(names, body) {
+      // Only the requested services that exist are handed over, exactly like a
+      // profile where the others were never loaded.
+      const given = names.every((n) => n in services);
+      if (given) body(services);
+    },
+  };
+  return { ctx, listeners };
+}
+
+async function startPluginWith(services) {
+  written.length = 0;
+  waiters.length = 0;
+  const mod = await import(`${pathToFileURL(PLUGIN).href}?t=${Math.random()}`);
+  const { ctx, listeners } = loadPluginWith(services);
+  mod.apply(ctx, { pipe: PIPE, steerPipe: "" });
+  return { listeners };
+}
+
+test("the token meter, when loaded, reports context usage", async () => {
+  const { listeners } = await startPluginWith({
+    tokenMeter: { measure: () => ({ totalTokens: 7_500 }) },
+    sessionProjections: {
+      stateOf: () => ({ pressureTokens: 51_200, contextWindow: 128_000 }),
+    },
+  });
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "session/event", session("s1"), {
+    type: "assistant/message",
+    data: { message: { content: [{ type: "text", text: "hi" }] } },
+  });
+  await waitFor(2, "ContextUsage");
+
+  const ev = written.find((e) => e.hook_event_name === "ContextUsage");
+  assert.ok(ev, "usage was reported");
+  assert.equal(ev.used_tokens, 51_200);
+  assert.equal(ev.context_window, 128_000);
+  assert.equal(ev.coucou_agent, "dsh");
+});
+
+test("jobs are reported as counts and a producer line, never output", async () => {
+  const jobs = {
+    list: () => [
+      { id: "bash-1", kind: "bash", label: "npm test", status: "running", progress: "3/10" },
+      { id: "bash-2", kind: "bash", label: "build", status: "completed" },
+    ],
+    events: { subscribe: () => () => {} },
+  };
+  const { listeners } = await startPluginWith({ jobs });
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  await waitFor(2, "JobsChanged");
+
+  const ev = written.find((e) => e.hook_event_name === "JobsChanged");
+  assert.ok(ev, "jobs were reported");
+  assert.equal(ev.jobs_running, 1);
+  assert.equal(ev.jobs_total, 2);
+  assert.match(ev.jobs_label, /bash-2|completed/);
+  assert.equal(ev.jobs_progress, "3/10");
+  // The job's own output is never part of the payload.
+  assert.equal(JSON.stringify(ev).includes("output"), false);
+});
+
+test("a schedule change reports the active reminders", async () => {
+  const schedule = {
+    catalog: async () => [
+      { id: "t1", title: "standup", status: "active", scheduledAt: "2026-10-10T08:00:00Z" },
+      { id: "t2", title: "old", status: "inactive", scheduledAt: "2026-10-01T08:00:00Z" },
+    ],
+  };
+  const { listeners } = await startPluginWith({ schedule });
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  fire(listeners, "schedule/changed");
+  await waitFor(2, "ScheduleChanged");
+
+  const ev = written.find((e) => e.hook_event_name === "ScheduleChanged");
+  assert.ok(ev, "the reminder set was reported");
+  assert.equal(ev.reminders_active, 1);
+  assert.equal(ev.reminders_total, 2);
+  assert.equal(ev.reminders_next, "2026-10-10T08:00:00Z");
+});
+
+test("a profile with neither jobs nor schedule still works", async () => {
+  // Neither service exists: the inject bodies must simply never run.
+  const { listeners } = await startPluginWith({});
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  await waitFor(1, "SessionStart");
+  assert.equal(written.some((e) => e.hook_event_name === "JobsChanged"), false);
+  assert.equal(written.some((e) => e.hook_event_name === "ScheduleChanged"), false);
+  assert.equal(written[0].hook_event_name, "SessionStart");
+});

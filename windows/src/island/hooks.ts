@@ -69,6 +69,15 @@ interface HookPayload {
   /** ContextUsage (the DSH plugin): the session's context pressure and window. */
   used_tokens?: number;
   context_window?: number;
+  /** JobsChanged (the DSH plugin): background-job counts and the producer's line. */
+  jobs_running?: number;
+  jobs_total?: number;
+  jobs_label?: string;
+  jobs_progress?: string;
+  /** ScheduleChanged (the DSH plugin): host-wide scheduled reminders. */
+  reminders_active?: number;
+  reminders_total?: number;
+  reminders_next?: string;
 }
 
 const PROJECT_ALIASES: Record<string, string> = {
@@ -413,6 +422,32 @@ function handleHook(island: Island, payload: HookPayload) {
       const tokens = typeof payload.used_tokens === "number" ? payload.used_tokens : 0;
       const window = typeof payload.context_window === "number" ? payload.context_window : 0;
       if (tokens > 0) State.contextUsage.set(agentId, { tokens, window, updatedAt: Date.now() });
+      State.notify();
+      break;
+    }
+
+    // DSH's background jobs. Counts and the producer's own label/progress line
+    // stay on the session card; no job output is ever forwarded.
+    case "JobsChanged": {
+      ensurePill();
+      State.jobInfo.set(agentId, {
+        running: typeof payload.jobs_running === "number" ? payload.jobs_running : 0,
+        total: typeof payload.jobs_total === "number" ? payload.jobs_total : 0,
+        label: payload.jobs_label ?? "",
+        progress: payload.jobs_progress ?? "",
+      });
+      State.notify();
+      break;
+    }
+
+    // DSH's scheduled reminders are host-wide, not a session's: they are worth
+    // a note, and they never open the island or change a session's state.
+    case "ScheduleChanged": {
+      State.scheduleInfo = {
+        active: typeof payload.reminders_active === "number" ? payload.reminders_active : 0,
+        total: typeof payload.reminders_total === "number" ? payload.reminders_total : 0,
+        next: payload.reminders_next ?? "",
+      };
       State.notify();
       break;
     }

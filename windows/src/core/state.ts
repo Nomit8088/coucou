@@ -244,6 +244,13 @@ class AppState {
    * simply never fills it.
    */
   contextUsage = new Map<string, { tokens: number; window: number; updatedAt: number }>();
+  /**
+   * The DSH session's background jobs, by pill, as the plugin reported them.
+   * Counts, a producer label and its own progress line — never a job's output.
+   */
+  jobInfo = new Map<string, { running: number; total: number; label: string; progress: string }>();
+  /** DSH's host-wide scheduled reminders (0 active until the plugin says). */
+  scheduleInfo: { active: number; total: number; next: string } = { active: 0, total: 0, next: "" };
   /** A plan card is open in place of the overview's left card. */
   showingPlanDetail = false;
   /** Which one: the Codex card rather than Claude's. */

@@ -424,6 +424,27 @@ function buildOverview(actions: ViewActions): ViewHost {
           pill.style.color = planColor(usage.window > 0 ? Math.min(100, pct) : null);
           who.append(pill);
         }
+        // DSH's background jobs: how many are live, and the producer's own
+        // line for the most recent one. Never a job's output.
+        const jobs = State.jobInfo.get(task.id);
+        if (jobs && jobs.total > 0) {
+          const pill = h("span", {
+            class: "ctx-pill",
+            title: jobs.label || t("Background jobs"),
+            text: `${t("Jobs")} ${jobs.running}/${jobs.total}`,
+          });
+          pill.style.color = jobs.running > 0 ? "#3B9EFF" : "#6B7079";
+          who.append(pill);
+        }
+        // Scheduled reminders are host-wide, so they are shown once, on the
+        // DSH pill only, and only when some exist.
+        if (task.id === "agent_dsh" && State.scheduleInfo.active > 0) {
+          who.append(h("span", {
+            class: "ctx-pill",
+            title: State.scheduleInfo.next || t("Reminders"),
+            text: `${t("Reminders")} ${State.scheduleInfo.active}`,
+          }));
+        }
         if (task.steps.length > 1) {
           who.append(h("span", {
             class: "count",

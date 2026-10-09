@@ -179,6 +179,24 @@ test("context usage is kept per pill, and only when there are tokens", () => {
   assert.equal(State.contextUsage.get(CODEX), undefined);
 });
 
+test("background jobs are counts and a producer line, never output", () => {
+  dsh({ hook_event_name: "JobsChanged", jobs_running: 2, jobs_total: 5, jobs_label: "completed · build" });
+  assert.deepEqual(State.jobInfo.get(DSH), { running: 2, total: 5, label: "completed · build", progress: "" });
+  // A job with no owner still reports; a missing count is zero, not NaN.
+  dsh({ hook_event_name: "JobsChanged", jobs_total: 1 });
+  assert.deepEqual(State.jobInfo.get(DSH), { running: 0, total: 1, label: "", progress: "" });
+  // Jobs never change the session's own state.
+  assert.equal(task().state, "idle");
+});
+
+test("scheduled reminders are host-wide and keep the session alone", () => {
+  dsh({ hook_event_name: "ScheduleChanged", reminders_active: 3, reminders_total: 4, reminders_next: "2026-10-10T08:00:00Z" });
+  assert.deepEqual(State.scheduleInfo, { active: 3, total: 4, next: "2026-10-10T08:00:00Z" });
+  // They are not a session's business: no reveal, no state change.
+  assert.deepEqual(asked, []);
+  assert.equal(task().state, "idle");
+});
+
 test("a notification is a rate limit, a question, or nothing", () => {
   dsh({ hook_event_name: "Notification", message: "Just so you know." });
   assert.equal(task().state, "idle");
