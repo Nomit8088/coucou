@@ -861,6 +861,7 @@ mod tests {
                 "desktopMochi",
                 "dshProfile",
                 "chatProviders",
+                "musicLikeHotkeys",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
