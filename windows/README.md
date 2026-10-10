@@ -2,11 +2,12 @@
 
 <img src="src-tauri/icons/128x128.png" width="96" alt="Coucou icon">
 
-# Coucou for Windows
+# Coucou for Windows (DSH & Media Enhanced)
 
 **Mochi doesn't get a notch on a PC — so it lives at the top of your screen instead.**
 
-Approve Claude Code permissions, watch your session work, drop a file, chat with Claude, keep an eye on your services — without leaving what you're doing.
+> 🚀 **Personalized Fork by [@Nomit8088](https://github.com/Nomit8088)**:
+> 深度适配 **DeepSeek Harness (DSH)** 智能代理开发环境；全面支持 **网易云音乐、QQ 音乐、Spotify** 原生媒体控制与 Mochi 起舞动效；提供独立 Windows 可执行安装程序（`.exe` / `.msi`）及免安装绿色版（开箱即用，免配源码环境），内置应用内一键在线更新。
 
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)
@@ -19,17 +20,21 @@ Approve Claude Code permissions, watch your session work, drop a file, chat with
 
 ---
 
-## Install
+## Install (安装与运行)
 
-Download **[Coucou-Windows.msi](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Coucou-Windows.msi)**
-(Windows Installer) or **[Coucou-Windows-setup.exe](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Coucou-Windows-setup.exe)**,
-always the newest version, and run it. The .exe installs for the current user only, with no admin prompt; the .msi may ask for admin rights.
+在新电脑上使用时，**无需拉取源码，无需配置 Node.js、Rust、Git 等环境**，直接下载以下官方 Release 即可使用：
 
-**Windows will show a warning the first time — that's expected.** The installer isn't code-signed yet, so SmartScreen doesn't know the publisher:
+- **[Coucou-Windows-setup.exe](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-setup.exe)**（推荐，自动安装到当前用户目录，无管理员弹窗）
+- **[Coucou-Windows-portable.zip](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-portable.zip)**（绿色便携版，解压后双击 `coucou.exe` 直接运行）
+- **[Coucou-Windows.msi](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1.msi)**（Windows Installer 标准安装包）
 
-1. A **"Windows protected your PC"** screen appears, with *Publisher: Unknown publisher*.
-2. Click **More info** (*Informations complémentaires* in French). This reveals a **Run anyway** button.
-3. Click **Run anyway** (*Exécuter quand même*). The installer starts normally.
+你可以随时在 [GitHub Releases 页面](https://github.com/Nomit8088/coucou/releases) 下载最新版本。
+
+**Windows 首次运行提示（SmartScreen）**：由于开源软件尚未购买昂贵的企业数字签名证书，Windows Defender / SmartScreen 首次运行可能会提示 *“Windows 已保护你的电脑”*：
+
+1. 弹窗出现 **“Windows 已保护你的电脑”** (*Publisher: Unknown publisher*)；
+2. 点击 **“更多信息” (More info)** 按钮；
+3. 点击 **“仍要运行” (Run anyway)** 按钮即可正常启动。
 
 This is only because the app isn't signed with a paid certificate yet. Coucou is open source, and Microsoft Defender scans the installer as clean.
 
@@ -63,7 +68,7 @@ You can also [build it yourself](#build-it-yourself).
 | Click a file in the session ticker | Its diff opens in the island; ↗ opens the file in VS Code, ‹ or `Esc` goes back |
 | `Esc` | Closes the island |
 | Put a file named like one of Mochi's sounds (`finish.wav`, `approval.mp3`, `greet.m4a`…) in the sounds folder | It replaces that sound after **Settings → General → Reload sounds**. **Open sounds folder** shows the folder: `~/.config/coucou/sounds` on Linux, `%APPDATA%\Coucou\sounds` on Windows |
-| Tray icon | Open, Weekly recap, Wardrobe…, Settings…, Pause, Quit |
+| Tray icon | Open, Weekly recap, Wardrobe…, Settings…, Check for updates…, Pause, Quit |
 | `Ctrl+Alt+Space` | Opens the chat, from any app |
 | `Ctrl+Alt+A` | Jumps to the waiting permission or question |
 | `Ctrl+Alt+T` | Brings the session's window forward ("Open terminal") |
@@ -285,9 +290,9 @@ is off or Coucou is paused.
 Music is its own pill, because Coucou reads it from the system rather than from
 an account:
 
-- **Spotify** — Linux reads it over MPRIS, Windows over the media session
-  Spotify registers with Windows.
-- **QQ Music** *(Windows)* — the PC client registers a media session too.
+- **NetEase Cloud Music (网易云音乐)** *(Windows)* — reads media controls, playback state and track metadata directly from Windows' System Media Transport Controls (SMTC).
+- **QQ Music (QQ 音乐)** *(Windows)* — the PC client registers a media session too.
+- **Spotify** — Linux reads it over MPRIS, Windows over the media session Spotify registers with Windows.
 
 Declare the pill in **Settings → Integrations**, where the other services live.
 The pill then wears the track's title and offers play/pause and next under the
@@ -296,6 +301,8 @@ next and play/pause; and Mochi dances while it plays — in the small island, on
 the pill and on the desktop. Clicking the cover, or **Open** on the idle card,
 brings the player forward or starts it; without one it opens the player's
 download page, and the row in Settings says *Not installed*.
+
+**Compact music controls & Stay-open**: You can toggle music to stay open (`Stay open` in Settings) for constant playback controls without auto-collapsing.
 
 Windows' media sessions carry no volume, and no shuffle or repeat of their own,
 so those three controls are not shown on Windows — everything else is the same
@@ -323,6 +330,14 @@ messages' `From`, `Subject` and `Date` headers, and signs out. No message body i
 downloaded, nothing is marked read, moved or deleted, and nothing is ever sent.
 The mailbox is checked every five minutes, and only while the pill is declared
 and Coucou is not paused.
+
+## Online Updates (在线更新)
+
+Coucou 内置轻量在线更新机制：
+
+- **托盘菜单快捷检测**：右键系统托盘图标，点击 **Check for updates… (检查更新…)** 即可触发更新检测。
+- **设置页面一键升级**：设置窗口顶部会显示当前安装版本；检测到 GitHub 发布了新版本时，自动展示更新日志并提供 **“一键下载并更新”**（在后台静默下载最新安装包并自动拉起安装器进行覆盖升级），同时支持直接在浏览器中打开 Release 页面。
+- **保留所有配置与数据**：更新过程仅覆盖程序文件，用户的 API Key、凭证、音频偏好和本地历史数据完全保留。
 
 ## Build it yourself
 
@@ -400,6 +415,7 @@ Linux.
 | Agent | Installs | Permissions |
 |---|---|---|
 | Claude Code | `.claude\settings.json` (**Settings → Claude Code**) | Allow / Deny and questions in the island |
+| DeepSeek Harness (DSH) | plugin `windows/dsh-plugin/` | Allow / Deny and questions (sync with Web GUI), context gauge, jobs, reminders |
 | Codex | `.codex\hooks.json` — then trust the hooks once with `/hooks` in Codex | Allow / Deny in the island |
 | GitHub Copilot CLI | `.copilot\hooks\coucou.json` | Allow / Deny in the island |
 | Muse Code | `.config\muse\settings.json` | Allow / Deny in the island |

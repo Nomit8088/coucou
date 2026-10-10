@@ -2,22 +2,18 @@
 
 <img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="Coucou icon">
 
-# Coucou
+# Coucou (DSH & Windows Enhanced Edition)
 
-**A tiny friend that lives in your Mac's notch — or at the top of your screen on Windows and Linux — and keeps an eye on your AI coding agent sessions. And now on your iPhone too.**
+**A tiny friend that lives in your Mac's notch — or at the top of your screen on Windows and Linux — and keeps an eye on your AI coding agent sessions.**
 
-Approve permissions, watch your agents work, drop a file, chat with Claude — all without leaving what you're doing. Walk away from your Mac and Mochi follows you to your iPhone: Lock Screen, Dynamic Island, widgets, Siri.
+> 🚀 **Personalized Fork by [@Nomit8088](https://github.com/Nomit8088)**: 深度适配 **DeepSeek Harness (DSH)** 代理开发环境，强化 Windows 本地音乐集成（网易云音乐、QQ 音乐、Spotify），提供免源码环境的独立 Windows 可执行安装包（.exe / .msi）及免安装绿色版，内置轻量级应用内在线更新。
 
-[![Version](https://img.shields.io/github/v/release/Louis-CFM/coucou?filter=v*&label=version&color=0A84FF)](https://github.com/Louis-CFM/coucou/releases)
-![macOS 15+](https://img.shields.io/badge/macOS-15%2B-black?logo=apple)
-![iOS 18+](https://img.shields.io/badge/iOS-18%2B-black?logo=apple)
+[![Latest Release](https://img.shields.io/github/v/release/Nomit8088/coucou?label=version&color=0A84FF)](https://github.com/Nomit8088/coucou/releases)
 ![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-AppImage%20%7C%20deb%20%7C%20rpm-FCC624?logo=linux&logoColor=black)
-![Swift 6](https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white)
-![SwiftUI](https://img.shields.io/badge/SwiftUI-native-0A84FF)
 ![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)
+![Rust](https://img.shields.io/badge/Rust-backend-000?logo=rust)
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
-![GitHub stars](https://img.shields.io/github/stars/Louis-CFM/coucou?style=social)
+[![GitHub stars](https://img.shields.io/github/stars/Nomit8088/coucou?style=social)](https://github.com/Nomit8088/coucou)
 
 <img src="docs/media/demo.gif" width="760" alt="Coucou in action">
 
@@ -31,6 +27,23 @@ Some studios showed off gorgeous notch companions… and never let anyone use th
 **Coucou is the open version.** Every line of code is open source under the MIT License: read it, fork it, learn from it. The Coucou name, Mochi and the sounds stay © Louis Raillé (see [License](#license)).
 
 Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch, waves hello, follows your cursor with its eyes, gets annoyed when you poke it (and dizzy if you insist), and tells you the moment Claude Code needs you.
+
+## 🌟 本 Fork 专属特性 (Personalized Fork Highlights)
+
+- 🤖 **DeepSeek Harness (DSH) 深度交互集成**：
+  - **双向协同审批**：权限请求（Allow/Deny）与提问在灵动岛与 DSH Web GUI（http://127.0.0.1:3080）同步展现，任意一端点击决策即时同步生效。
+  - **专属 DSH 会话卡片与自适应布局**：卡片高度自适应，独立展示 Context 仪表盘、后台任务（Jobs）、定时提醒（Reminders）与权限预设（Presets）快捷切换，指令输入框完整呈现。
+  - **通信与防误退优化**：过滤内部上下文注入事件，彻底解决卡片意外闪退或提前关闭；优化管道通信，解决审批卡住问题。
+- 🎵 **Windows 原生音乐全适配（网易云音乐、QQ 音乐、Spotify）**：
+  - 原生接入 Windows 系统媒体传输控件（SMTC），精准捕捉播放状态与封面。
+  - **紧凑型灵动岛音乐控件**：集成封面、播放/暂停、快进/切歌、进度条拖拽，支持“常驻展开（Stay-open）”。
+  - Mochi 伴随音乐节奏动感起舞。
+- 📦 **免配置独立 EXE 运行（开箱即用）**：
+  - 新电脑**完全无需配置 Node.js、Rust、Git 等开发环境**，也不必拉取源码本地启动。
+  - 直接下载 `Coucou-Windows-setup.exe`（双击安装）或 `Coucou-Windows-portable.zip`（免安装绿色版），解压双击即可运行。
+- 🔄 **应用内在线更新**：
+  - 系统托盘菜单提供「检查更新…」快捷入口。
+  - 设置页面内置更新检测模块，自动比对 GitHub 最新 Release，支持一键在后台静默下载安装包并自动覆盖升级。
 
 ## Features
 
@@ -100,6 +113,15 @@ The Mac app does the work; the iPhone app keeps you in the loop when you step aw
 
 ## Versions
 
+### Coucou (DSH & Windows Enhanced) Releases
+
+| Version | Date | Highlights |
+|---|---|---|
+| [v0.1.1](https://github.com/Nomit8088/coucou/releases/tag/v0.1.1) | Oct 10, 2026 | 应用内在线更新（托盘菜单 + 设置页面检测），一键静默下载安装包并自动覆盖升级 |
+| [v0.1.0](https://github.com/Nomit8088/coucou/releases/tag/v0.1.0) | Oct 10, 2026 | 深度适配 DeepSeek Harness (DSH)、网易云音乐/QQ音乐/Spotify 原生媒体控制与 Mochi 起舞动效、独立免源码 EXE 安装包与绿色便携版 |
+
+### Upstream Versions (Mac / Linux)
+
 macOS releases are published as `v*` tags. See [CHANGELOG.md](CHANGELOG.md) for the full notes of each version.
 
 | Version | Date | Highlights |
@@ -157,17 +179,21 @@ Everything else, troubleshooting included, is in [docs/IPHONE.md](docs/IPHONE.md
 2. Unzip and move **Coucou.app** to `/Applications`.
 3. Launch it, and click **Open** when macOS asks you to confirm. Updating from 0.1.0? macOS may ask you, once for each key you saved, to let Coucou use it: enter your Mac password and click **Always Allow**.
 
-### Windows
+### Windows (DSH Enhanced Edition)
 
-Download **[Coucou-Windows.msi](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Coucou-Windows.msi)** or **[Coucou-Windows-setup.exe](https://github.com/Louis-CFM/coucou/releases/download/windows-latest/Coucou-Windows-setup.exe)** (Windows 10/11, always the newest version) and run it. You can also [build it from source](#build-from-source).
+新电脑**无需拉取源码，无需配置 Node.js、Rust、Git 等开发环境**，直接下载即可开箱即用：
 
-**Windows will show a warning the first time — that's expected.** The installer isn't code-signed yet, so SmartScreen doesn't know the publisher:
+- **[Coucou-Windows-0.1.1-setup.exe](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-setup.exe)**（安装版，推荐，双击自动安装至用户目录，无需管理员权限）
+- **[Coucou-Windows-0.1.1-portable.zip](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-portable.zip)**（绿色免安装版，解压后双击 `coucou.exe` 直接运行）
+- **[Coucou-Windows-0.1.1.msi](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1.msi)**（Windows Installer）
 
-1. A **"Windows protected your PC"** screen appears, with *Publisher: Unknown publisher*.
-2. Click **More info** (*Informations complémentaires* in French). This reveals a **Run anyway** button.
-3. Click **Run anyway** (*Exécuter quand même*). The installer starts normally.
+> 💡 **在线更新**：安装完成后，后续可在系统托盘右键菜单选择「检查更新…」或在设置窗口一键检查并在线升级。
 
-This is only because the app isn't signed with a paid certificate yet. Coucou is open source, and Microsoft Defender scans the installer as clean.
+**Windows 首次运行提示（SmartScreen）**：由于开源软件尚未购买付费商业签名，首次启动时 Windows Defender / SmartScreen 可能会提示 *“Windows 已保护你的电脑”*（未知发布者）：
+1. 界面弹出 **“Windows 已保护你的电脑”**，点击 **“更多信息” (More info)**；
+2. 点击出现的 **“仍要运行” (Run anyway)** 按钮即可正常进入。
+
+本软件为完全开源透明项目，不包含任何恶意代码或遥测跟踪。你也可以选择从源码[自行构建](#build-from-source)。
 
 **Windows and Linux 0.3.0** add open on hover, your own sounds, a colour of your own for each Mochi and the Mochi-to-desktop shortcut; on Linux, the Spotify pill with Mochi dancing to it, global shortcuts on Wayland and "Open terminal" that brings the terminal forward. 0.2.0 caught up with the Mac: Codex, Copilot CLI, Muse Code and six more agents with approvals from the island, answers to Claude's questions, live diffs, GitHub pull requests and CI, plan usage, local models, the wardrobe, Mochi on the desktop, keyboard shortcuts, the weekly recap and 10 languages. See the [changelog](CHANGELOG.md).
 
