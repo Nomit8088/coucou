@@ -32,6 +32,7 @@ mod shortcuts;
 mod sounds;
 mod spotify;
 mod tray;
+mod updater;
 #[cfg(windows)]
 mod webview_drop;
 
@@ -842,6 +843,8 @@ pub fn run() {
             spotify::spotify_control,
             spotify::spotify_open,
             spotify::spotify_installed,
+            updater::check_for_update,
+            updater::download_and_install_update,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();

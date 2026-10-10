@@ -906,6 +906,7 @@ async function render() {
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
+    updaterSection(),
     agentsSection(agents),
     planSection(status),
     personalChatSection(chatKeys, keyChanged),
@@ -917,6 +918,90 @@ async function render() {
       class: "hint",
       text: t("No telemetry. Network requests only go to the services you configure yourself."),
     }),
+  );
+}
+
+function updaterSection(): HTMLElement {
+  const statusEl = h("span", { class: "hint", style: "margin-left: 10px; font-size: 13px;" });
+  const checkBtn = h("button", {
+    text: t("Check for updates"),
+    style: "font-size: 12px; padding: 4px 10px; cursor: pointer; border-radius: 6px;",
+  });
+
+  const card = h("div", {
+    style: "display:none; margin-top: 10px; padding: 12px 14px; background: rgba(255,255,255,0.06); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);",
+  });
+
+  checkBtn.onclick = async () => {
+    checkBtn.textContent = t("Checking…");
+    statusEl.textContent = "";
+    card.style.display = "none";
+    clear(card);
+
+    const info = await Bridge.checkForUpdate();
+    checkBtn.textContent = t("Check for updates");
+
+    if (!info) {
+      statusEl.textContent = t("Failed to check for updates");
+      statusEl.style.color = "#ff6b6b";
+      return;
+    }
+
+    if (info.hasUpdate) {
+      statusEl.textContent = t("New version available: v{0}", { 0: info.latestVersion });
+      statusEl.style.color = "#4cd964";
+
+      const title = h("div", {
+        style: "font-weight: 600; margin-bottom: 6px; font-size: 13.5px;",
+        text: t("Update to v{0}", { 0: info.latestVersion }),
+      });
+
+      const notes = h("div", {
+        class: "hint",
+        style: "max-height: 120px; overflow-y: auto; white-space: pre-wrap; margin-bottom: 10px; font-size: 12px; line-height: 1.4;",
+        text: info.releaseNotes || t("No release notes"),
+      });
+
+      const actions = h("div", { style: "display: flex; gap: 8px; align-items: center;" });
+
+      if (info.downloadUrl) {
+        const downloadBtn = h("button", {
+          text: t("Download and install"),
+          style: "cursor: pointer; font-weight: 500; border-radius: 6px; padding: 5px 12px;",
+        });
+        downloadBtn.onclick = async () => {
+          downloadBtn.textContent = t("Downloading installer…");
+          const res = await Bridge.downloadAndInstallUpdate(info.downloadUrl!);
+          if (res) {
+            downloadBtn.textContent = t("Installer started!");
+          } else {
+            downloadBtn.textContent = t("Download failed, try in browser");
+            void Bridge.openUrl(info.downloadUrl!);
+          }
+        };
+        actions.append(downloadBtn);
+      }
+
+      const viewBtn = h("button", {
+        text: t("View on GitHub"),
+        style: "cursor: pointer; border-radius: 6px; padding: 5px 12px;",
+        onclick: () => void Bridge.openUrl(info.releaseUrl || "https://github.com/Nomit8088/coucou/releases"),
+      });
+      actions.append(viewBtn);
+
+      card.append(title, notes, actions);
+      card.style.display = "block";
+    } else {
+      statusEl.textContent = t("Coucou is up to date (v{0})", { 0: info.currentVersion });
+      statusEl.style.color = "var(--text-muted, #888)";
+    }
+  };
+
+  return h(
+    "div",
+    { style: "margin: -6px 0 18px 0; display: flex; flex-direction: column;" },
+    h("div", { style: "display: flex; align-items: center;" }, checkBtn, statusEl),
+    card,
   );
 }
 

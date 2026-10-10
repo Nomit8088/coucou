@@ -236,7 +236,22 @@ export const Bridge = {
   spotifyOpen: (pillId?: string) => call<boolean>("spotify_open", { pillId: pillId ?? null }),
   /** Whether there is a player to launch (Settings). */
   spotifyInstalled: (pillId: string) => call<boolean>("spotify_installed", { pillId }),
+
+  // ── Online updater ────────────────────────────────────────────────────────
+  checkForUpdate: () => call<UpdateInfo>("check_for_update"),
+  downloadAndInstallUpdate: (downloadUrl: string) =>
+    call<string>("download_and_install_update", { downloadUrl }),
 };
+
+export interface UpdateInfo {
+  hasUpdate: boolean;
+  currentVersion: string;
+  latestVersion: string;
+  releaseNotes: string;
+  releaseUrl: string;
+  downloadUrl: string | null;
+  fileName: string | null;
+}
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume" | "like";
 
