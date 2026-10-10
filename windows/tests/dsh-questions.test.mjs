@@ -41,14 +41,16 @@ before(async () => {
       while ((nl = buf.indexOf("\n")) >= 0) {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
+        let parsed;
         try {
-          written.push(JSON.parse(line));
+          parsed = JSON.parse(line);
+          written.push(parsed);
         } catch {
           continue;
         }
         for (const wake of waiters.splice(0)) wake();
         // A question keeps the connection open for the answer.
-        if (answerLine != null) {
+        if (parsed.hook_event_name === "PermissionRequest" && answerLine != null) {
           socket.write(`${answerLine}\n`);
           answerLine = null;
         }
@@ -129,15 +131,25 @@ const islandAnswers = (id, label) => JSON.stringify({ answers: { [id]: label } }
 /** Fires user-questions/request and returns what the plugin hands to DSH. */
 async function ask(listeners, questions, line) {
   answerLine = line;
-  let delegated = false;
+  let webWon = false;
+  let webResolve;
+  const webPromise = new Promise((resolve) => {
+    webResolve = resolve;
+  });
+  const timeoutMs = line == null ? 25 : 1000;
+  const timer = setTimeout(() => {
+    webWon = true;
+    webResolve({ answers: [] });
+  }, timeoutMs);
+
   const outcome = await listeners.get("user-questions/request")[0](
     { agent: agent("s1"), questions },
     () => {
-      delegated = true;
-      return Promise.resolve({ answers: [] });
+      return webPromise;
     },
   );
-  return { outcome, delegated };
+  clearTimeout(timer);
+  return { outcome, delegated: webWon || !outcome?.answers?.length };
 }
 
 test("a picked option reaches DSH as its question id and selected labels", async () => {
