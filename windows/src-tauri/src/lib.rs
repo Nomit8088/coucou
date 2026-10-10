@@ -114,6 +114,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     }
     integrations::settings_saved(&app, &settings.active_integrations);
     spotify::sync(&app, &settings.active_integrations);
+    spotify::sync_like_hotkeys(&settings.music_like_hotkeys);
     if shortcuts_changed {
         shortcuts::apply(&app, &settings.shortcuts);
     }
@@ -878,6 +879,7 @@ pub fn run() {
             pipe::start(handle.clone());
             integrations::start(handle.clone());
             spotify::sync(&handle, &loaded.active_integrations);
+            spotify::sync_like_hotkeys(&loaded.music_like_hotkeys);
             shortcuts::apply(&handle, &loaded.shortcuts);
             Ok(())
         })

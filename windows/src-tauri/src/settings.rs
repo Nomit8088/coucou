@@ -73,6 +73,8 @@ pub struct Settings {
     pub dsh_profile: String,
     /// Island chat providers. DeepSeek is always present; extras are OpenAI-compatible.
     pub chat_providers: Vec<ChatProviderConfig>,
+    /// Custom global hotkey to send when liking a track, by pill id.
+    pub music_like_hotkeys: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -165,6 +167,7 @@ impl Default for Settings {
             desktop_mochi: DesktopMochiPref::default(),
             dsh_profile: String::new(),
             chat_providers: vec![deepseek_provider()],
+            music_like_hotkeys: BTreeMap::new(),
         }
     }
 }

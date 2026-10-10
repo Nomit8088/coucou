@@ -12,8 +12,8 @@ import { ICONS } from "./icons";
 import { Bridge } from "../core/bridge";
 import { State, type AgentTask } from "../core/state";
 import {
-  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, capsOf, currentArtwork, formatTime, isAd, pillIdOf, spotifyPosition,
-  volumeLevel, withPlaying, type SpotifyTrack,
+  SPOTIFY_GREEN, SPOTIFY_ID, Spotify, capsOf, currentArtwork, formatTime, isAd, isTrackLiked, pillIdOf, spotifyPosition,
+  toggleTrackLiked, volumeLevel, withPlaying, type SpotifyTrack,
 } from "../core/spotify";
 import { createMiniBot } from "../mochi/minibots";
 import { pillDefinition } from "../core/pills";
@@ -312,6 +312,24 @@ export function buildSpotifyCard(): SpotifyCardHost {
   const prev = iconButton(ICONS.backward, 11, 0, () => void Bridge.spotifyControl("previous"));
   const next = iconButton(ICONS.forward, 11, 0, () => void Bridge.spotifyControl("next"));
   const repeat = iconButton(ICONS.repeat, 10, 2.2, () => setFlag("repeat", !Spotify.state.repeat));
+  const likeBtn = iconButton(ICONS.heart, 11, 0, () => {
+    const s = Spotify.state;
+    if (!s.track) return;
+    toggleTrackLiked(s.track);
+    syncLike();
+    void Bridge.spotifyControl("like");
+    State.notify();
+  });
+
+  function syncLike() {
+    const s = Spotify.state;
+    const liked = isTrackLiked(s.track);
+    clear(likeBtn);
+    likeBtn.append(svg(liked ? ICONS.heartFill : ICONS.heart, 11));
+    likeBtn.style.color = liked ? "#FF4D6D" : "#8e939c";
+    likeBtn.title = liked ? t("Liked") : t("Like");
+    likeBtn.style.filter = liked ? "drop-shadow(0 0 4px rgba(255, 77, 109, 0.6))" : "";
+  }
   prev.style.color = "#C5C8CD";
   next.style.color = "#C5C8CD";
   const play = h("button", { class: "np-play", onclick: togglePlay });
@@ -322,7 +340,7 @@ export function buildSpotifyCard(): SpotifyCardHost {
   );
   const volumeBox = h("div", { class: "np-volume" }, volIcon, volume.el);
   const controls = h("div", { class: "np-controls" },
-    h("div", { class: "np-buttons" }, shuffle, prev, play, next, repeat),
+    h("div", { class: "np-buttons" }, shuffle, prev, play, next, repeat, likeBtn),
     h("div", { class: "grow" }),
     volumeBox,
   );
@@ -423,6 +441,8 @@ export function buildSpotifyCard(): SpotifyCardHost {
       play.append(icon);
     }
     play.title = s.playing ? t("Pause") : t("Play");
+
+    syncLike();
 
     const level = volumeLevel(s.volume);
     if (level !== volIconLevel) {

@@ -23,7 +23,7 @@ Windows only（`windows/`）。壳（岛、Mochi、服装、桌面、声音、�
 2. **Codex**：现有安装器、Allow/Deny、套餐用量保留。不往 Codex 注入文本。
 3. **岛内聊天**：DeepSeek 预设（`https://api.deepseek.com/v1`，Credential `deepseek-api-key`，默认 `deepseek-chat`）+ 可增删的 OpenAI 兼容提供商（名称 / URL / Key / 模型）。聊天芯片两级：提供商 → 模型。无 tools。key 进 Credential Manager。聊天 ≠ DSH，禁止用聊天框 `steer()`。
 4. **服务**：GitHub、Resend 不动。新增 `integration_gitlab`（`#FC6D26`）：Base URL + access token（`PRIVATE-TOKEN`），卡片只要 My MRs / To review / 默认分支 pipeline，不要贡献格子。
-5. **DSH 一次做完**：不要写 `dsh-hooks.json`，不要把展示和批准拆成两期。Cordis 插件装到 `%LOCALAPPDATA%\Coucou\dsh-plugin\`，在 profile 的 `cordis.patch.yml` 里 insert 固定 id `coucou`。默认 profile `%USERPROFILE%\.dsh\profiles\web`。主 pill `agent_dsh`（`#4D6BFE`）。插件：展示（含小写工具名与 `DIFF_TOOLS`）、`approval/request`（callId 补全参数）、`user-questions/request`（不要别名 AskUserQuestion）、反向 pipe 做 steer / 拖文件。Coucou 没开则批准/提问 `next()` 给 Web GUI。禁止默认放行。禁止 configPath 指向 `~/.claude/settings.json`。改 patch 后必须提示重启 DSH。
+5. **DSH 一次做完**：不要写 `dsh-hooks.json`，不要把展示和批准拆成两期。Cordis 插件装到 `%LOCALAPPDATA%\Coucou\dsh-plugin\`，在 profile 的 `cordis.patch.yml` 里 insert 固定 id `coucou`。默认 profile `%USERPROFILE%\.dsh\profiles\web`。主 pill `agent_dsh`（`#4D6BFE`）。插件：展示（含小写工具名与 `DIFF_TOOLS`）、`approval/request`（callId 补全参数）、`user-questions/request`（不要别名 AskUserQuestion）、反向 pipe 做 steer / 拖文件。批准/提问同时给 Coucou 与 Web GUI，先点的算数。禁止默认放行。禁止 configPath 指向 `~/.claude/settings.json`。改 patch 后必须提示重启 DSH。
 
 ## 实现顺序（严格按此）
 

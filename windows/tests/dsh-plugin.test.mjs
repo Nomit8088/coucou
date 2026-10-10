@@ -358,13 +358,14 @@ test("an approval waits, and only a click decides", async () => {
   }, () => Promise.resolve());
   await waitFor(2, "PreToolUse");
 
-  // The fake island answers "deny" (see the server above).
+  // The fake island answers "deny" (see the server above). The Web GUI is
+  // asked at the same time but never answers here, so the click must win.
   decide = "deny";
   const outcome = await listeners.get("approval/request")[0]({
     agent: agent("s1"),
     toolName: "pwsh",
     callId: "call-9",
-  }, () => Promise.resolve("unavailable"));
+  }, () => new Promise(() => {}));
 
   assert.equal(outcome, "rejected", "a click on Deny must become a rejection");
   const asked = written.find((e) => e.hook_event_name === "PermissionRequest");
@@ -379,26 +380,62 @@ test("an approval waits, and only a click decides", async () => {
 test("nobody clicking never turns into an allow", async () => {
   const { listeners } = await startPlugin();
   fire(listeners, "agent/created", { agent: agent("s1") });
-  // Silence: the fake island writes no answer line at all. The plugin's own
-  // budget is minutes long, so the property under test is that the promise is
-  // still pending — it has produced neither an allow nor a deny.
+  // Silence on both sides: the fake island writes no answer, and the Web GUI
+  // never resolves either. The plugin's own budget is minutes long, so the
+  // property under test is that the promise is still pending — it has produced
+  // neither an allow nor a deny.
   decide = null;
+  let nextCalled = false;
   let settled = null;
   void listeners.get("approval/request")[0]({
     agent: agent("s1"),
     toolName: "write",
   }, () => {
-    settled = "delegated";
-    return Promise.resolve("unavailable");
+    nextCalled = true;
+    return new Promise(() => {});
   }).then((outcome) => {
     settled = outcome;
   });
 
   await new Promise((resolve) => setTimeout(resolve, 500));
   decide = "deny";
+  assert.equal(nextCalled, true, "the Web GUI must be asked while the island is waiting");
   assert.equal(settled, null, `a silent island decided ${settled}`);
   // The request was put to the island; nothing was decided for it.
   assert.equal(written.filter((e) => e.hook_event_name === "PermissionRequest").length, 1);
+});
+
+test("a Web GUI answer wins if the island has not clicked", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  decide = null;
+  const outcome = await listeners.get("approval/request")[0]({
+    agent: agent("s1"),
+    toolName: "write",
+  }, () => Promise.resolve("allowed-once"));
+
+  assert.equal(outcome, "allowed-once", "the Web GUI's Allow must go through");
+  await waitFor(2, "PermissionRequest");
+  assert.equal(written.filter((e) => e.hook_event_name === "PermissionRequest").length, 1);
+  await waitFor(3, "PermissionDismiss");
+  assert.equal(written.some((e) => e.hook_event_name === "PermissionDismiss"), true);
+});
+
+test("a question is asked in the Web GUI at the same time as the island", async () => {
+  const { listeners } = await startPlugin();
+  fire(listeners, "agent/created", { agent: agent("s1") });
+  decide = null;
+  const questions = [{ id: "q1", question: "Which one?", options: [{ label: "A" }, { label: "B" }] }];
+  const outcome = await listeners.get("user-questions/request")[0]({
+    agent: agent("s1"),
+    questions,
+  }, () => Promise.resolve({ answers: [{ id: "q1", selected: ["B"] }] }));
+
+  assert.deepEqual(outcome, { answers: [{ id: "q1", selected: ["B"] }] });
+  await waitFor(2, "PermissionRequest");
+  const asked = written.find((e) => e.hook_event_name === "PermissionRequest");
+  assert.ok(asked, "the island was asked");
+  assert.equal(asked.tool_name, "user-questions");
 });
 
 test("a turn that did no work does not report a finished turn", async () => {

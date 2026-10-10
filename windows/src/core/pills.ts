@@ -63,6 +63,9 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
   // QQ Music on Windows, through the media session its PC client registers.
   { id: "integration_qqmusic", name: "QQ Music", color: "#31C27C", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "windows", connect: none, mediaApp: "QQMusic.exe" },
+  // NetEase Cloud Music on Windows, through the media session its PC client registers.
+  { id: "integration_cloudmusic", name: "CloudMusic", color: "#C20C0C", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "windows", connect: none, mediaApp: "cloudmusic.exe" },
   // The mailbox: read over IMAP with the account's authorisation code, never a
   // password, and never written to.
   { id: "integration_qqmail", name: "QQ Mail", color: "#12B7F5", category: "service",

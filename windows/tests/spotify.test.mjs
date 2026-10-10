@@ -9,8 +9,10 @@ import { emit, sent } from "./tauri.mjs";
 import { installFakeDom } from "./fakedom.mjs";
 import {
   IDLE_SPOTIFY, SPOTIFY_ID, Spotify, capsOf, currentArtwork, desktopDances, formatTime, isAd, islandDances,
-  musicPlaying, pillIdOf, spotifyPosition, volumeLevel, withPlaying,
+  isTrackLiked, musicPlaying, pillIdOf, spotifyPosition, toggleTrackLiked, volumeLevel, withPlaying,
 } from "../src/core/spotify.ts";
+import { COMPACT_MUSIC_W, COMPACT_W, islandSize } from "../src/core/layout.ts";
+import { CompactMusicWidget } from "../src/island/compact-music.ts";
 import { BotEngine, danceTransform, stepDanceLevel } from "../src/mochi/engine.ts";
 import { registerSpotifyHandlers } from "../src/island/spotify.ts";
 import { buildSpotifyCard, buildSpotifyPill } from "../src/views/spotify.ts";
@@ -361,3 +363,96 @@ test("the pill shows play/pause and next on hover, only with a track", () => {
   pill.el.fire("mouseleave");
   assert.ok(!pill.el.classList.contains("controls"));
 });
+
+test("islandSize widens to COMPACT_MUSIC_W when music is active in compact mode", () => {
+  assert.equal(islandSize("compact", "overview", 0, false).w, COMPACT_W);
+  assert.equal(islandSize("compact", "overview", 0, true).w, COMPACT_MUSIC_W);
+  assert.equal(islandSize("hidden", "overview", 0, true).w, 184);
+  assert.equal(islandSize("expanded", "overview", 0, true).w, 640);
+});
+
+test("compact music widget syncs track, toggles hover controls, and sends playback actions", () => {
+  let hoveredReported = null;
+  let expanded = false;
+  const widget = new CompactMusicWidget({
+    onHoverChange: (h) => {
+      hoveredReported = h;
+    },
+    onExpand: () => {
+      expanded = true;
+    },
+  });
+
+  Spotify.state = playing({ track: track({ title: "七里香", artist: "周杰伦" }) });
+  widget.sync(true);
+
+  assert.ok(widget.el.classList.contains("on"));
+  assert.ok(widget.el.textContent.includes("七里香"));
+  assert.ok(widget.el.textContent.includes("周杰伦"));
+
+  // Hover reveals controls and notifies host
+  widget.el.fire("mouseenter");
+  assert.ok(widget.el.classList.contains("hovered"));
+  assert.equal(hoveredReported, true);
+
+  const prevBtn = widget.el.querySelector(".compact-music-btn");
+  const before = sent("spotify_control").length;
+  prevBtn.fire("click");
+  assert.deepEqual(sent("spotify_control").slice(before), [{ action: "previous", value: null }]);
+
+  widget.el.fire("mouseleave");
+  assert.ok(!widget.el.classList.contains("hovered"));
+  assert.equal(hoveredReported, false);
+});
+
+test("liking a track persists locally and syncs across compact widget and expanded card", () => {
+  const current = track({ title: "夜曲", artist: "周杰伦" });
+  Spotify.state = playing({ track: current });
+
+  assert.equal(isTrackLiked(current), false);
+
+  let likedFromHost = null;
+  const widget = new CompactMusicWidget({
+    onHoverChange: () => {},
+    onExpand: () => {},
+    onLike: (liked) => {
+      likedFromHost = liked;
+    },
+  });
+  widget.sync(true);
+
+  const likeBtn = widget.el.querySelector(".compact-music-like");
+  assert.ok(likeBtn);
+  likeBtn.fire("click");
+
+  assert.equal(isTrackLiked(current), true);
+  assert.equal(likedFromHost, true);
+
+  // Card also shows liked
+  const card = buildSpotifyCard();
+  card.sync();
+  assert.ok(card.el.textContent.includes("夜曲"));
+
+  // Toggle off
+  likeBtn.fire("click");
+  assert.equal(isTrackLiked(current), false);
+  assert.equal(likedFromHost, false);
+
+  // Verifies Bridge.spotifyControl("like") was called
+  const likeCalls = sent("spotify_control").filter((c) => c.action === "like");
+  assert.ok(likeCalls.length >= 2);
+});
+
+test("custom musicLikeHotkeys in settings can be stored and configured", () => {
+  assert.ok(DEFAULT_SETTINGS.musicLikeHotkeys != null);
+  State.settings = {
+    ...DEFAULT_SETTINGS,
+    musicLikeHotkeys: {
+      integration_qqmusic: "Ctrl+Alt+L",
+      integration_cloudmusic: "Ctrl+Shift+L",
+    },
+  };
+  assert.equal(State.settings.musicLikeHotkeys.integration_qqmusic, "Ctrl+Alt+L");
+  assert.equal(State.settings.musicLikeHotkeys.integration_cloudmusic, "Ctrl+Shift+L");
+});
+

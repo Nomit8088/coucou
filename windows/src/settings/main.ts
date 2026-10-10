@@ -206,6 +206,8 @@ const INTEGRATIONS: IntegrationDef[] = [
     fields: [], mediaApp: "Spotify.exe" },
   { id: "integration_qqmusic", name: "QQ Music", color: "#31C27C",
     fields: [], mediaApp: "QQMusic.exe" },
+  { id: "integration_cloudmusic", name: "CloudMusic", color: "#C20C0C",
+    fields: [], mediaApp: "cloudmusic.exe" },
 ];
 
 const MAX_ACTIVE = MAX_DECLARED;
@@ -283,6 +285,94 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
       void Bridge.spotifyInstalled(def.id).then((ok) => {
         hint.textContent = ok === false ? t("Not installed") : "";
       });
+
+      const defaultHotkey =
+        def.id === "integration_cloudmusic" ? "Ctrl+Alt+L" :
+        def.id === "integration_spotify" ? "Alt+Shift+B" : "Ctrl+Alt+V";
+      const currentHotkey = settings.musicLikeHotkeys?.[def.id] || defaultHotkey;
+
+      const hotkeyInput = h("input", {
+        type: "text",
+        value: currentHotkey,
+        style: "width:105px;text-align:center;font-size:12px;font-family:monospace;padding:3px 6px;border-radius:6px;border:1px solid #333;background:#1a1a1a;color:#eee",
+        spellcheck: "false",
+      }) as HTMLInputElement;
+
+      const recordBtn = h("button", {
+        class: "link-btn",
+        style: "font-size:11.5px;color:#8e939c;cursor:pointer",
+        text: t("Record"),
+      });
+
+      let recording = false;
+      const stopRecord = () => {
+        recording = false;
+        recordBtn.textContent = t("Record");
+        recordBtn.style.color = "#8e939c";
+      };
+
+      recordBtn.addEventListener("click", () => {
+        if (recording) {
+          stopRecord();
+          return;
+        }
+        recording = true;
+        recordBtn.textContent = t("Press keys…");
+        recordBtn.style.color = "#FF4D6D";
+        hotkeyInput.focus();
+      });
+
+      hotkeyInput.addEventListener("keydown", (e: KeyboardEvent) => {
+        if (!recording) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const res = recordPress(e);
+        if (res.kind === "keys") {
+          hotkeyInput.value = res.keys;
+          settings.musicLikeHotkeys = { ...(settings.musicLikeHotkeys || {}), [def.id]: res.keys };
+          stopRecord();
+          void save();
+        } else if (res.kind === "clear" || res.kind === "cancel") {
+          stopRecord();
+        }
+      });
+
+      hotkeyInput.addEventListener("change", () => {
+        const val = hotkeyInput.value.trim() || defaultHotkey;
+        hotkeyInput.value = val;
+        settings.musicLikeHotkeys = { ...(settings.musicLikeHotkeys || {}), [def.id]: val };
+        void save();
+      });
+
+      const resetBtn = h("button", {
+        class: "link-btn",
+        style: "font-size:11.5px;color:#8e939c;cursor:pointer",
+        text: t("Reset"),
+        onclick: () => {
+          hotkeyInput.value = defaultHotkey;
+          const map = { ...(settings.musicLikeHotkeys || {}) };
+          delete map[def.id];
+          settings.musicLikeHotkeys = map;
+          stopRecord();
+          void save();
+        },
+      });
+
+      rows.append(
+        h(
+          "div",
+          { class: "row", style: "align-items:center;gap:8px;margin-top:4px" },
+          h("label", { style: "font-size:11.5px;color:#8e939c", text: t("Like hotkey:") }),
+          hotkeyInput,
+          recordBtn,
+          resetBtn,
+        ),
+        h("div", {
+          class: "hint",
+          style: "font-size:11px;color:#666;margin-top:-2px",
+          text: t("Sent to player when clicking Like (matches player's global hotkey)"),
+        }),
+      );
     }
 
     list.append(
@@ -327,14 +417,47 @@ function generalSection(): HTMLElement {
     onclick: () => void Bridge.reloadSounds().then(() => window.setTimeout(countCustom, 300)),
   });
 
+  const isStayOpen = Math.round(settings.autoCloseInterval) === 0;
   const autoClose = h("input", {
-    type: "number", min: "5", max: "120", step: "1",
-    value: String(Math.round(settings.autoCloseInterval)),
-    style: "width:72px",
+    type: "number", min: "0", max: "120", step: "1",
+    value: isStayOpen ? "0" : String(Math.round(settings.autoCloseInterval)),
+    style: "width:64px",
+    disabled: isStayOpen,
   }) as HTMLInputElement;
+
+  const stayOpenCheck = h("input", {
+    type: "checkbox",
+    checked: isStayOpen,
+    style: "cursor:pointer;",
+  }) as HTMLInputElement;
+
+  const stayOpenLabel = h("label", {
+    style: "display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin-left:10px;font-size:12.5px;",
+  },
+    stayOpenCheck,
+    h("span", { text: t("Stay open") }),
+  );
+
+  stayOpenCheck.addEventListener("change", () => {
+    if (stayOpenCheck.checked) {
+      settings.autoCloseInterval = 0;
+      autoClose.value = "0";
+      autoClose.disabled = true;
+    } else {
+      settings.autoCloseInterval = 15;
+      autoClose.value = "15";
+      autoClose.disabled = false;
+    }
+    void save();
+  });
+
   autoClose.addEventListener("change", () => {
-    settings.autoCloseInterval = Math.max(5, Math.min(120, Number(autoClose.value) || 15));
-    autoClose.value = String(settings.autoCloseInterval);
+    const val = Number(autoClose.value);
+    const n = Math.max(0, Math.min(120, isNaN(val) ? 15 : val));
+    settings.autoCloseInterval = n;
+    autoClose.value = String(n);
+    stayOpenCheck.checked = n === 0;
+    autoClose.disabled = n === 0;
     void save();
   });
 
@@ -383,7 +506,8 @@ function generalSection(): HTMLElement {
     h("div", { class: "row" },
       h("label", { text: t("Auto-close") }),
       autoClose,
-      h("span", { class: "hint", text: t("seconds after you leave the island") }),
+      h("span", { class: "hint", text: t("seconds after you leave the island (0 = stay open)") }),
+      stayOpenLabel,
     ),
     h("div", { class: "row" },
       h("label", { text: t("Island lives on") }),

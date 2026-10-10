@@ -878,8 +878,14 @@ function buildSettings(actions: ViewActions): ViewHost {
     oninput: (e: Event) => actions.setVolume(Number((e.target as HTMLInputElement).value)),
   }) as HTMLInputElement;
   const autoLabel = h("span", {});
-  const segButtons = [10, 15, 30].map((s) =>
-    h("button", { onclick: () => actions.setAutoClose(s) }, `${s}s`),
+  const segOptions: { sec: number; label: Msg | string }[] = [
+    { sec: 10, label: "10s" },
+    { sec: 15, label: "15s" },
+    { sec: 30, label: "30s" },
+    { sec: 0, label: tl("Stay open") },
+  ];
+  const segButtons = segOptions.map((opt) =>
+    h("button", { onclick: () => actions.setAutoClose(opt.sec) }, opt.label),
   );
   const claudeBadge = h("span", { class: "status-badge" });
   const apiBadge = h("span", { class: "status-badge" });
@@ -920,8 +926,12 @@ function buildSettings(actions: ViewActions): ViewHost {
       soundSwitch.classList.toggle("on", s.soundEnabled);
       volume.value = String(s.soundVolume);
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
-      autoLabel.textContent = t("Auto-close · {seconds}s", { seconds: Math.round(s.autoCloseInterval) });
-      segButtons.forEach((b, i) => b.classList.toggle("on", s.autoCloseInterval === [10, 15, 30][i]));
+      if (Math.round(s.autoCloseInterval) === 0) {
+        autoLabel.textContent = t("Auto-close · Never");
+      } else {
+        autoLabel.textContent = t("Auto-close · {seconds}s", { seconds: Math.round(s.autoCloseInterval) });
+      }
+      segButtons.forEach((b, i) => b.classList.toggle("on", Math.round(s.autoCloseInterval) === segOptions[i].sec));
       clear(claudeBadge);
       claudeBadge.append(
         dot(s.hooksInstalled ? "#22C55E" : "#F4505E", 6),

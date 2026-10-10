@@ -159,3 +159,45 @@ export function islandDances(o: {
 export function desktopDances(music: boolean, state: BotStateName): boolean {
   return music && DANCE_STATES.has(state);
 }
+
+// ── Liked tracks ─────────────────────────────────────────────────────────────
+
+const LIKED_KEY = "coucou:liked_tracks";
+let likedTracks = new Set<string>();
+
+export function initLikedTracks() {
+  try {
+    if (typeof localStorage !== "undefined") {
+      const raw = localStorage.getItem(LIKED_KEY);
+      if (raw) likedTracks = new Set(JSON.parse(raw));
+    }
+  } catch {}
+}
+initLikedTracks();
+
+export function likedTrackKey(track: SpotifyTrack | null | undefined): string {
+  if (!track || !track.title) return "";
+  return `${track.title.trim().toLowerCase()}|${track.artist.trim().toLowerCase()}`;
+}
+
+export function isTrackLiked(track: SpotifyTrack | null | undefined): boolean {
+  const k = likedTrackKey(track);
+  return k ? likedTracks.has(k) : false;
+}
+
+export function toggleTrackLiked(track: SpotifyTrack | null | undefined): boolean {
+  const k = likedTrackKey(track);
+  if (!k) return false;
+  const next = !likedTracks.has(k);
+  if (next) {
+    likedTracks.add(k);
+  } else {
+    likedTracks.delete(k);
+  }
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LIKED_KEY, JSON.stringify([...likedTracks]));
+    }
+  } catch {}
+  return next;
+}

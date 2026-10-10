@@ -42,7 +42,7 @@ function cancelStopTimer(id: string): boolean {
 }
 
 /** Events after which a pending permission request of the same session is moot. */
-const TURN_OVER = new Set(["Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt"]);
+const TURN_OVER = new Set(["Stop", "StopFailure", "UserPromptSubmit", "SessionEnd", "Interrupt", "PermissionDismiss"]);
 
 interface HookPayload {
   hook_event_name?: string;
@@ -527,6 +527,10 @@ function handleHook(island: Island, payload: HookPayload) {
       supersedeStop();
       State.updateTask(agentId, "idle");
       State.setPillBadge(agentId, null);
+      break;
+
+    case "PermissionDismiss":
+      // The Web GUI answered first. TURN_OVER already took the card down.
       break;
 
     case "StopFailure":

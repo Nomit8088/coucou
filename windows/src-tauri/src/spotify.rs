@@ -42,6 +42,7 @@ const ARTWORK_LIMIT: usize = 3 * 1024 * 1024;
 pub const PLAYERS: &[(&str, &str)] = &[
     ("integration_spotify", "Spotify.exe"),
     ("integration_qqmusic", "QQMusic.exe"),
+    ("integration_cloudmusic", "cloudmusic.exe"),
 ];
 
 /// Where "Get Spotify" leads on Windows.
@@ -50,6 +51,9 @@ pub const SPOTIFY_DOWNLOAD: &str = "https://www.spotify.com/download/windows/";
 /// Where "Get QQ Music" leads.
 #[cfg(any(windows, test))]
 pub const QQMUSIC_DOWNLOAD: &str = "https://y.qq.com/download/index.html";
+/// Where "Get NetEase Cloud Music" leads.
+#[cfg(any(windows, test))]
+pub const CLOUDMUSIC_DOWNLOAD: &str = "https://music.163.com/#/download";
 
 /// The pill that follows this application id (as the media session spells it).
 #[cfg(any(windows, test))]
@@ -69,6 +73,7 @@ pub fn app_for_pill(pill: &str) -> Option<&'static str> {
 pub fn download_url(pill: &str) -> &'static str {
     match pill {
         "integration_qqmusic" => QQMUSIC_DOWNLOAD,
+        "integration_cloudmusic" => CLOUDMUSIC_DOWNLOAD,
         _ => SPOTIFY_DOWNLOAD,
     }
 }
@@ -595,6 +600,14 @@ pub fn sync(app: &AppHandle, active_integrations: &[String]) {
     let _ = (app, active_integrations);
 }
 
+/// Syncs the user-configured hotkeys for music player like/favorite action.
+pub fn sync_like_hotkeys(hotkeys: &std::collections::BTreeMap<String, String>) {
+    #[cfg(windows)]
+    windows::sync_like_hotkeys(hotkeys);
+    #[cfg(not(windows))]
+    let _ = hotkeys;
+}
+
 // ── The music pills' rules ────────────────────────────────────────────────────
 //
 // These run everywhere: they are what the page and the listener agree on, so
@@ -697,6 +710,7 @@ mod windows {
         /// The session the controls drive, while one is followed.
         session: Option<Session>,
         state: PlayerState,
+        like_hotkeys: std::collections::BTreeMap<String, String>,
     }
 
     static SHARED: LazyLock<Mutex<Shared>> = LazyLock::new(|| {
@@ -707,8 +721,13 @@ mod windows {
             wake: None,
             session: None,
             state: PlayerState::default(),
+            like_hotkeys: std::collections::BTreeMap::new(),
         })
     });
+
+    pub fn sync_like_hotkeys(hotkeys: &std::collections::BTreeMap<String, String>) {
+        SHARED.lock().unwrap().like_hotkeys = hotkeys.clone();
+    }
 
     /// The last cover sent: a thumbnail is not re-read on every signal.
     static COVER: Mutex<Option<(String, String)>> = Mutex::new(None);
@@ -1048,6 +1067,60 @@ mod windows {
         Some(bytes)
     }
 
+    /// Synthesizes a global key combination to toggle favorite/like in the player.
+    fn send_hotkey(modifiers: &[u8], key: u8) -> bool {
+        extern "system" {
+            fn keybd_event(bVk: u8, bScan: u8, dwFlags: u32, dwExtraInfo: usize);
+        }
+        const KEYEVENTF_KEYUP: u32 = 0x0002;
+        unsafe {
+            for &m in modifiers {
+                keybd_event(m, 0, 0, 0);
+            }
+            keybd_event(key, 0, 0, 0);
+            keybd_event(key, 0, KEYEVENTF_KEYUP, 0);
+            for &m in modifiers.iter().rev() {
+                keybd_event(m, 0, KEYEVENTF_KEYUP, 0);
+            }
+        }
+        true
+    }
+
+    fn parse_hotkey(keys: &str) -> Option<(Vec<u8>, u8)> {
+        let mut mods = Vec::new();
+        let mut vk: Option<u8> = None;
+        for part in keys.split('+').map(str::trim) {
+            match part.to_ascii_uppercase().as_str() {
+                "CTRL" | "CONTROL" => mods.push(0x11),
+                "ALT" | "OPTION" | "MENU" => mods.push(0x12),
+                "SHIFT" => mods.push(0x10),
+                "SUPER" | "WIN" | "CMD" | "META" => mods.push(0x5B),
+                s if s.len() == 1 && s.chars().next().unwrap().is_ascii_alphabetic() => {
+                    vk = Some(s.chars().next().unwrap().to_ascii_uppercase() as u8);
+                }
+                s if s.len() == 1 && s.chars().next().unwrap().is_ascii_digit() => {
+                    vk = Some(s.chars().next().unwrap() as u8);
+                }
+                "F1" => vk = Some(0x70),
+                "F2" => vk = Some(0x71),
+                "F3" => vk = Some(0x72),
+                "F4" => vk = Some(0x73),
+                "F5" => vk = Some(0x74),
+                "F6" => vk = Some(0x75),
+                "F7" => vk = Some(0x76),
+                "F8" => vk = Some(0x77),
+                "F9" => vk = Some(0x78),
+                "F10" => vk = Some(0x79),
+                "F11" => vk = Some(0x7A),
+                "F12" => vk = Some(0x7B),
+                "SPACE" => vk = Some(0x20),
+                _ => {}
+            }
+        }
+        let vk = vk?;
+        Some((mods, vk))
+    }
+
     // ── Controls ──────────────────────────────────────────────────────────────
 
     /// A control from the card or the pill: `playPause`, `next`, `previous` or a
@@ -1057,6 +1130,25 @@ mod windows {
         // This runs on a command thread, where WinRT is not initialized yet.
         unsafe {
             let _ = RoInitialize(RO_INIT_MULTITHREADED);
+        }
+        if action == "like" || action == "toggleLike" {
+            let (pill, custom_keys) = {
+                let s = SHARED.lock().unwrap();
+                (s.state.pill_id.clone(), s.like_hotkeys.clone())
+            };
+            if let Some(keys) = custom_keys.get(&pill).or_else(|| custom_keys.get("default")) {
+                if !keys.trim().is_empty() {
+                    if let Some((mods, vk)) = parse_hotkey(keys) {
+                        return send_hotkey(&mods, vk);
+                    }
+                }
+            }
+            return match pill.as_str() {
+                "integration_qqmusic" => send_hotkey(&[0x11, 0x12], 0x56), // Ctrl + Alt + V
+                "integration_cloudmusic" => send_hotkey(&[0x11, 0x12], 0x4C), // Ctrl + Alt + L
+                "integration_spotify" => send_hotkey(&[0x12, 0x10], 0x42), // Alt + Shift + B
+                _ => send_hotkey(&[0x11, 0x12], 0x56),
+            };
         }
         let session = SHARED.lock().unwrap().session.clone();
         let Some(session) = session else { return false };
@@ -1086,11 +1178,16 @@ mod windows {
     /// Where the player behind a pill usually installs its program.
     fn known_exe(pill: &str) -> Option<PathBuf> {
         let root = |name: &str| std::env::var_os(name).map(PathBuf::from);
-        let candidates: Vec<PathBuf> = match pill {
+        let mut candidates: Vec<PathBuf> = match pill {
             "integration_qqmusic" => ["ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"]
                 .iter()
                 .filter_map(|name| root(name))
                 .map(|dir| dir.join("Tencent").join("QQMusic").join("QQMusic.exe"))
+                .collect(),
+            "integration_cloudmusic" => ["ProgramFiles(x86)", "ProgramFiles", "LOCALAPPDATA"]
+                .iter()
+                .filter_map(|name| root(name))
+                .map(|dir| dir.join("Netease").join("CloudMusic").join("cloudmusic.exe"))
                 .collect(),
             _ => ["APPDATA", "LOCALAPPDATA"]
                 .iter()
@@ -1103,6 +1200,26 @@ mod windows {
                 })
                 .collect(),
         };
+        if pill == "integration_qqmusic" {
+            // Also check custom paths and non-system drives where QQ Music is often installed:
+            for drive in ["C:\\", "D:\\", "E:\\"] {
+                let d = PathBuf::from(drive);
+                candidates.push(d.join("Community").join("QQMusic").join("QQMusic.exe"));
+                candidates.push(d.join("Tencent").join("QQMusic").join("QQMusic.exe"));
+                candidates.push(d.join("QQMusic").join("QQMusic.exe"));
+                candidates.push(d.join("Program Files").join("Tencent").join("QQMusic").join("QQMusic.exe"));
+                candidates.push(d.join("Program Files (x86)").join("Tencent").join("QQMusic").join("QQMusic.exe"));
+            }
+        } else if pill == "integration_cloudmusic" {
+            // Also check custom paths and non-system drives where CloudMusic is often installed:
+            for drive in ["C:\\", "D:\\", "E:\\"] {
+                let d = PathBuf::from(drive);
+                candidates.push(d.join("Netease").join("CloudMusic").join("cloudmusic.exe"));
+                candidates.push(d.join("CloudMusic").join("cloudmusic.exe"));
+                candidates.push(d.join("Program Files").join("Netease").join("CloudMusic").join("cloudmusic.exe"));
+                candidates.push(d.join("Program Files (x86)").join("Netease").join("CloudMusic").join("cloudmusic.exe"));
+            }
+        }
         candidates.into_iter().find(|path| path.is_file())
     }
 
@@ -1117,6 +1234,13 @@ mod windows {
 
     /// Brings the player forward or starts it; without it, its download page.
     pub fn open(pill: &str) -> bool {
+        if let Some(path) = known_exe(pill) {
+            if let Some(path_str) = path.to_str() {
+                if shell_open(path_str) {
+                    return true;
+                }
+            }
+        }
         let Some(exe) = app_for_pill(pill) else { return false };
         if shell_open(exe) {
             return true;

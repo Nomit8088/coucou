@@ -159,6 +159,8 @@ export interface Settings {
    * else English), or one of src/i18n's ten codes ("fr", "pt-BR", "zh-Hans"…).
    */
   language: string;
+  /** Custom global hotkey to send when liking a track, by pill id ("integration_qqmusic": "Ctrl+Alt+V"). */
+  musicLikeHotkeys: Record<string, string>;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;
@@ -185,6 +187,7 @@ export const DEFAULT_SETTINGS: Settings = {
   chatProviders: [],
   dshProfile: "",
   chatModels: {},
+  musicLikeHotkeys: {},
   ollamaUrl: "",
   lmstudioUrl: "",
   customUrl: "",

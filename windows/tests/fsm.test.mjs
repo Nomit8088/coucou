@@ -121,6 +121,15 @@ test("the collapse delay is the configured one", () => {
   assert.equal(fsm.state, "petit");
 });
 
+test("a zero delay means stay open (never auto-close) when the mouse leaves", () => {
+  fsm.homeToPetitDelay = 0;
+  fsm.forceHome();
+  fsm.mouseLeft();
+  seconds(600);
+  assert.equal(fsm.state, "home");
+  assert.equal(fsm.homeCollapseDueAt, null);
+});
+
 test("reveal shows the compact island from hidden and hides it again after 60 s", () => {
   fsm.reveal();
   assert.equal(fsm.state, "petit");
@@ -494,3 +503,61 @@ test("open on hover: an island opened by an alert keeps the normal delay", () =>
   seconds(2);
   assert.equal(fsm.state, "petit");
 });
+
+// ── Stay open / music hold (petitToHidden disabled) ──────────────────────────
+
+test("when stay open is set (0 delay), the compact island never hides after the mouse leaves", () => {
+  fsm.homeToPetitDelay = 0;
+  fsm.mouseEntered();
+  fsm.mouseLeft();
+  seconds(60);
+  assert.equal(fsm.state, "petit");
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+});
+
+test("when shouldKeepPetit is true (e.g. music playing), the compact island never hides", () => {
+  let musicPlaying = true;
+  fsm.shouldKeepPetit = () => musicPlaying;
+  fsm.mouseEntered();
+  fsm.mouseLeft();
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+
+  // Stopping music resumes the 60s hide countdown
+  musicPlaying = false;
+  fsm.syncPetitHold();
+  seconds(59);
+  assert.equal(fsm.state, "petit");
+  seconds(1);
+  assert.equal(fsm.state, "hidden");
+});
+
+test("dismissing the compact island hides it even when stay open / music is active", () => {
+  fsm.homeToPetitDelay = 0;
+  fsm.shouldKeepPetit = () => true;
+  fsm.mouseEntered();
+  fsm.mouseLeft();
+  assert.equal(fsm.state, "petit");
+
+  // Manual minimize/dismiss
+  fsm.dismiss();
+  assert.equal(fsm.state, "hidden");
+  assert.equal(fsm.dismissed, true);
+
+  // Hovering top of screen does not bring it back while dismissed
+  fsm.mouseEntered();
+  assert.equal(fsm.state, "hidden");
+
+  // A new notification/alert arrives: wakes up and clears dismissal
+  fsm.forceHome();
+  assert.equal(fsm.state, "home");
+  assert.equal(fsm.dismissed, false);
+
+  // Closing alert back to compact restores the stay-open behavior
+  fsm.forcePetit();
+  fsm.mouseLeft();
+  seconds(600);
+  assert.equal(fsm.state, "petit");
+});
+

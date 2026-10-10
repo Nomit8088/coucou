@@ -20,6 +20,22 @@ export class IslandStateMachine {
     if (!Number.isFinite(seconds) || seconds < 0 || seconds === this.homeDelay) return;
     this.homeDelay = seconds;
     if (this.state === "home" && this.homeCollapse != null) this.scheduleHomeCollapse();
+    if (this.state === "petit") {
+      if (!this.canPetitHide()) this.clear("petitHide");
+      else if (this.petitHide == null) this.schedulePetitHide();
+    }
+  }
+  /**
+   * Predicate deciding whether the compact island should stay on screen
+   * instead of timing out to hidden after 60s (e.g. music is active or stay open is set).
+   */
+  shouldKeepPetit: (() => boolean) | null = null;
+
+  /** Whether the compact island is allowed to fold to hidden automatically. */
+  canPetitHide(): boolean {
+    if (this.homeDelay === 0) return false;
+    if (this.shouldKeepPetit?.()) return false;
+    return true;
   }
   /** petit → hidden delay, seconds. */
   petitToHiddenDelay = 60;
@@ -187,6 +203,19 @@ export class IslandStateMachine {
     this.forcePetit();
   }
 
+  /**
+   * Re-evaluates whether the compact island should hold its position or start/cancel
+   * its hide timer (e.g. when music playback starts or stops).
+   */
+  syncPetitHold() {
+    if (this.state !== "petit" || this.dismissed) return;
+    if (!this.canPetitHide()) {
+      this.clear("petitHide");
+    } else if (this.petitHide == null && !this.pinned) {
+      this.schedulePetitHide();
+    }
+  }
+
   // ── Timers ──────────────────────────────────────────────────────────────────
 
   private schedulePetitHide() {
@@ -194,15 +223,22 @@ export class IslandStateMachine {
     // A card folded away while it waits for an answer keeps the compact island
     // on screen, so it can be reopened (isHeldOpen on macOS).
     if (this.pinned) return;
+    if (!this.canPetitHide()) return;
     this.petitHide = window.setTimeout(() => {
       this.petitHide = null;
-      if (this.state === "petit" && !this.pinned) this.transition("hidden");
+      if (this.state === "petit" && !this.pinned && this.canPetitHide()) {
+        this.transition("hidden");
+      }
     }, this.petitToHiddenDelay * 1000);
   }
 
   private scheduleHomeCollapse() {
     this.clear("homeCollapse");
     if (this.pinned) return;
+    if (this.homeDelay === 0 && !this.byHover) {
+      this.homeCollapseDueAt = null;
+      return;
+    }
     const ms = (this.byHover ? this.hoverCloseDelay : this.homeDelay) * 1000;
     this.homeCollapseDueAt = performance.now() + ms;
     this.homeCollapse = window.setTimeout(() => {

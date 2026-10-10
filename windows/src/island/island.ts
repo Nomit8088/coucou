@@ -12,7 +12,8 @@ import {
 } from "../core/layout";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
-import { islandDances, isMusicPill, pillIdOf } from "../core/spotify";
+import { Spotify, islandDances, isMusicPill, pillIdOf } from "../core/spotify";
+import { sanitizeDeclared } from "../core/pills";
 import { BotEngine, hexToRGB } from "../mochi/engine";
 import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
@@ -28,6 +29,7 @@ import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
+import { CompactMusicWidget } from "./compact-music";
 
 const BOT_OVERHANG = 40;
 
@@ -61,6 +63,7 @@ export class Island {
   private countdown!: HTMLElement;
   private dismissBtn!: HTMLElement;
   private wakeStrip!: HTMLElement;
+  private compactMusic!: CompactMusicWidget;
 
   private header!: ViewHost;
   private views!: Map<IslandViewName, ViewHost>;
@@ -135,6 +138,7 @@ export class Island {
     State.subscribe(() => {
       this.dirty = true;
       this.ensureRunning();
+      this.fsm.syncPetitHold();
     });
   }
 
@@ -259,6 +263,24 @@ export class Island {
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.countdown = h("div", { id: "countdown" });
+    this.compactMusic = new CompactMusicWidget({
+      onHoverChange: () => {
+        if (State.mode === "compact") {
+          const target = this.targetSize();
+          if (this.width.target !== target.w) {
+            this.animateGeometry(this.width.target > target.w);
+          }
+        }
+      },
+      onExpand: () => {
+        this.expand("overview");
+      },
+      onLike: (liked) => {
+        if (liked) {
+          this.engine.triggerEmote("love");
+        }
+      },
+    });
     // The compact island's −: off the screen until something happens. Only the
     // compact island has it — an open island is closed by clicking outside it.
     this.dismissBtn = h(
@@ -324,6 +346,7 @@ export class Island {
       this.clipEl,
       this.botGlow,
       this.botCanvas,
+      this.compactMusic.el,
       this.miniGrid,
       this.dismissBtn,
       this.countdown,
@@ -344,6 +367,12 @@ export class Island {
   private wireFsm() {
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    this.fsm.shouldKeepPetit = () => {
+      return (
+        State.settings.activeIntegrations.some(isMusicPill) &&
+        (State.spotifyPlaying || Boolean(Spotify.state.track))
+      );
+    };
     this.fsm.onTransition = (from, to) => {
       // The greeting is over, however it ended: back to his desktop spot.
       if (from === "coucou" && to !== "coucou") this.desktop.launch();
@@ -706,8 +735,23 @@ export class Island {
 
   // ── Geometry ────────────────────────────────────────────────────────────────
 
+  private get isCompactMusicActive(): boolean {
+    if (State.mode !== "compact") return false;
+    const s = Spotify.state;
+    if (!s.track) return false;
+    const declared = sanitizeDeclared(State.settings, State.os).activeIntegrations;
+    const pill = pillIdOf(s);
+    if (!declared.includes(pill)) return false;
+    return s.playing || this.compactMusic.isHovered;
+  }
+
   private targetSize(): { w: number; h: number; r: number } {
-    let { w, h } = islandSize(State.mode, State.view, State.chatHistory.length);
+    let { w, h } = islandSize(
+      State.mode,
+      State.view,
+      State.chatHistory.length,
+      this.isCompactMusicActive,
+    );
     if (State.mode === "expanded" && State.view === "question" && State.pendingApproval?.questions) {
       h = QUESTION_PICKER_H;
     }
@@ -1085,6 +1129,9 @@ export class Island {
     this.viewsEl.classList.toggle("hidden-by-upload", uploadActive);
 
     tickMiniBots(dt);
+    if (State.mode === "compact" && this.isCompactMusicActive) {
+      this.compactMusic.tick(nowMs);
+    }
     // A ticker scroll that loses its frames freezes mid-way, rows overlapping.
     const viewAnimating = this.views.get(State.view)?.tick?.(nowMs) === true;
     if (UploadSeq.isActive) this.stepSequence();
@@ -1102,7 +1149,8 @@ export class Island {
       ? settling
       : settling ||
         !this.botCx.settled || !this.botCy.settled || !this.botSize.settled ||
-        greetingActive || this.engine.busy || UploadSeq.isActive || viewAnimating;
+        greetingActive || this.engine.busy || UploadSeq.isActive || viewAnimating ||
+        (State.mode === "compact" && this.isCompactMusicActive && Spotify.state.playing);
 
     if (busy) {
       requestAnimationFrame(this.frame);
@@ -1295,6 +1343,12 @@ export class Island {
 
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
+
+    const target = this.targetSize();
+    if (this.width.target !== target.w || this.height.target !== target.h) {
+      this.animateGeometry(this.width.target > target.w);
+    }
+    this.compactMusic.sync(this.isCompactMusicActive);
   }
 
   /** Applies settings coming from Rust at boot. */
@@ -1303,6 +1357,7 @@ export class Island {
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;
     this.fsm.openOnHover = State.settings.openOnHover;
+    this.fsm.syncPetitHold();
     State.notify();
   }
 

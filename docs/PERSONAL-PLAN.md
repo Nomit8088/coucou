@@ -180,7 +180,7 @@ IPC：Windows 上插件直接写 `\\.\pipe\coucou-<SID>`（与 hook 同一行 JS
 - 做 `approval/request` 的 answerer
 - 用 `callId` 从缓存补全参数，岛上显示 `write · C:\…\.env`，不能只有工具名
 - Allow → `allowed-once`，Deny → `rejected`（DSH 没有 Always）
-- Coucou 没开或超时（约 110s）：`next()`，DSH Web GUI 继续问
+- Coucou 与 Web GUI 同时问：插件立刻 `next()`，也把请求打到岛上；先点的算数，后点的忽略。Coucou 没开或超时不单独劫持，Web 继续等
 - **禁止**默认放行；没有人工点击不得 `allowed-once`
 - `dsh` 加入 `takes_decisions`（`windows/hook/src/reply.rs`）和 `APPROVAL_AGENTS`（`windows/src/island/agents.ts`）
 
@@ -189,7 +189,7 @@ IPC：Windows 上插件直接写 `\\.\pipe\coucou-<SID>`（与 hook 同一行 JS
 - 做 `user-questions/request` 的 answerer
 - DSH 形状：`{ id, question, header?, options?, multiSelect? }`，不要当成 Claude 的 `AskUserQuestion`
 - 岛上现有提问卡可复用展示；回传按 id 填 `answers`
-- 失败同样 `next()` 给 Web GUI
+- 失败不单独劫持：Web GUI 与岛上同时问，先答的算数
 
 **从岛上发下一句 / 拖文件（反向通道）**
 

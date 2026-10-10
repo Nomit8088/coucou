@@ -238,7 +238,7 @@ export const Bridge = {
   spotifyInstalled: (pillId: string) => call<boolean>("spotify_installed", { pillId }),
 };
 
-export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume";
+export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume" | "like";
 
 export type ShortcutStatus =
   | "active" | "off" | "inUse" | "duplicate" | "invalid"

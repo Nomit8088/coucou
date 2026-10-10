@@ -177,6 +177,59 @@
    "ru": "Автозакрытие",
    "id": "Tutup otomatis"
   },
+  "Auto-close · Never": {
+   "zh-Hans": "自动关闭 · 常驻",
+   "hi": "ऑटो-क्लोज़ · हमेशा",
+   "es": "Cierre automático · Nunca",
+   "ar": "الإغلاق التلقائي · أبدًا",
+   "fr": "Fermeture auto · Jamais",
+   "bn": "স্বয়ংক্রিয় বন্ধ · কখনো না",
+   "pt-BR": "Fechar auto · Nunca",
+   "ru": "Автозакрытие · Никогда",
+   "id": "Tutup otomatis · Tidak pernah"
+  },
+  "Stay open": {
+   "zh-Hans": "常驻",
+   "hi": "हमेशा",
+   "es": "Permanente",
+   "ar": "دائم",
+   "fr": "Permanent",
+   "bn": "স্থায়ী",
+   "pt-BR": "Permanente",
+   "ru": "Постоянно",
+   "id": "Tetap buka"
+  },
+  "seconds after you leave the island (0 = stay open)": {
+   "zh-Hans": "离开刘海后的秒数（0 为常驻）",
+   "hi": "आइलैंड छोड़ने के बाद के सेकंड (0 = हमेशा)",
+   "es": "segundos después de salir de la isla (0 = permanente)",
+   "ar": "ثوانٍ بعد مغادرة الجزيرة (0 = دائم)",
+   "fr": "secondes après avoir quitté l'île (0 = permanent)",
+   "bn": "দ্বীপ ছাড়ার পর সেকেন্ড (0 = স্থায়ী)",
+   "pt-BR": "segundos após sair da ilha (0 = permanente)",
+   "ru": "секунд после ухода с острова (0 = постоянно)",
+   "id": "detik setelah meninggalkan pulau (0 = tetap buka)"
+  },
+  "Like hotkey:": {
+   "zh-Hans": "喜欢快捷键：",
+   "en": "Like hotkey:"
+  },
+  "Press keys…": {
+   "zh-Hans": "请按快捷键…",
+   "en": "Press keys…"
+  },
+  "Record": {
+   "zh-Hans": "录制",
+   "en": "Record"
+  },
+  "Reset": {
+   "zh-Hans": "重置",
+   "en": "Reset"
+  },
+  "Sent to player when clicking Like (matches player's global hotkey)": {
+   "zh-Hans": "点击喜欢时向播放器发送的热键（需与播放器全局快捷键一致）",
+   "en": "Sent to player when clicking Like (matches player's global hotkey)"
+  },
   "Back": {
    "zh-Hans": "返回",
    "hi": "वापस",
