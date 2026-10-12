@@ -35,7 +35,7 @@ export interface AgentTask {
   miniEye?: EyeShape | null;
   pillBadge?: PillBadge | null;
   sessionCwd?: string | null;
-  /** Claude Code's session, so "Open terminal" can find the window it runs in. */
+  /** Claude Code's display-owner session, so "Open terminal" can find its window. */
   sessionId?: string | null;
   /** Claude's final message after Stop, one line; cleared when a new turn starts. */
   finalLine?: string | null;
@@ -252,8 +252,13 @@ class AppState {
   searchResult: SearchResult | null = null;
   chatHistory: ChatMessage[] = [];
   pendingApproval: ApprovalInfo | null = null;
+  /** Requests waiting behind the visible card, in arrival order. */
+  approvalQueue: ApprovalInfo[] = [];
   /** The pill that was in front when the card came up; it comes back after. */
   focusBeforeApproval: string | null = null;
+
+  /** Session ids currently contributing state to each agent pill. */
+  private liveSessions = new Map<string, Map<string, BotStateName>>();
 
   integrations: Record<string, IntegrationInfo> = {};
 
@@ -360,23 +365,94 @@ class AppState {
     this.setFocus(info.pillId);
   }
 
+  /** Adds a request once; returns true when it became the visible card. */
+  enqueueApproval(info: ApprovalInfo): boolean {
+    if (!info.requestId) return false;
+    if (this.pendingApproval?.requestId === info.requestId || this.approvalQueue.some((x) => x.requestId === info.requestId)) return false;
+    if (this.pendingApproval || this.approvalQueue.length > 0) {
+      if (this.approvalQueue.length >= 5) return false;
+      this.approvalQueue.push(info);
+      this.notify();
+      return false;
+    }
+    this.beginApproval(info);
+    return true;
+  }
+
   /**
-   * The card has its answer, or is withdrawn: the session carries on, and the
-   * pill you were on comes back — unless you moved to another one meanwhile.
+   * The card has its answer, or is withdrawn. Promote the next queued request
+   * and return it so the island can display it immediately.
    */
-  endApproval() {
+  endApproval(): ApprovalInfo | null {
     const req = this.pendingApproval;
-    if (!req) return;
+    if (!req) return null;
     this.pendingApproval = null;
     this.isPinned = false;
-    this.updateTask(req.pillId, "working");
+    if (req.sessionId && this.hasSession(req.pillId, req.sessionId)) this.sessionState(req.pillId, req.sessionId, "working");
+    else this.updateTask(req.pillId, "working");
     this.setPillBadge(req.pillId, null);
+    const next = this.approvalQueue.shift() ?? null;
     const previous = this.focusBeforeApproval;
     this.focusBeforeApproval = null;
-    if (previous && this.focusId === req.pillId && this.tasks.some((t) => t.id === previous)) {
+    if (next) {
+      this.beginApproval(next);
+    } else if (previous && this.focusId === req.pillId && this.tasks.some((t) => t.id === previous)) {
       this.focusId = previous;
     }
     this.notify();
+    return next;
+  }
+
+  hasApproval(requestId: string): boolean {
+    return this.pendingApproval?.requestId === requestId || this.approvalQueue.some((x) => x.requestId === requestId);
+  }
+
+  /** Remove queued requests invalidated by a turn/session ending. */
+  discardQueuedApprovals(pillId: string, sessionId: string): string[] {
+    const removed = this.approvalQueue.filter((x) => x.pillId === pillId && x.sessionId === sessionId).map((x) => x.requestId);
+    if (removed.length) {
+      this.approvalQueue = this.approvalQueue.filter((x) => !(x.pillId === pillId && x.sessionId === sessionId));
+      this.notify();
+    }
+    return removed;
+  }
+
+  registerSession(id: string, sessionId: string) {
+    if (!sessionId) return;
+    const sessions = this.liveSessions.get(id) ?? new Map<string, BotStateName>();
+    if (!sessions.has(sessionId)) sessions.set(sessionId, "idle");
+    this.liveSessions.set(id, sessions);
+    const task = this.tasks.find((x) => x.id === id);
+    if (task && !task.sessionId) task.sessionId = sessionId;
+  }
+
+  hasSession(id: string, sessionId: string): boolean {
+    return !!sessionId && this.liveSessions.get(id)?.has(sessionId) === true;
+  }
+
+  /** Test/restart boundary: forget live session ownership without touching pills. */
+  resetLiveSessions() {
+    this.liveSessions.clear();
+  }
+
+  sessionState(id: string, sessionId: string, state: BotStateName) {
+    if (!sessionId) return this.updateTask(id, state);
+    this.registerSession(id, sessionId);
+    this.liveSessions.get(id)!.set(sessionId, state);
+    const priority: BotStateName[] = ["error", "approval", "question", "working", "thinking", "ratelimit", "finished", "idle"];
+    const aggregate = [...this.liveSessions.get(id)!.values()].sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0] ?? "idle";
+    this.updateTask(id, aggregate);
+  }
+
+  removeSession(id: string, sessionId: string): boolean {
+    const sessions = this.liveSessions.get(id);
+    if (!sessions || !sessionId) return true;
+    sessions.delete(sessionId);
+    const task = this.tasks.find((x) => x.id === id);
+    if (task?.sessionId === sessionId) task.sessionId = sessions.keys().next().value ?? null;
+    if (!sessions.size) this.liveSessions.delete(id);
+    else this.sessionState(id, [...sessions.keys()][0], [...sessions.values()][0]);
+    return sessions.size === 0;
   }
 
   updateTask(id: string, state: BotStateName) {
