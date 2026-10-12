@@ -24,6 +24,7 @@ import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
+import { armPendingTimeout, clearPendingTimeout } from "./hooks";
 import { tl } from "../i18n/i18n";
 import { refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
@@ -146,17 +147,14 @@ export class Island {
   private closeApproval() {
     const next = State.endApproval();
     this.fsm.pinned = false;
+    // A promoted card gets the same 110 s deadline as any other, armed by the one
+    // owner in hooks.ts — a second timer here would race that one and could deny
+    // the next card the moment the previous card's deadline passed.
     if (next) {
       this.alert(next.questions ? "question" : "approval");
-      const requestId = next.requestId;
-      window.setTimeout(() => {
-        if (State.pendingApproval?.requestId !== requestId) return;
-        void Bridge.approvalDecline(requestId);
-        State.endApproval();
-        this.fsm.pinned = false;
-        this.setView(State.defaultView());
-      }, 110_000);
+      armPendingTimeout(this);
     } else {
+      clearPendingTimeout();
       this.setView(State.defaultView());
     }
   }

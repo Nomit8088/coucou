@@ -243,6 +243,16 @@ export const MAX_DIFFS_PER_PILL = 50;
 /** A pill's diffs are forgotten after an hour without a new one, as on macOS. */
 export const DIFF_TTL_MS = 3_600_000;
 
+/**
+ * Which state a pill shows when several live sessions share it. A Record rather
+ * than a list so TypeScript refuses a new BotStateName that has no rank; with an
+ * array, indexOf's -1 sorted an unranked state ahead of "error".
+ */
+const STATE_PRIORITY: Record<BotStateName, number> = {
+  error: 0, approval: 1, question: 2, working: 3, thinking: 4, searching: 5,
+  ratelimit: 6, finished: 7, sleeping: 8, dizzy: 9, idle: 10,
+};
+
 class AppState {
   mode: IslandMode = "hidden";
   view: IslandViewName = "overview";
@@ -450,6 +460,11 @@ class AppState {
     return !!sessionId && this.liveSessions.get(id)?.has(sessionId) === true;
   }
 
+  /** True while any registered session still owns this pill. */
+  hasAnySession(id: string): boolean {
+    return (this.liveSessions.get(id)?.size ?? 0) > 0;
+  }
+
   /** Test/restart boundary: forget live session ownership without touching pills. */
   resetLiveSessions() {
     this.liveSessions.clear();
@@ -459,8 +474,8 @@ class AppState {
     if (!sessionId) return this.updateTask(id, state);
     this.registerSession(id, sessionId);
     this.liveSessions.get(id)!.set(sessionId, state);
-    const priority: BotStateName[] = ["error", "approval", "question", "working", "thinking", "ratelimit", "finished", "idle"];
-    const aggregate = [...this.liveSessions.get(id)!.values()].sort((a, b) => priority.indexOf(a) - priority.indexOf(b))[0] ?? "idle";
+    const aggregate = [...this.liveSessions.get(id)!.values()]
+      .reduce<BotStateName>((worst, s) => (STATE_PRIORITY[s] < STATE_PRIORITY[worst] ? s : worst), "idle");
     this.updateTask(id, aggregate);
   }
 
