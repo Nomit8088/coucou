@@ -39,6 +39,8 @@ beforeEach(() => {
   State.paused = false;
   State.isPinned = false;
   State.pendingApproval = null;
+  State.approvalQueue = [];
+  State.resetLiveSessions();
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
 });
@@ -245,6 +247,16 @@ test("a session end clears the session id so the pill can no longer be steered",
   assert.deepEqual(task().steps, []);
 });
 
+test("ending one of two sessions does not clear the sibling session", () => {
+  dsh({ hook_event_name: "SessionStart", session_id: "s1" });
+  dsh({ hook_event_name: "SessionStart", session_id: "s2" });
+  dsh({ hook_event_name: "PreToolUse", session_id: "s2", tool_name: "Bash", tool_input: { command: "build" } });
+  dsh({ hook_event_name: "SessionEnd", session_id: "s1" });
+  assert.equal(task().sessionId, "s2");
+  assert.equal(task().state, "working");
+  assert.deepEqual(task().steps, ["Runs · build"]);
+});
+
 test("a new turn within 5.2 s of a stop is not put back to idle", () => {
   dsh({ hook_event_name: "Stop" });
   seconds(1);
@@ -313,12 +325,15 @@ test("only DSH's questions become a question card", () => {
   assert.equal(State.pendingApproval.questions, undefined);
 });
 
-test("a second request never replaces the card: it goes back to the agent", () => {
+test("permission requests queue in arrival order instead of replacing the card", () => {
   dsh({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "write" });
   dsh({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "pwsh" });
   assert.equal(State.pendingApproval.requestId, "r1");
-  assert.deepEqual(sent("approval_decline"), [{ requestId: "r2" }]);
-  assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
+  assert.deepEqual(State.approvalQueue.map((x) => x.requestId), ["r2"]);
+  assert.deepEqual(sent("approval_decline"), []);
+  assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }, { requestId: "r2" }]);
+  State.endApproval();
+  assert.equal(State.pendingApproval.requestId, "r2");
 });
 
 test("an unanswered card is withdrawn after 110 s", () => {

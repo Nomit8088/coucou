@@ -144,9 +144,21 @@ export class Island {
 
   /** The request has its answer: the card goes and the session carries on. */
   private closeApproval() {
-    State.endApproval();
+    const next = State.endApproval();
     this.fsm.pinned = false;
-    this.setView(State.defaultView());
+    if (next) {
+      this.alert(next.questions ? "question" : "approval");
+      const requestId = next.requestId;
+      window.setTimeout(() => {
+        if (State.pendingApproval?.requestId !== requestId) return;
+        void Bridge.approvalDecline(requestId);
+        State.endApproval();
+        this.fsm.pinned = false;
+        this.setView(State.defaultView());
+      }, 110_000);
+    } else {
+      this.setView(State.defaultView());
+    }
   }
 
   /**
