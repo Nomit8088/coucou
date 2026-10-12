@@ -62,9 +62,9 @@ jobs:
           key: macos-tauri-${{ matrix.arch }}-${{ hashFiles('desktop/Cargo.lock') }}
       - name: Install frontend dependencies
         run: npm ci
-      # Same guard as the Linux workflow. A shared tag has to agree with the three
-      # files that carry the version, otherwise the DMG ships a version the release
-      # does not name and the Mac updater offers the same update forever.
+      # Same guard as the Linux workflow, but written for BSD sed: `\s` is a GNU
+      # extension and silently matches nothing here, which is how a tag once came
+      # through with an empty Cargo.toml version.
       - name: Check the tag and every version agree
         if: startsWith(github.ref, 'refs/tags/')
         run: |
@@ -72,7 +72,7 @@ jobs:
           tag="${tag#v}"
           conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
           pkg=$(node -p "require('./package.json').version")
-          cargo=$(sed -nE 's/^version\s*=\s*"(.+)"/\1/p' Cargo.toml | head -1)
+          cargo=$(sed -nE 's/^version[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' Cargo.toml | head -1)
           echo "tag=$tag tauri.conf=$conf package.json=$pkg Cargo.toml=$cargo"
           bad=""
           [ "$tag" = "$conf" ]  || bad="$bad tauri.conf.json says $conf;"
