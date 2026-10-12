@@ -1,0 +1,43 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "fr.louisraille.NotchBuddy",
+  "app": {
+    "macOSPrivateApi": true,
+    "windows": [
+      {
+        "label": "island",
+        "title": "Coucou",
+        "url": "index.html",
+        "width": 240,
+        "height": 6,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "shadow": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "focus": false,
+        "focusable": false,
+        "visibleOnAllWorkspaces": true,
+        "visible": false,
+        "center": false,
+        "maximizable": false,
+        "minimizable": false,
+        "closable": false,
+        "dragDropEnabled": true
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["app", "dmg"],
+    "icon": ["icons/icon.icns", "icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png"],
+    "resources": {
+      "../target/release/coucou-hook.exe": null,
+      "../target/release/coucou-hook": "coucou-hook"
+    },
+    "macOS": {
+      "minimumSystemVersion": "13.0",
+      "infoPlist": "Info.macos.plist"
+    }
+  }
+}

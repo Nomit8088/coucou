@@ -23,5 +23,5 @@ windows = { version = "0.61", features = [
 ] }
 
 # The socket syscalls and peer credentials the Linux transport needs.
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"

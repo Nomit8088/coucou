@@ -4,10 +4,82 @@
 // click on the other side is ignored. Nothing here allows a tool without a click.
 
 import net from "node:net";
+import fs from "node:fs";
+import path from "node:path";
 import module from "node:module";
 import { pathToFileURL } from "node:url";
 
 export const name = "coucou";
+
+/** Same wire protocol on Windows named pipes and private macOS/Linux sockets.
+ * Recover only a stale socket we own; never remove a live server or another file.
+ * The directory must already be private (Rust prepares it, Node never chmods HOME).
+ */
+export function startSteerServer(endpoint, onLine) {
+  let stopped = false;
+  const sockets = new Set();
+  const server = net.createServer((socket) => {
+    sockets.add(socket);
+    socket.setEncoding("utf8"); // Preserve multibyte prompts split between stream chunks.
+    socket.setTimeout(3_000, () => socket.destroy());
+    socket.once("close", () => sockets.delete(socket));
+    let buf = "";
+    socket.on("data", (chunk) => {
+      if (stopped) { socket.destroy(); return; }
+      buf += chunk.toString("utf8");
+      if (Buffer.byteLength(buf) > 65_536) { socket.destroy(); return; }
+      let nl;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const line = buf.slice(0, nl);
+        buf = buf.slice(nl + 1);
+        onLine(line);
+      }
+    });
+    socket.on("error", () => {});
+  });
+  server.on("error", () => {});
+  const ready = (async () => {
+    try {
+      if (process.platform !== "win32") {
+        if (!path.isAbsolute(endpoint) || typeof process.getuid !== "function") return false;
+        const dir = fs.lstatSync(path.dirname(endpoint));
+        if (!dir.isDirectory() || dir.isSymbolicLink() || dir.uid !== process.getuid() || (dir.mode & 0o077)) return false;
+        let old;
+        try { old = fs.lstatSync(endpoint); } catch (error) { if (error.code !== "ENOENT") return false; }
+        if (old) {
+          if (!old.isSocket() || old.uid !== process.getuid()) return false;
+          const stale = await new Promise((resolve) => {
+            const probe = net.connect(endpoint);
+            probe.setTimeout(CONNECT_MS, () => { probe.destroy(); resolve(false); });
+            probe.once("connect", () => { probe.destroy(); resolve(false); });
+            probe.once("error", (error) => resolve(error.code === "ECONNREFUSED"));
+          });
+          if (!stale || stopped) return false;
+          const current = fs.lstatSync(endpoint);
+          if (current.ino !== old.ino || current.dev !== old.dev || !current.isSocket()) return false;
+          fs.unlinkSync(endpoint);
+        }
+      }
+      if (stopped) return false;
+      return await new Promise((resolve) => {
+        server.once("error", () => resolve(false));
+        server.listen(endpoint, () => {
+          if (stopped) { server.close(); resolve(false); return; }
+          try {
+            if (process.platform !== "win32") fs.chmodSync(endpoint, 0o600);
+            resolve(true);
+          } catch { server.close(); resolve(false); }
+        });
+      });
+    } catch { return false; }
+  })();
+  return { ready, close() {
+    stopped = true;
+    for (const socket of sockets) socket.destroy();
+    if (server.listening) return new Promise((resolve) => server.close(resolve));
+    return Promise.resolve();
+  } };
+}
 
 const AGENT = "dsh";
 const CONNECT_MS = 400;
@@ -796,28 +868,8 @@ export function apply(ctx, config) {
   });
 
   if (steerPipe) {
-    const server = net.createServer((socket) => {
-      let buf = "";
-      socket.on("data", (chunk) => {
-        buf += chunk.toString("utf8");
-        let nl;
-        while ((nl = buf.indexOf("\n")) >= 0) {
-          const line = buf.slice(0, nl);
-          buf = buf.slice(nl + 1);
-          void steerLine(line);
-        }
-      });
-      socket.on("error", () => {});
-    });
-    server.on("error", () => {});
-    try {
-      server.listen(steerPipe);
-    } catch {
-      // Coucou keeps working; the island falls back to its own chat.
-    }
-    ctx.effect(() => () => {
-      server.close();
-    });
+    const listener = startSteerServer(steerPipe, (line) => { void steerLine(line); });
+    ctx.effect(() => () => listener.close());
   }
 
   async function steerLine(line) {

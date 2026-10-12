@@ -30,6 +30,13 @@ const PACKAGES = {
       names: [`Coucou-Windows-${version}.msi`, "Coucou-Windows.msi"],
     },
   ],
+  darwin: [
+    {
+      dir: "dmg",
+      suffix: ".dmg",
+      names: [`Coucou-macOS-${version}-${arch}.dmg`, `Coucou-macOS-${arch}.dmg`],
+    },
+  ],
   linux: [
     {
       dir: "appimage",

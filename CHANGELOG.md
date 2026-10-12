@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **macOS（Tauri 增强版）**：以现有 Windows 版为基础，新增 AppKit/CoreGraphics 窗口适配、macOS Keychain、Finder 原生拖拽及 Retina 坐标转换；DSH 事件与反向指令通过当前用户的私有 Unix socket 通信，保留双端审批和提问。Mac 隐藏未实现的音乐、模拟点赞热键与桌面悬浮入口；局部快捷键采用 Command。新增 Intel / Apple Silicon DMG 打包与 Mac CI，更新仅打开对应架构 DMG / Release 页面，不下载 Windows 安装程序。原生 Swift 工程不参与此版构建；Mac 实机验收尚待完成。
+
 - **GitHub / GitLab 灵动岛通知**：流水线成功或失败会展开灵动岛，主按钮可跳转到流水线（对标 DSH「打开终端」）。关联的 PR/MR（我创建的 / 指派给我的 / 请我审的，设置里可分别开关）有新条目时提示——自己开的不弹。关联请求上的新评论会合并成一次提示，并忽略自己的评论。GitLab 改为走 GraphQL 读取 MR 的 head pipeline 与评论。
 
 ## 0.1.1 — October 10, 2026

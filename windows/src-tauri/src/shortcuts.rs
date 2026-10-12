@@ -261,6 +261,10 @@ pub fn character_vk(code: Code) -> Option<u16> {
 /// What each action should do, before the OS is asked anything: the shortcut
 /// to register, or the reason it won't be. `types` answers whether a Ctrl+Alt
 /// combination types a character (see platform::ctrl_alt_types).
+fn supported(def: &ActionDef) -> bool {
+    def.ported && !(cfg!(target_os = "macos") && def.id == "desktopToggle")
+}
+
 pub fn plan(
     stored: &Bindings,
     types: impl Fn(&Shortcut) -> Option<String>,
@@ -271,7 +275,7 @@ pub fn plan(
         .map(|def| {
             let refuse = |status, typed| Err(ActionStatus { id: def.id, status, typed, trigger: None });
             let binding = effective(def, stored);
-            let outcome = if !def.ported {
+            let outcome = if !supported(def) {
                 refuse(Status::NotPorted, None)
             } else if !binding.enabled || binding.keys.trim().is_empty() {
                 refuse(Status::Off, None)
@@ -298,7 +302,7 @@ pub fn plan(
 pub fn from_args(args: &[String]) -> Option<&'static str> {
     let at = args.iter().position(|a| a == "--shortcut")?;
     let def = find(args.get(at + 1)?)?;
-    def.ported.then_some(def.id)
+    supported(def).then_some(def.id)
 }
 
 // ── Registration ──────────────────────────────────────────────────────────────
@@ -735,8 +739,8 @@ mod tests {
     fn the_action_not_ported_yet_is_reserved_not_registered() {
         let plan = plan(&Bindings::new(), never);
         for (def, outcome) in plan {
-            let reserved = def.id == "attachFrontWindow";
-            assert_eq!(def.ported, !reserved);
+            let reserved = !supported(def);
+            assert_eq!(def.ported, def.id != "attachFrontWindow");
             match outcome {
                 Ok(_) => assert!(def.ported && def.enabled_by_default, "{}", def.id),
                 Err(s) if reserved => assert_eq!(s.status, Status::NotPorted),
@@ -798,7 +802,7 @@ mod tests {
         // Same key, other modifiers: not a duplicate.
         stored.insert("jumpToTerminal".into(), Binding { keys: "Ctrl+Shift+A".into(), enabled: true });
         let plan = super::plan(&stored, never);
-        assert!(plan.iter().all(|(d, o)| o.is_ok() || !d.ported || d.id == "toggleIsland"));
+        assert!(plan.iter().all(|(d, o)| o.is_ok() || !supported(d) || d.id == "toggleIsland"));
 
         // A disabled action doesn't hold its keys.
         stored.insert("goToAlert".into(), Binding { keys: "Ctrl+Alt+A".into(), enabled: false });
@@ -854,7 +858,10 @@ mod tests {
         assert_eq!(from_args(&args(&["coucou", "--shortcut", "wardrobeToggle"])), Some("wardrobeToggle"));
         assert_eq!(from_args(&args(&["coucou", "--shortcut"])), None);
         assert_eq!(from_args(&args(&["coucou", "--shortcut", "rm -rf"])), None);
+        #[cfg(not(target_os = "macos"))]
         assert_eq!(from_args(&args(&["coucou", "--shortcut", "desktopToggle"])), Some("desktopToggle"));
+        #[cfg(target_os = "macos")]
+        assert_eq!(from_args(&args(&["coucou", "--shortcut", "desktopToggle"])), None);
         assert_eq!(from_args(&args(&["coucou", "--shortcut", "attachFrontWindow"])), None);
         assert_eq!(from_args(&args(&["coucou"])), None);
     }
