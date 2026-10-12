@@ -129,12 +129,17 @@ jobs:
           - **绿色免安装版**: ``Coucou-Windows-$v-portable.zip``（解压即用，包含主程序与 hook）
 
           > 💡 **提示**: Windows SmartScreen 首次打开若提示「未知发布者」，点击「更多信息」->「仍要运行」即可。
+
+          > 🍎 若本页同时列出 ``Coucou-macOS-$v-aarch64.dmg`` / ``Coucou-macOS-$v-x86_64.dmg``，那是 macOS 13+ 版（**未签名、未公证**，首次打开需在「系统设置 → 隐私与安全性」允许，拖入 Applications 安装；说明见 ``desktop/MACOS.md``）。
           "@
 
           # Only the shared `v*` release owns the Latest slot: it is the one that
-          # also carries Mac DMGs, and /releases/latest is what both updaters read.
-          # A platform-only tag must never take it. linux.yml applies the same rule.
-          $latest = if ($tag -like "windows-v*") { "false" } else { "true" }
+          # also carries Mac DMGs (attached by macos-tauri.yml), and
+          # /releases/latest is what both updaters read. A platform-only tag must
+          # never take it. linux.yml applies the same rule.
+          $shared = $tag -notlike "windows-v*"
+          $latest = if ($shared) { "true" } else { "false" }
+          $title = if ($shared) { "Coucou v$v — Windows + macOS" } else { "Coucou for Windows v$v" }
           $exists = gh release view "$tag" 2>$null
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Updating existing release $tag..."
@@ -149,7 +154,7 @@ jobs:
               "release/Coucou-Windows-$v-setup.exe" `
               "release/Coucou-Windows-$v.msi" `
               "release/Coucou-Windows-$v-portable.zip" `
-              --title "Coucou for Windows v$v" `
+              --title $title `
               --notes $notes `
               --latest=$latest
           }
