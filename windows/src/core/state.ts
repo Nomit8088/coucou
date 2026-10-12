@@ -161,11 +161,30 @@ export interface Settings {
   language: string;
   /** Custom global hotkey to send when liking a track, by pill id ("integration_qqmusic": "Ctrl+Alt+V"). */
   musicLikeHotkeys: Record<string, string>;
+  /** Which GitHub PRs the island watches. */
+  githubWatch: GitWatch;
+  /** Which GitLab MRs the island watches. */
+  gitlabWatch: GitWatch;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;
     spot: { x: number; y: number; space: string } | null;
   };
+}
+
+export interface GitWatch {
+  created: boolean;
+  assigned: boolean;
+  review: boolean;
+}
+
+export interface GitNotice {
+  pillId: string;
+  title: string;
+  detail: string;
+  url: string;
+  action: string;
+  tone: "success" | "error" | "info";
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -195,6 +214,8 @@ export const DEFAULT_SETTINGS: Settings = {
   mochiOutfit: DEFAULT_OUTFIT,
   pillColors: {},
   language: "",
+  githubWatch: { created: true, assigned: true, review: true },
+  gitlabWatch: { created: true, assigned: true, review: true },
 };
 
 type Listener = () => void;
@@ -281,6 +302,9 @@ class AppState {
   wardrobePreview: Outfit | null = null;
 
   lastActivity = performance.now();
+
+  /** GitHub/GitLab island notice (pipeline, new PR/MR, comments). */
+  notice: GitNotice | null = null;
 
   settings: Settings = { ...DEFAULT_SETTINGS };
 

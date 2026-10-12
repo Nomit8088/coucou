@@ -7,6 +7,7 @@
 // reads what Rust sends and turns it into what the card shows.
 
 import { dayMonth, t, tn } from "../i18n/i18n";
+import type { GitNotice } from "./state";
 
 export type CIState = "pending" | "success" | "failure" | "unknown";
 export type ReviewState = "approved" | "changesRequested" | "pending" | "unknown";
@@ -64,10 +65,12 @@ export interface GitHubStats {
 }
 
 export type GitHubEvent =
-  | { kind: "ciFailed"; prId: string }
-  | { kind: "ciPassed"; prId: string }
+  | { kind: "ciFailed"; prId: string; url?: string; title?: string }
+  | { kind: "ciPassed"; prId: string; url?: string; title?: string }
   | { kind: "mainFailed"; repo: string }
-  | { kind: "reviewRequested"; prId: string };
+  | { kind: "reviewRequested"; prId: string; url?: string; title?: string }
+  | { kind: "newPr"; prId: string; url?: string; title?: string }
+  | { kind: "comments"; prId: string; url?: string; title?: string; count?: number };
 
 /** Every word the GitHub card shows, in the current language (src/i18n). */
 export const GH_STRINGS = {
@@ -290,7 +293,7 @@ export interface GitHubAlert {
   sound: "error" | "question" | "finish";
 }
 
-/** handleGitHubEvents: the loudest event wins — red CI > review request > green CI. */
+/** handleGitHubEvents: the loudest event wins — red CI > review/comments > green CI. */
 export function gitHubAlert(events: GitHubEvent[]): GitHubAlert | null {
   let level = 0;
   let alert: GitHubAlert | null = null;
@@ -301,6 +304,8 @@ export function gitHubAlert(events: GitHubEvent[]): GitHubAlert | null {
         if (level < 3) { level = 3; alert = { badge: "error", sound: "error" }; }
         break;
       case "reviewRequested":
+      case "newPr":
+      case "comments":
         if (level < 2) { level = 2; alert = { badge: "finished", sound: "question" }; }
         break;
       case "ciPassed":
@@ -309,4 +314,38 @@ export function gitHubAlert(events: GitHubEvent[]): GitHubAlert | null {
     }
   }
   return alert;
+}
+
+/** Loudest event that should open the island, with a jump URL. Default-branch CI stays a badge. */
+export function gitNotice(events: GitHubEvent[], pillId: string, gitlab: boolean): GitNotice | null {
+  let level = 0;
+  let best: GitHubEvent | null = null;
+  for (const e of events) {
+    const next =
+      e.kind === "ciFailed" ? 4 :
+      e.kind === "comments" ? 3 :
+      e.kind === "newPr" ? 2 :
+      e.kind === "ciPassed" ? 1 : 0;
+    if (next > level) { level = next; best = e; }
+  }
+  if (!best || level === 0) return null;
+  const url = "url" in best ? (best.url ?? "") : "";
+  const detail = "title" in best && best.title ? best.title : ("prId" in best ? best.prId : "");
+  if (best.kind === "ciFailed") {
+    return { pillId, title: t("Pipeline failed"), detail, url, action: t("Open pipeline"), tone: "error" };
+  }
+  if (best.kind === "ciPassed") {
+    return { pillId, title: t("Pipeline passed"), detail, url, action: t("Open pipeline"), tone: "success" };
+  }
+  if (best.kind === "comments") {
+    return { pillId, title: t("New comments"), detail, url, action: t("Open comments"), tone: "info" };
+  }
+  return {
+    pillId,
+    title: gitlab ? t("New merge request") : t("New pull request"),
+    detail,
+    url,
+    action: gitlab ? t("Open merge request") : t("Open pull request"),
+    tone: "info",
+  };
 }

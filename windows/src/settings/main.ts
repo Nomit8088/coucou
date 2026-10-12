@@ -9,7 +9,7 @@ import {
   ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
 } from "../core/shortcuts";
-import { DEFAULT_SETTINGS, type Settings } from "../core/state";
+import { DEFAULT_SETTINGS, type GitWatch, type Settings } from "../core/state";
 import { SOUND_NAMES } from "../core/sound";
 import {
   MAX_DECLARED, PILL_CATEGORIES, availablePills, chooseMainPill, isComingSoon, mainPillChoices,
@@ -220,6 +220,28 @@ function declaredChanged() {
   void save();
 }
 
+function gitWatchRows(id: "integration_github" | "integration_gitlab"): HTMLElement {
+  const key = id === "integration_github" ? "githubWatch" : "gitlabWatch";
+  const watch: GitWatch = settings[key] ?? { created: true, assigned: true, review: true };
+  const row = (field: keyof GitWatch, label: string) => h(
+    "div",
+    { class: "row" },
+    h("label", { style: "min-width:104px", text: t(label) }),
+    toggle(watch[field], (on) => {
+      settings[key] = { ...(settings[key] ?? watch), [field]: on };
+      void save();
+    }),
+  );
+  return h(
+    "div",
+    { style: "display:flex;flex-direction:column;gap:6px;padding-top:4px" },
+    row("created", N_("Created by me")),
+    row("assigned", N_("Assigned to me")),
+    row("review", N_("Review requested")),
+    h("div", { class: "hint", text: t("Which pull requests and merge requests the island watches. New ones you opened yourself never pop up.") }),
+  );
+}
+
 function integrationsSection(present: Record<string, boolean>): HTMLElement {
   const note = h("div", { class: "hint" });
   const list = h("div", { style: "display:flex;flex-direction:column;gap:14px" });
@@ -278,6 +300,9 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
     }
 
     if (def.hint) rows.append(h("div", { class: "hint", text: t(def.hint) }));
+    if (def.id === "integration_github" || def.id === "integration_gitlab") {
+      rows.append(gitWatchRows(def.id));
+    }
     if (def.mediaApp != null) {
       // As on the Mac's row: said only when there is no player to launch.
       const hint = h("div", { class: "hint", style: "padding-top:5px" });

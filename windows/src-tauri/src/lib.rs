@@ -10,6 +10,7 @@ mod desktop;
 mod dsh;
 mod files;
 mod github;
+mod gitlab;
 mod hooks;
 mod i18n;
 mod identity;

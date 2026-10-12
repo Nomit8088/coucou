@@ -83,6 +83,15 @@ fn enabled(app: &AppHandle, id: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn git_watch(app: &AppHandle, github: bool) -> crate::settings::GitWatch {
+    app.try_state::<crate::Shared>()
+        .map(|shared| {
+            let settings = shared.settings.lock().unwrap();
+            if github { settings.github_watch } else { settings.gitlab_watch }
+        })
+        .unwrap_or_default()
+}
+
 fn spawn<F, Fut>(app: AppHandle, id: &'static str, delay_secs: u64, every_secs: u64, poll: F)
 where
     F: Fn(AppHandle) -> Fut + Send + 'static,
@@ -401,7 +410,7 @@ fn spawn_github_loops(app: AppHandle) {
             // Sleeps for `wait`, or less when the island asks for fresh data.
             let _ = tokio::time::timeout(wait, GITHUB.pulse_wake.notified()).await;
             let pending = run_github_pulse(&pulse_app).await;
-            wait = Duration::from_secs(if pending { 60 } else { 300 });
+            wait = Duration::from_secs(if pending { 60 } else { 300 }); // pending includes open PRs (comments)
         }
     });
     tauri::async_runtime::spawn(async move {
@@ -453,7 +462,7 @@ async fn run_github_pulse(app: &AppHandle) -> bool {
     let root = github_graphql(&token, github::PULSE_QUERY, "pulse").await;
     GITHUB.pulse_busy.store(false, Ordering::SeqCst);
     let Some(pulse) = root.and_then(|r| GitHubPulse::parse(&r, now_ms())) else { return false };
-    let pending = pulse.has_pending();
+    let pending = pulse.wants_fast_poll();
 
     let events = {
         let mut cache = GITHUB.cache.lock().unwrap();
@@ -461,7 +470,7 @@ async fn run_github_pulse(app: &AppHandle) -> bool {
         if GITHUB.generation.load(Ordering::SeqCst) != generation {
             return pending;
         }
-        let events = GitHubPulse::events(cache.pulse.as_ref(), &pulse);
+        let events = GitHubPulse::events(cache.pulse.as_ref(), &pulse, git_watch(app, true));
         cache.pulse = Some(pulse);
         events
     };
@@ -1046,9 +1055,10 @@ fn fmt_value(v: &Value) -> String {
 struct GitlabCache {
     fetched_at: u64,
     running: bool,
+    pulse: Option<crate::gitlab::GitlabPulse>,
 }
 
-static GITLAB: Mutex<GitlabCache> = Mutex::new(GitlabCache { fetched_at: 0, running: false });
+static GITLAB: Mutex<GitlabCache> = Mutex::new(GitlabCache { fetched_at: 0, running: false, pulse: None });
 
 fn gitlab_base() -> Option<(reqwest::Url, String)> {
     let raw = secrets::get("gitlab-url")?;
@@ -1096,6 +1106,25 @@ async fn gitlab_get(base: &reqwest::Url, token: &str, path: &str) -> Option<Valu
     response.json().await.ok()
 }
 
+async fn gitlab_graphql(base: &reqwest::Url, token: &str) -> Option<Value> {
+    let url = format!("{}{}", base.as_str().trim_end_matches('/'), "/api/graphql");
+    let response = client()
+        .post(url)
+        .header("PRIVATE-TOKEN", token)
+        .header("Content-Type", "application/json")
+        .json(&json!({ "query": crate::gitlab::GRAPHQL_QUERY }))
+        .send()
+        .await
+        .ok()?;
+    if !response.status().is_success() {
+        return None;
+    }
+    let root: Value = response.json().await.ok()?;
+    root.get("data").filter(|d| d.is_object())?;
+    Some(root)
+}
+
+#[allow(dead_code)]
 fn gitlab_pipelines(base: &reqwest::Url, list: Option<&Value>) -> (Vec<Value>, bool) {
     let mut out = Vec::new();
     let mut running = false;
@@ -1135,6 +1164,7 @@ fn gitlab_pipelines(base: &reqwest::Url, list: Option<&Value>) -> (Vec<Value>, b
     (out, running)
 }
 
+#[allow(dead_code)]
 fn gitlab_mrs(base: &reqwest::Url, list: Option<&Value>) -> Vec<Value> {
     list.and_then(Value::as_array)
         .map(|items| {
@@ -1171,33 +1201,52 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
             return;
         }
     }
-    let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=8").await;
-    let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=8").await;
-    if review.is_none() {
-        review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
-    }
-    // The pipelines I triggered, across every project I can see — GitLab's
-    // /pipelines is defined as "pipelines triggered by the authenticated user",
-    // so a colleague pushing to main never shows up here. (It used to be "the
-    // default branch of whichever project was touched last", whoever ran it.)
-    let mine_pipelines = gitlab_get(&base, &token, "/api/v4/pipelines?per_page=3").await;
-    let (pipelines, running) = gitlab_pipelines(&base, mine_pipelines.as_ref());
-    {
+    let watch = git_watch(app, false);
+    let pulse = if let Some(root) = gitlab_graphql(&base, &token).await {
+        crate::gitlab::GitlabPulse::parse(&root, now)
+    } else {
+        None
+    };
+    let pulse = if let Some(pulse) = pulse {
+        pulse
+    } else {
+        let user = gitlab_get(&base, &token, "/api/v4/user").await;
+        let login = user
+            .as_ref()
+            .and_then(|u| u.get("username").and_then(Value::as_str))
+            .unwrap_or("")
+            .to_string();
+        let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=8").await;
+        let assigned = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=assigned_to_me&per_page=8").await;
+        let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=8").await;
+        if review.is_none() {
+            review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
+        }
+        crate::gitlab::GitlabPulse::from_rest(login, mine.as_ref(), assigned.as_ref(), review.as_ref(), now)
+    };
+    let (pipelines, running) = pulse.card_pipelines();
+    let events = {
         let mut cache = GITLAB.lock().unwrap();
+        let events = crate::gitlab::GitlabPulse::events(cache.pulse.as_ref(), &pulse, watch);
         cache.fetched_at = now;
-        cache.running = running;
-    }
+        cache.running = running || pulse.wants_fast_poll();
+        cache.pulse = Some(pulse.clone());
+        events
+    };
     emit(app, IntegrationUpdate {
         id: "integration_gitlab",
         data: json!({
-            "mine": gitlab_mrs(&base, mine.as_ref()),
-            "review": gitlab_mrs(&base, review.as_ref()),
+            "mine": crate::gitlab::GitlabPulse::card_mrs(&pulse.mine),
+            "review": crate::gitlab::GitlabPulse::card_mrs(&pulse.review),
             "pipelines": pipelines,
             "host": base.as_str().trim_end_matches('/'),
         }),
         error: None,
         event: None,
     });
+    if !events.is_empty() {
+        let _ = app.emit_to(WINDOW_LABEL, "gitlab-alerts", &events);
+    }
 }
 
 pub fn gitlab_refresh_if_stale(app: &AppHandle) {

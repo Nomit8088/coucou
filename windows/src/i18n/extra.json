@@ -3351,6 +3351,149 @@
    "pt-BR": "{0} não está instalado",
    "ru": "{0} не установлен",
    "id": "{0} belum terpasang"
+  },
+  "Created by me": {
+   "zh-Hans": "我创建的",
+   "hi": "मेरे बनाए",
+   "es": "Creados por mí",
+   "ar": "أنشأتها أنا",
+   "fr": "Créés par moi",
+   "bn": "আমি তৈরি করেছি",
+   "pt-BR": "Criados por mim",
+   "ru": "Созданные мной",
+   "id": "Saya buat"
+  },
+  "Assigned to me": {
+   "zh-Hans": "指派给我的",
+   "hi": "मुझे असाइन किए",
+   "es": "Asignados a mí",
+   "ar": "مُسندة إليّ",
+   "fr": "Assignés à moi",
+   "bn": "আমাকে অ্যাসাইন করা",
+   "pt-BR": "Atribuídos a mim",
+   "ru": "Назначенные мне",
+   "id": "Ditugaskan ke saya"
+  },
+  "Review requested": {
+   "zh-Hans": "请我审的",
+   "hi": "समीक्षा का अनुरोध",
+   "es": "Revisión pedida",
+   "ar": "طُلبت مراجعتي",
+   "fr": "Revue demandée",
+   "bn": "রিভিউ চাওয়া",
+   "pt-BR": "Revisão pedida",
+   "ru": "Просят ревью",
+   "id": "Diminta mereview"
+  },
+  "Which pull requests and merge requests the island watches. New ones you opened yourself never pop up.": {
+   "zh-Hans": "灵动岛关注这些拉取/合并请求。你自己新开的不会弹窗。",
+   "hi": "आइलैंड इन्हीं पुल/मर्ज अनुरोधों को देखता है। आपके खोले नए कभी पॉपअप नहीं होते।",
+   "es": "La isla vigila estas pull/merge requests. Las que abras tú no saltan.",
+   "ar": "تراقب الجزيرة طلبات السحب/الدمج هذه. ما تفتحه بنفسك لا يظهر.",
+   "fr": "L’île surveille ces pull/merge requests. Celles que vous ouvrez vous-même ne s’affichent pas.",
+   "bn": "আইল্যান্ড এই পুল/মার্জ রিকোয়েস্ট দেখে। নিজে খোলা নতুনগুলো পপআপ হয় না।",
+   "pt-BR": "A ilha acompanha esses pull/merge requests. Os que você abrir não disparam aviso.",
+   "ru": "Остров следит за этими pull/merge request. Свои новые не всплывают.",
+   "id": "Pulau memantau pull/merge request ini. Yang Anda buka sendiri tidak muncul."
+  },
+  "Pipeline passed": {
+   "zh-Hans": "流水线成功",
+   "hi": "पाइपलाइन सफल",
+   "es": "Pipeline correcta",
+   "ar": "نجح المسار",
+   "fr": "Pipeline réussie",
+   "bn": "পাইপলাইন সফল",
+   "pt-BR": "Pipeline ok",
+   "ru": "Пайплайн успешен",
+   "id": "Pipeline berhasil"
+  },
+  "Pipeline failed": {
+   "zh-Hans": "流水线失败",
+   "hi": "पाइपलाइन विफल",
+   "es": "Pipeline fallida",
+   "ar": "فشل المسار",
+   "fr": "Pipeline en échec",
+   "bn": "পাইপলাইন ব্যর্থ",
+   "pt-BR": "Pipeline falhou",
+   "ru": "Пайплайн упал",
+   "id": "Pipeline gagal"
+  },
+  "New pull request": {
+   "zh-Hans": "新的拉取请求",
+   "hi": "नया पुल अनुरोध",
+   "es": "Nueva pull request",
+   "ar": "طلب سحب جديد",
+   "fr": "Nouvelle pull request",
+   "bn": "নতুন পুল রিকোয়েস্ট",
+   "pt-BR": "Novo pull request",
+   "ru": "Новый pull request",
+   "id": "Pull request baru"
+  },
+  "New merge request": {
+   "zh-Hans": "新的合并请求",
+   "hi": "नया मर्ज अनुरोध",
+   "es": "Nueva merge request",
+   "ar": "طلب دمج جديد",
+   "fr": "Nouvelle merge request",
+   "bn": "নতুন মার্জ রিকোয়েস্ট",
+   "pt-BR": "Novo merge request",
+   "ru": "Новый merge request",
+   "id": "Merge request baru"
+  },
+  "New comments": {
+   "zh-Hans": "新评论",
+   "hi": "नई टिप्पणियाँ",
+   "es": "Comentarios nuevos",
+   "ar": "تعليقات جديدة",
+   "fr": "Nouveaux commentaires",
+   "bn": "নতুন মন্তব্য",
+   "pt-BR": "Novos comentários",
+   "ru": "Новые комментарии",
+   "id": "Komentar baru"
+  },
+  "Open pipeline": {
+   "zh-Hans": "前往流水线",
+   "hi": "पाइपलाइन खोलें",
+   "es": "Abrir el pipeline",
+   "ar": "فتح المسار",
+   "fr": "Ouvrir le pipeline",
+   "bn": "পাইপলাইন খুলুন",
+   "pt-BR": "Abrir o pipeline",
+   "ru": "Открыть пайплайн",
+   "id": "Buka pipeline"
+  },
+  "Open pull request": {
+   "zh-Hans": "前往拉取请求",
+   "hi": "पुल अनुरोध खोलें",
+   "es": "Abrir la pull request",
+   "ar": "فتح طلب السحب",
+   "fr": "Ouvrir la pull request",
+   "bn": "পুল রিকোয়েস্ট খুলুন",
+   "pt-BR": "Abrir o pull request",
+   "ru": "Открыть pull request",
+   "id": "Buka pull request"
+  },
+  "Open merge request": {
+   "zh-Hans": "前往合并请求",
+   "hi": "मर्ज अनुरोध खोलें",
+   "es": "Abrir la merge request",
+   "ar": "فتح طلب الدمج",
+   "fr": "Ouvrir la merge request",
+   "bn": "মার্জ রিকোয়েস্ট খুলুন",
+   "pt-BR": "Abrir o merge request",
+   "ru": "Открыть merge request",
+   "id": "Buka merge request"
+  },
+  "Open comments": {
+   "zh-Hans": "前往评论",
+   "hi": "टिप्पणियाँ खोलें",
+   "es": "Abrir los comentarios",
+   "ar": "فتح التعليقات",
+   "fr": "Ouvrir les commentaires",
+   "bn": "মন্তব্য খুলুন",
+   "pt-BR": "Abrir os comentários",
+   "ru": "Открыть комментарии",
+   "id": "Buka komentar"
   }
  }
 }

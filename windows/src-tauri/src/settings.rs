@@ -75,6 +75,32 @@ pub struct Settings {
     pub chat_providers: Vec<ChatProviderConfig>,
     /// Custom global hotkey to send when liking a track, by pill id.
     pub music_like_hotkeys: BTreeMap<String, String>,
+    /// Which GitHub pull requests the island watches for pipelines, new PRs and comments.
+    pub github_watch: GitWatch,
+    /// Which GitLab merge requests the island watches for pipelines, new MRs and comments.
+    pub gitlab_watch: GitWatch,
+}
+
+/// Which pull/merge requests an integration follows. New ones the user opened
+/// themselves never pop up; pipeline results and others' comments still can.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct GitWatch {
+    pub created: bool,
+    pub assigned: bool,
+    pub review: bool,
+}
+
+impl Default for GitWatch {
+    fn default() -> Self {
+        Self { created: true, assigned: true, review: true }
+    }
+}
+
+impl GitWatch {
+    pub fn any(self) -> bool {
+        self.created || self.assigned || self.review
+    }
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -168,6 +194,8 @@ impl Default for Settings {
             dsh_profile: String::new(),
             chat_providers: vec![deepseek_provider()],
             music_like_hotkeys: BTreeMap::new(),
+            github_watch: GitWatch::default(),
+            gitlab_watch: GitWatch::default(),
         }
     }
 }
@@ -862,6 +890,8 @@ mod tests {
                 "dshProfile",
                 "chatProviders",
                 "musicLikeHotkeys",
+                "githubWatch",
+                "gitlabWatch",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

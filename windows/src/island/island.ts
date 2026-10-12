@@ -189,6 +189,7 @@ export class Island {
           integration_resend: "https://resend.com/emails",
           integration_vercel: "https://vercel.com/dashboard",
           integration_github: "https://github.com/pulls",
+          integration_gitlab: String(State.integrations.integration_gitlab?.data?.host ?? ""),
           integration_stripe: "https://dashboard.stripe.com/payments",
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",

@@ -819,6 +819,42 @@ function buildError(actions: ViewActions): ViewHost {
 
 // ── Finished ──────────────────────────────────────────────────────────────────
 
+function buildNotice(actions: ViewActions): ViewHost {
+  const who = h("div");
+  const title = h("div", { class: "title one-line" });
+  const detail = h("div", { class: "detail one-line" });
+  const open = btn(tl("Open pipeline"), "primary", () => {
+    const url = State.notice?.url;
+    if (url) actions.openUrl(url);
+    actions.collapse();
+  });
+  const row = h("div", { class: "actions" },
+    open,
+    btn(tl("OK"), "secondary", () => actions.collapse()),
+  );
+  const cardEl = card("green", stack(116, 16, who, title, detail, row));
+  const el = h("div", { class: "view" }, cardEl);
+  return {
+    el,
+    sync() {
+      const notice = State.notice;
+      const task = State.tasks.find((t) => t.id === notice?.pillId) ?? State.focusTask;
+      clear(who);
+      who.append(agentWho(task, ""));
+      title.textContent = notice?.title ?? "";
+      detail.textContent = notice?.detail ?? "";
+      detail.style.display = notice?.detail && notice.detail !== notice.title ? "" : "none";
+      const label = notice?.action ?? t("Open pipeline");
+      const span = open.firstElementChild as HTMLElement;
+      if (span.textContent !== label) span.textContent = label;
+      open.style.display = notice?.url ? "" : "none";
+      const wash = notice?.tone === "error" ? "red" : notice?.tone === "success" ? "green" : "soft";
+      cardEl.classList.toggle("wash", !!wash);
+      if (wash) cardEl.style.setProperty("--wash", washRGBA(wash));
+    },
+  };
+}
+
 function buildFinished(actions: ViewActions): ViewHost {
   const who = h("div");
   const title = h("div", { class: "title one-line" });
@@ -968,6 +1004,7 @@ export function buildViews(
   map.set("question", buildQuestion(actions));
   map.set("error", buildError(actions));
   map.set("finished", buildFinished(actions));
+  map.set("notice", buildNotice(actions));
   map.set("confused", buildConfused());
   map.set("note", buildNote());
   map.set("settings", buildSettings(actions));

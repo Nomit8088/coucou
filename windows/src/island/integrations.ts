@@ -3,7 +3,7 @@
 // the pill isn't focused, plays a sound, and clears itself after 60 s.
 
 import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
-import { gitHubAlert, type GitHubEvent } from "../core/github";
+import { gitHubAlert, gitNotice, type GitHubEvent } from "../core/github";
 import { availablePills } from "../core/pills";
 import { Sound } from "../core/sound";
 import { State } from "../core/state";
@@ -15,7 +15,8 @@ const clearTimers = new Map<string, number>();
 
 export function registerIntegrationHandlers(island: Island) {
   void onEvent<IntegrationUpdate>("integration", (update) => handle(island, update));
-  void onEvent<GitHubEvent[]>("github-alerts", handleGitHubAlerts);
+  void onEvent<GitHubEvent[]>("github-alerts", (events) => handleGitAlerts(island, events, GITHUB, false));
+  void onEvent<GitHubEvent[]>("gitlab-alerts", (events) => handleGitAlerts(island, events, "integration_gitlab", true));
   void refreshConfigured();
   State.subscribe(refreshGitHubWhenShown);
   State.subscribe(refreshGitLabWhenShown);
@@ -28,13 +29,23 @@ export function registerIntegrationHandlers(island: Island) {
  * is focused, as on macOS.
  */
 export function handleGitHubAlerts(events: GitHubEvent[]) {
+  handleGitAlerts({ alert() {}, setView() {}, reveal() {} } as unknown as Island, events, GITHUB, false);
+}
+
+function handleGitAlerts(island: Island, events: GitHubEvent[], pillId: string, gitlab: boolean) {
   if (State.paused) return;
   const alert = gitHubAlert(events);
   if (!alert) return;
-  const task = State.tasks.find((t) => t.id === GITHUB);
+  const task = State.tasks.find((t) => t.id === pillId);
   if (!task) return;
-  if (State.focusId !== GITHUB) task.pillBadge = alert.badge;
+  if (State.focusId !== pillId) task.pillBadge = alert.badge;
   Sound.play(alert.sound);
+  const notice = gitNotice(events, pillId, gitlab);
+  if (notice && !State.pendingApproval) {
+    State.notice = notice;
+    State.setFocus(pillId);
+    island.alert("notice");
+  }
   State.notify();
 }
 

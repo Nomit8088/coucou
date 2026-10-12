@@ -7,7 +7,7 @@ import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
 import {
   GRID_WEEKS, activityHeader, actionsUrl, ciWord, contributionColor, contributionsLabel, dayLabel,
-  formatCount, gitHubAlert, lastDays, lastWeeks, mainCISummary, myPRsValue, profileUrl, readActivity,
+  formatCount, gitHubAlert, gitNotice, lastDays, lastWeeks, mainCISummary, myPRsValue, profileUrl, readActivity,
   readPulse, readStats, safeGitHubUrl, shortRepo, totalLabel, weekColumn, worstCI,
 } from "../src/core/github.ts";
 import { registerIntegrationHandlers } from "../src/island/integrations.ts";
@@ -164,9 +164,25 @@ test("the loudest event decides the badge and the sound", () => {
     { badge: "error", sound: "error" },
   );
   assert.deepEqual(gitHubAlert([{ kind: "ciFailed", prId: "a" }]), { badge: "error", sound: "error" });
+  assert.deepEqual(gitHubAlert([{ kind: "newPr", prId: "a" }]), { badge: "finished", sound: "question" });
+  assert.deepEqual(gitHubAlert([{ kind: "comments", prId: "a", count: 2 }]), { badge: "finished", sound: "question" });
 });
 
-const island = { reveal: () => {} };
+test("the island notice prefers a failed pipeline, then comments, then a new PR", () => {
+  assert.equal(gitNotice([{ kind: "mainFailed", repo: "r" }], "integration_github", false), null);
+  const failed = gitNotice([{ kind: "ciFailed", prId: "a/b#1", url: "https://github.com/a/b/pull/1", title: "Fix" }], "integration_github", false);
+  assert.equal(failed?.title, "Pipeline failed");
+  assert.equal(failed?.action, "Open pipeline");
+  assert.equal(failed?.url, "https://github.com/a/b/pull/1");
+  const mixed = gitNotice([
+    { kind: "ciPassed", prId: "a", url: "u", title: "ok" },
+    { kind: "newPr", prId: "b", url: "v", title: "Please review" },
+  ], "integration_gitlab", true);
+  assert.equal(mixed?.title, "New merge request");
+  assert.equal(mixed?.action, "Open merge request");
+});
+
+const island = { reveal: () => {}, alert: () => {} };
 registerIntegrationHandlers(island);
 
 const github = () => State.tasks.find((t) => t.id === GITHUB);
