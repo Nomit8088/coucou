@@ -3494,6 +3494,182 @@
    "pt-BR": "Abrir os comentários",
    "ru": "Открыть комментарии",
    "id": "Buka komentar"
+  },
+  "Requirements": {
+   "zh-Hans": "需求",
+   "hi": "आवश्यकताएँ",
+   "es": "Requisitos",
+   "ar": "المتطلبات",
+   "fr": "Exigences",
+   "bn": "চাহিদা",
+   "pt-BR": "Requisitos",
+   "ru": "Требования",
+   "id": "Kebutuhan"
+  },
+  "Defects": {
+   "zh-Hans": "缺陷",
+   "hi": "दोष",
+   "es": "Defectos",
+   "ar": "العيوب",
+   "fr": "Défauts",
+   "bn": "ত্রুটি",
+   "pt-BR": "Defeitos",
+   "ru": "Дефекты",
+   "id": "Cacat"
+  },
+  "Login": {
+   "zh-Hans": "登录名",
+   "hi": "लॉगिन",
+   "es": "Usuario",
+   "ar": "اسم الدخول",
+   "fr": "Identifiant",
+   "bn": "লগইন",
+   "pt-BR": "Login",
+   "ru": "Логин",
+   "id": "Login"
+  },
+  "Versions": {
+   "zh-Hans": "版本",
+   "hi": "संस्करण",
+   "es": "Versiones",
+   "ar": "الإصدارات",
+   "fr": "Versions",
+   "bn": "সংস্করণ",
+   "pt-BR": "Versões",
+   "ru": "Версии",
+   "id": "Versi"
+  },
+  "Demand states": {
+   "zh-Hans": "需求状态",
+   "hi": "मांग स्थितियाँ",
+   "es": "Estados de requisitos",
+   "ar": "حالات المتطلبات",
+   "fr": "États des exigences",
+   "bn": "চাহিদার অবস্থা",
+   "pt-BR": "Estados de requisitos",
+   "ru": "Состояния требований",
+   "id": "Status permintaan"
+  },
+  "Bug states": {
+   "zh-Hans": "缺陷状态",
+   "hi": "बग स्थितियाँ",
+   "es": "Estados de errores",
+   "ar": "حالات الأخطاء",
+   "fr": "États des anomalies",
+   "bn": "বাগের অবস্থা",
+   "pt-BR": "Estados de bugs",
+   "ru": "Состояния дефектов",
+   "id": "Status bug"
+  },
+  "Project IDs": {
+   "zh-Hans": "项目 ID",
+   "hi": "प्रोजेक्ट आईडी",
+   "es": "ID de proyecto",
+   "ar": "معرّفات المشاريع",
+   "fr": "ID de projet",
+   "bn": "প্রকল্প আইডি",
+   "pt-BR": "IDs de projeto",
+   "ru": "ID проектов",
+   "id": "ID proyek"
+  },
+  "Separate values with commas. Empty means all.": {
+   "zh-Hans": "多个值用逗号分隔，留空表示全部。",
+   "hi": "मानों को कॉमा से अलग करें। खाली छोड़ने का अर्थ सभी।",
+   "es": "Separa los valores con comas. Vacío significa todos.",
+   "ar": "افصل القيم بفواصل. الفراغ يعني الكل.",
+   "fr": "Séparez les valeurs par des virgules. Vide signifie tout.",
+   "bn": "মানগুলো কমা দিয়ে আলাদা করুন। খালি রাখলে সব বোঝায়।",
+   "pt-BR": "Separe os valores com vírgulas. Vazio significa todos.",
+   "ru": "Разделяйте значения запятыми. Пустое поле означает все.",
+   "id": "Pisahkan nilai dengan koma. Kosong berarti semua."
+  },
+  "Include the items I last touched": {
+   "zh-Hans": "包含我最后处理过的条目",
+   "hi": "वे आइटम शामिल करें जिन्हें मैंने अंतिम बार छुआ",
+   "es": "Incluir los elementos que toqué por última vez",
+   "ar": "تضمين العناصر التي عدّلتها آخر مرة",
+   "fr": "Inclure les éléments que j'ai modifiés en dernier",
+   "bn": "আমি সর্বশেষ যে আইটেমগুলো স্পর্শ করেছি সেগুলো অন্তর্ভুক্ত করুন",
+   "pt-BR": "Incluir os itens que toquei por último",
+   "ru": "Включать элементы, которые я последним изменил",
+   "id": "Sertakan item yang terakhir saya sentuh"
+  },
+  "New requirement": {
+   "zh-Hans": "新需求",
+   "hi": "नई आवश्यकता",
+   "es": "Nuevo requisito",
+   "ar": "متطلب جديد",
+   "fr": "Nouvelle exigence",
+   "bn": "নতুন চাহিদা",
+   "pt-BR": "Novo requisito",
+   "ru": "Новое требование",
+   "id": "Kebutuhan baru"
+  },
+  "New defect": {
+   "zh-Hans": "新缺陷",
+   "hi": "नया दोष",
+   "es": "Nuevo defecto",
+   "ar": "عيب جديد",
+   "fr": "Nouveau défaut",
+   "bn": "নতুন ত্রুটি",
+   "pt-BR": "Novo defeito",
+   "ru": "Новый дефект",
+   "id": "Cacat baru"
+  },
+  "Open requirement": {
+   "zh-Hans": "打开需求",
+   "hi": "आवश्यकता खोलें",
+   "es": "Abrir requisito",
+   "ar": "فتح المتطلب",
+   "fr": "Ouvrir l'exigence",
+   "bn": "চাহিদা খুলুন",
+   "pt-BR": "Abrir requisito",
+   "ru": "Открыть требование",
+   "id": "Buka kebutuhan"
+  },
+  "Open defect": {
+   "zh-Hans": "打开缺陷",
+   "hi": "दोष खोलें",
+   "es": "Abrir defecto",
+   "ar": "فتح العيب",
+   "fr": "Ouvrir le défaut",
+   "bn": "ত্রুটি খুলুন",
+   "pt-BR": "Abrir defeito",
+   "ru": "Открыть дефект",
+   "id": "Buka cacat"
+  },
+  "The DevOps login whose requirements and defects the card counts. Your CTeam login, not your Windows account name.": {
+   "zh-Hans": "卡片统计该 DevOps 登录名相关的需求与缺陷。填写 CTeam 登录名，而非 Windows 账户名。",
+   "hi": "वह DevOps लॉगिन जिसकी आवश्यकताएँ और दोष कार्ड गिनता है। अपना CTeam लॉगिन दें, Windows खाता नाम नहीं।",
+   "es": "El usuario de DevOps cuyos requisitos y defectos cuenta la tarjeta. Tu usuario de CTeam, no el nombre de tu cuenta de Windows.",
+   "ar": "اسم دخول DevOps الذي تحصي البطاقة متطلباته وعيوبه. اسم دخول CTeam وليس اسم حساب Windows.",
+   "fr": "L'identifiant DevOps dont la carte compte les exigences et les défauts. Votre identifiant CTeam, pas le nom de votre compte Windows.",
+   "bn": "যে DevOps লগইনের চাহিদা ও ত্রুটি কার্ড গুনবে। আপনার CTeam লগইন দিন, Windows অ্যাকাউন্ট নাম নয়।",
+   "pt-BR": "O login do DevOps cujos requisitos e defeitos o cartão conta. Seu login do CTeam, não o nome da conta do Windows.",
+   "ru": "Логин DevOps, требования и дефекты которого считает карточка. Ваш логин CTeam, а не имя учётной записи Windows.",
+   "id": "Login DevOps yang kebutuhan dan cacatnya dihitung kartu. Login CTeam Anda, bukan nama akun Windows."
+  },
+  "Your CTeam personal access token. Stored in the Windows Credential Manager, never on disk.": {
+   "zh-Hans": "你的 CTeam 个人访问令牌。保存在 Windows 凭据管理器中，不落盘。",
+   "hi": "आपका CTeam व्यक्तिगत एक्सेस टोकन। Windows क्रेडेंशियल मैनेजर में सुरक्षित, डिस्क पर कभी नहीं।",
+   "es": "Tu token de acceso personal de CTeam. Se guarda en el Administrador de credenciales de Windows, nunca en disco.",
+   "ar": "رمز الوصول الشخصي الخاص بك في CTeam. يُحفظ في مدير بيانات الاعتماد في Windows ولا يُكتب على القرص.",
+   "fr": "Votre jeton d'accès personnel CTeam. Conservé dans le Gestionnaire d'identifiants Windows, jamais sur le disque.",
+   "bn": "আপনার CTeam ব্যক্তিগত অ্যাক্সেস টোকেন। Windows ক্রেডেনশিয়াল ম্যানেজারে সংরক্ষিত, ডিস্কে কখনও নয়।",
+   "pt-BR": "Seu token de acesso pessoal do CTeam. Guardado no Gerenciador de Credenciais do Windows, nunca em disco.",
+   "ru": "Ваш личный токен доступа CTeam. Хранится в диспетчере учётных данных Windows, никогда на диске.",
+   "id": "Token akses pribadi CTeam Anda. Disimpan di Windows Credential Manager, tidak pernah di disk."
+  },
+  "Which projects, versions and states the card counts. Versions are matched against the title.": {
+   "zh-Hans": "卡片统计哪些项目、版本与状态。版本按标题匹配。",
+   "hi": "कार्ड किन प्रोजेक्ट, संस्करणों और स्थितियों को गिनता है। संस्करण शीर्षक से मिलाए जाते हैं।",
+   "es": "Qué proyectos, versiones y estados cuenta la tarjeta. Las versiones se comparan con el título.",
+   "ar": "المشاريع والإصدارات والحالات التي تحصيها البطاقة. تُطابَق الإصدارات مع العنوان.",
+   "fr": "Quels projets, versions et états la carte compte. Les versions sont comparées au titre.",
+   "bn": "কার্ড কোন প্রকল্প, সংস্করণ ও অবস্থা গুনবে। সংস্করণ শিরোনামের সাথে মেলানো হয়।",
+   "pt-BR": "Quais projetos, versões e estados o cartão conta. As versões são comparadas com o título.",
+   "ru": "Какие проекты, версии и состояния считает карточка. Версии сопоставляются с заголовком.",
+   "id": "Proyek, versi, dan status mana yang dihitung kartu. Versi dicocokkan dengan judul."
   }
  }
 }

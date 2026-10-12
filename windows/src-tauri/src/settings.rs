@@ -79,6 +79,59 @@ pub struct Settings {
     pub github_watch: GitWatch,
     /// Which GitLab merge requests the island watches for pipelines, new MRs and comments.
     pub gitlab_watch: GitWatch,
+    /// What the Kingeye (CTeam DevOps) card counts: which projects, which versions
+    /// (matched against the title), and which states to keep.
+    pub kingeye: KingeyePrefs,
+}
+
+/// What Kingeye shows. The lists are what the user picked in Settings; an empty
+/// project list falls back to the default project, and empty `versions`/`states`
+/// mean "do not filter on that".
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct KingeyePrefs {
+    /// CTeam project ids ("aiops", "he"…).
+    pub projects: Vec<String>,
+    /// Version numbers the requirement/defect titles must carry ("4.5.16", "7.1.10"…).
+    pub versions: Vec<String>,
+    /// Requirement (DEMAND) state names to keep ("需求评审", "研发中"…). Empty means all.
+    #[serde(default)]
+    pub demand_states: Vec<String>,
+    /// Defect (BUG) state names to keep ("新", "开发中", "待回归"…). Empty means all.
+    #[serde(default)]
+    pub bug_states: Vec<String>,
+    /// Legacy shared state names fallback for backwards compatibility.
+    #[serde(default)]
+    pub states: Vec<String>,
+    /// Also count the items this login last touched, not only those it created.
+    pub include_touched: bool,
+}
+
+impl KingeyePrefs {
+    pub fn effective_demand_states(&self) -> &[String] {
+        &self.demand_states
+    }
+
+    pub fn effective_bug_states(&self) -> &[String] {
+        if !self.bug_states.is_empty() {
+            &self.bug_states
+        } else {
+            &self.states
+        }
+    }
+}
+
+impl Default for KingeyePrefs {
+    fn default() -> Self {
+        Self {
+            projects: Vec::new(),
+            versions: Vec::new(),
+            demand_states: Vec::new(),
+            bug_states: Vec::new(),
+            states: Vec::new(),
+            include_touched: true,
+        }
+    }
 }
 
 /// Which pull/merge requests an integration follows. New ones the user opened
@@ -196,6 +249,7 @@ impl Default for Settings {
             music_like_hotkeys: BTreeMap::new(),
             github_watch: GitWatch::default(),
             gitlab_watch: GitWatch::default(),
+            kingeye: KingeyePrefs::default(),
         }
     }
 }
@@ -892,9 +946,24 @@ mod tests {
                 "musicLikeHotkeys",
                 "githubWatch",
                 "gitlabWatch",
+                "kingeye",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn kingeye_prefs_supports_separate_demand_and_bug_states() {
+        let json = r#"{"projects":["aiops"],"versions":[],"demandStates":["研发中"],"bugStates":["开发中"],"includeTouched":true}"#;
+        let prefs: KingeyePrefs = serde_json::from_str(json).unwrap();
+        assert_eq!(prefs.effective_demand_states(), &["研发中"]);
+        assert_eq!(prefs.effective_bug_states(), &["开发中"]);
+
+        // Legacy states fallback for bugs
+        let legacy_json = r#"{"projects":["aiops"],"versions":[],"states":["新"],"includeTouched":true}"#;
+        let legacy_prefs: KingeyePrefs = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(legacy_prefs.effective_demand_states(), &Vec::<String>::new());
+        assert_eq!(legacy_prefs.effective_bug_states(), &["新"]);
     }
 
     #[test]

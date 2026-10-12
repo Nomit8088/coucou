@@ -193,6 +193,7 @@ export class Island {
           integration_stripe: "https://dashboard.stripe.com/payments",
           integration_notion: "https://notion.so",
           integration_calcom: "https://app.cal.com/bookings",
+          integration_kingeye: String(State.integrations.integration_kingeye?.data?.host ?? "https://devops.cwoa.net"),
         };
         if (isMusicPill(task.id)) void Bridge.spotifyOpen(task.id);
         else if (task.sessionId) {
@@ -761,7 +762,11 @@ export class Island {
     if (State.mode === "expanded" && this.dshSessionCard()) {
       h = DSH_SESSION_H;
     }
-    if (State.mode === "expanded" && State.view === "overview" && State.showingDiffDetail) {
+    if (
+      State.mode === "expanded" &&
+      State.view === "overview" &&
+      (State.showingDiffDetail || State.showingIntegrationDetail)
+    ) {
       h = DIFF_DETAIL_H;
     }
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;

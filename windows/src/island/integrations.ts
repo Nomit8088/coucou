@@ -6,7 +6,8 @@ import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
 import { gitHubAlert, gitNotice, type GitHubEvent } from "../core/github";
 import { availablePills } from "../core/pills";
 import { Sound } from "../core/sound";
-import { State } from "../core/state";
+import { State, type GitNotice } from "../core/state";
+import { t } from "../i18n/i18n";
 import type { Island } from "./island";
 
 const GITHUB = "integration_github";
@@ -17,9 +18,11 @@ export function registerIntegrationHandlers(island: Island) {
   void onEvent<IntegrationUpdate>("integration", (update) => handle(island, update));
   void onEvent<GitHubEvent[]>("github-alerts", (events) => handleGitAlerts(island, events, GITHUB, false));
   void onEvent<GitHubEvent[]>("gitlab-alerts", (events) => handleGitAlerts(island, events, "integration_gitlab", true));
+  void onEvent<KingeyeAlertItem[]>("kingeye-alerts", (items) => handleKingeyeAlerts(island, items));
   void refreshConfigured();
   State.subscribe(refreshGitHubWhenShown);
   State.subscribe(refreshGitLabWhenShown);
+  State.subscribe(refreshKingeyeWhenShown);
 }
 
 /**
@@ -49,8 +52,53 @@ function handleGitAlerts(island: Island, events: GitHubEvent[], pillId: string, 
   State.notify();
 }
 
+export interface KingeyeAlertItem {
+  id: string;
+  number: string;
+  title: string;
+  classify: string;
+  state: string;
+  priority: string;
+  createTime: string;
+  url: string;
+}
+
+function handleKingeyeAlerts(island: Island, items: KingeyeAlertItem[]) {
+  if (State.paused || items.length === 0) return;
+  const pillId = "integration_kingeye";
+  const task = State.tasks.find((t) => t.id === pillId);
+  if (!task) return;
+  const hasBug = items.some((i) => i.classify === "BUG");
+  if (State.focusId !== pillId) task.pillBadge = hasBug ? "error" : "finished";
+  Sound.play(hasBug ? "error" : "finish");
+
+  const first = items[0];
+  const isBug = first.classify === "BUG";
+  const notice: GitNotice = {
+    pillId,
+    title: isBug ? t("New defect") : t("New requirement"),
+    detail: `${first.number} ${first.title}`,
+    url: first.url,
+    action: isBug ? t("Open defect") : t("Open requirement"),
+    tone: isBug ? "error" : "info",
+  };
+  if (!State.pendingApproval) {
+    State.notice = notice;
+    State.setFocus(pillId);
+    island.alert("notice");
+  }
+  State.notify();
+}
+
 let gitHubShown = false;
 let gitLabShown = false;
+let kingeyeShown = false;
+
+function refreshKingeyeWhenShown() {
+  const shown = State.mode === "expanded" && State.focusTask?.id === "integration_kingeye";
+  if (shown && !kingeyeShown) void Bridge.refreshIntegration("integration_kingeye");
+  kingeyeShown = shown;
+}
 
 function refreshGitLabWhenShown() {
   const shown = State.mode === "expanded" && State.focusTask?.id === "integration_gitlab";

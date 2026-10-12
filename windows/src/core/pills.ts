@@ -56,6 +56,10 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("resend-api-key") },
   { id: "integration_gitlab", name: "GitLab", color: "#FC6D26", category: "service",
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("gitlab-token") },
+  // Kingeye: the team's CTeam DevOps. The card counts the requirements and
+  // defects the configured login is involved in (see src-tauri/src/kingeye.rs).
+  { id: "integration_kingeye", name: "Cteams", color: "#2F6BFF", category: "service",
+    subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("kingeye-token") },
   // Spotify's MPRIS interface on the session bus (src-tauri/src/spotify.rs), and
   // its media session on Windows (the same file, SMTC).
   { id: "integration_spotify", name: "Spotify", color: "#1DB954", category: "service",

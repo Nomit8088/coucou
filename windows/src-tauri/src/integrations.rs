@@ -68,6 +68,10 @@ pub fn start(app: AppHandle) {
     spawn(app.clone(), "integration_github", 7, 300, poll_github);
     spawn_github_loops(app.clone());
     spawn(app.clone(), "integration_gitlab", 8, 60, poll_gitlab);
+    // The DevOps card changes on a human's timescale, and its API answers a
+    // hundred rows at a time: five minutes is plenty, and far kinder than a
+    // tighter loop on an endpoint that also serves the web UI.
+    spawn(app.clone(), "integration_kingeye", 10, 300, poll_kingeye);
     // A mailbox is read every five minutes, never more: IMAP signs in again
     // each time, and nobody needs a second's notice for an email.
     spawn(app, "integration_qqmail", 9, 300, poll_qqmail);
@@ -124,6 +128,7 @@ pub async fn poll_once(app: AppHandle, id: &str) {
         }
         "integration_resend" => poll_resend(app).await,
         "integration_gitlab" => poll_gitlab(app).await,
+        "integration_kingeye" => poll_kingeye(app).await,
         "integration_qqmail" => poll_qqmail(app).await,
         _ => {}
     }
@@ -1106,22 +1111,44 @@ async fn gitlab_get(base: &reqwest::Url, token: &str, path: &str) -> Option<Valu
     response.json().await.ok()
 }
 
-async fn gitlab_graphql(base: &reqwest::Url, token: &str) -> Option<Value> {
+async fn gitlab_graphql(base: &reqwest::Url, token: &str, query: &str) -> Option<Value> {
     let url = format!("{}{}", base.as_str().trim_end_matches('/'), "/api/graphql");
     let response = client()
         .post(url)
         .header("PRIVATE-TOKEN", token)
         .header("Content-Type", "application/json")
-        .json(&json!({ "query": crate::gitlab::GRAPHQL_QUERY }))
+        .json(&json!({ "query": query }))
         .send()
         .await
         .ok()?;
+    let status = response.status().as_u16();
     if !response.status().is_success() {
+        log::line(format!("gitlab graphql HTTP {status}"));
         return None;
     }
     let root: Value = response.json().await.ok()?;
-    root.get("data").filter(|d| d.is_object())?;
+    let errors = root.get("errors").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+    if errors > 0 {
+        log::line(format!("gitlab graphql errors: {errors}"));
+    }
+    if root.get("data").and_then(|d| d.get("currentUser")).and_then(Value::as_object).is_none() {
+        return None;
+    }
     Some(root)
+}
+
+async fn gitlab_fill_pipelines(base: &reqwest::Url, token: &str, mrs: &mut [crate::gitlab::GitlabMr]) {
+    for mr in mrs.iter_mut().take(20) {
+        if mr.ci != crate::github::CiState::Unknown {
+            continue;
+        }
+        let Some(pid) = mr.project_id else { continue };
+        let path = format!("/api/v4/projects/{pid}/merge_requests/{}/pipelines?per_page=1", mr.iid);
+        let Some(list) = gitlab_get(base, token, &path).await else { continue };
+        if let Some(row) = list.as_array().and_then(|a| a.first()) {
+            crate::gitlab::apply_pipeline_row(mr, row);
+        }
+    }
 }
 
 #[allow(dead_code)]
@@ -1202,27 +1229,38 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
         }
     }
     let watch = git_watch(app, false);
-    let pulse = if let Some(root) = gitlab_graphql(&base, &token).await {
-        crate::gitlab::GitlabPulse::parse(&root, now)
+    let pulse = if let Some(root) = gitlab_graphql(&base, &token, crate::gitlab::GRAPHQL_QUERY).await {
+        let mut pulse = crate::gitlab::GitlabPulse::parse(&root, now);
+        if let Some(pulse) = pulse.as_mut() {
+            if let Some(review) = gitlab_graphql(&base, &token, crate::gitlab::GRAPHQL_REVIEW_QUERY).await {
+                pulse.merge_review(&review);
+            }
+        }
+        pulse
     } else {
         None
     };
     let pulse = if let Some(pulse) = pulse {
         pulse
     } else {
+        log::line("gitlab graphql unavailable — REST pipelines");
         let user = gitlab_get(&base, &token, "/api/v4/user").await;
         let login = user
             .as_ref()
             .and_then(|u| u.get("username").and_then(Value::as_str))
             .unwrap_or("")
             .to_string();
-        let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=8").await;
-        let assigned = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=assigned_to_me&per_page=8").await;
-        let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=8").await;
+        let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=20").await;
+        let assigned = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=assigned_to_me&per_page=20").await;
+        let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=20").await;
         if review.is_none() {
-            review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
+            review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=20").await;
         }
-        crate::gitlab::GitlabPulse::from_rest(login, mine.as_ref(), assigned.as_ref(), review.as_ref(), now)
+        let mut pulse = crate::gitlab::GitlabPulse::from_rest(login, mine.as_ref(), assigned.as_ref(), review.as_ref(), now);
+        gitlab_fill_pipelines(&base, &token, &mut pulse.mine).await;
+        gitlab_fill_pipelines(&base, &token, &mut pulse.assigned).await;
+        gitlab_fill_pipelines(&base, &token, &mut pulse.review).await;
+        pulse
     };
     let (pipelines, running) = pulse.card_pipelines();
     let events = {
@@ -1260,6 +1298,332 @@ pub fn gitlab_refresh_if_stale(app: &AppHandle) {
         tauri::async_runtime::spawn(async move { poll_gitlab_force(&app, true).await });
     }
 }
+
+// ── Kingeye (CTeam DevOps) ────────────────────────────────────────────────────
+//
+// The requirements and defects this login is involved in, from the CTeam public
+// OpenAPI: `POST /api/open/CTeam/api/service_open/issue/2.1.0/basic` with an
+// `X-DEVOPS-ACCESS-TOKEN` header. Only the pages the token is allowed to read
+// are asked for, and no request is made until both the token and the login are
+// configured.
+
+/// What one work item looks like once kingeye::card_item has it.
+static KINGEYE_SEEN: std::sync::LazyLock<Mutex<std::collections::HashSet<String>>> =
+    std::sync::LazyLock::new(|| Mutex::new(std::collections::HashSet::new()));
+static KINGEYE_SEEDED: AtomicBool = AtomicBool::new(false);
+static KINGEYE_FETCHED_AT: AtomicU64 = AtomicU64::new(0);
+
+/// The token, the login, and the host the links must stay on.
+///
+/// The login is required rather than guessed: a CTeam login ("timon") is not the
+/// OS account name ("nomit"), and guessing wrong would quietly count nothing at
+/// all instead of saying so.
+fn kingeye_config() -> Option<(String, String, String)> {
+    let token = secrets::get("kingeye-token").filter(|t| !t.trim().is_empty())?;
+    let login = secrets::get("kingeye-login").filter(|l| !l.trim().is_empty())?;
+    let origin = secrets::get("kingeye-url")
+        .map(|u| u.trim().trim_end_matches('/').to_string())
+        .filter(|u| u.starts_with("https://") || u.starts_with("http://"))
+        .unwrap_or_else(|| crate::kingeye::DEFAULT_ORIGIN.to_string());
+    Some((token, login.trim().to_string(), origin))
+}
+
+fn kingeye_prefs(app: &AppHandle) -> crate::settings::KingeyePrefs {
+    app.try_state::<crate::Shared>()
+        .map(|shared| shared.settings.lock().unwrap().kingeye.clone())
+        .unwrap_or_default()
+}
+
+/// One page of one kind in the given projects, newest first (the API answers
+/// newest-first on its own, which is why nothing is sorted here).
+///
+/// `Err(status)` carries the HTTP status behind a failure so the card can say
+/// what went wrong; 0 means the answer never arrived or was not JSON.
+async fn kingeye_page(
+    client: &reqwest::Client,
+    origin: &str,
+    token: &str,
+    login: &str,
+    projects: &[String],
+    classify: &str,
+    size: usize,
+    user_filter: Option<(&str, &str)>,
+) -> Result<Vec<Value>, u16> {
+    let url = format!("{origin}/api/open/CTeam/api/service_open/issue/2.1.0/basic");
+    let mut filters = crate::kingeye::query_filters(projects, classify);
+    if let (Some(arr), Some((k, v))) = (filters.as_array_mut(), user_filter) {
+        arr.push(json!({ "name": k, "value": [v] }));
+    }
+    let response = client
+        .post(&url)
+        .query(&[("userId", login), ("num", "1"), ("size", &size.to_string())])
+        .header("X-DEVOPS-ACCESS-TOKEN", token)
+        .header("Accept", "application/json")
+        .json(&filters)
+        .send()
+        .await
+        .map_err(|_| 0u16)?;
+    let status = response.status().as_u16();
+    if !response.status().is_success() {
+        log::line(format!("kingeye HTTP {status}"));
+        return Err(status);
+    }
+    let root: Value = response.json().await.map_err(|_| 0u16)?;
+    // The gateway answers 200 with its own status in the body.
+    if root.get("status").and_then(Value::as_i64).unwrap_or(0) != 0 {
+        let message = root.get("message").and_then(Value::as_str).unwrap_or("");
+        log::line(format!("kingeye API error: {message}"));
+        // A rejected token comes back this way, with the HTTP code still 200.
+        return Err(if message.contains("validate fail") { 401 } else { 0 });
+    }
+    Ok(root
+        .get("data")
+        .and_then(|d| d.get("content"))
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default())
+}
+
+async fn poll_kingeye(app: AppHandle) {
+    if PAUSED.load(Ordering::Relaxed) || !enabled(&app, "integration_kingeye") {
+        return;
+    }
+    let Some((token, login, origin)) = kingeye_config() else { return };
+    let prefs = kingeye_prefs(&app);
+    let assign_id = secrets::get("kingeye-assign-id").unwrap_or_default();
+    let projects = if prefs.projects.is_empty() {
+        vec!["aiops".to_string()]
+    } else {
+        prefs.projects.clone()
+    };
+    let http = client();
+
+    let mut records: Vec<Value> = Vec::new();
+    let mut first_error: Option<u16> = None;
+    for classify in ["BUG", "DEMAND"] {
+        // 1. operator_user (经办人)
+        if let Ok(page) = kingeye_page(&http, &origin, &token, &login, &projects, classify, 50, Some(("operator_user", &login))).await {
+            for mut it in page {
+                if let Some(obj) = it.as_object_mut() {
+                    obj.insert("_matched".to_string(), json!(true));
+                }
+                records.push(it);
+            }
+        }
+        // 2. developers (开发人员)
+        if let Ok(page) = kingeye_page(&http, &origin, &token, &login, &projects, classify, 50, Some(("developers", &login))).await {
+            for mut it in page {
+                if let Some(obj) = it.as_object_mut() {
+                    obj.insert("_matched".to_string(), json!(true));
+                }
+                records.push(it);
+            }
+        }
+        // 3. createUser (创建人)
+        if let Ok(page) = kingeye_page(&http, &origin, &token, &login, &projects, classify, 50, Some(("createUser", &login))).await {
+            for mut it in page {
+                if let Some(obj) = it.as_object_mut() {
+                    obj.insert("_matched".to_string(), json!(true));
+                }
+                records.push(it);
+            }
+        }
+        // 4. Global newest pool (for touched / updateUser, only if enabled)
+        if prefs.include_touched {
+            match kingeye_page(&http, &origin, &token, &login, &projects, classify, 100, None).await {
+                Ok(mut page) => records.append(&mut page),
+                Err(status) => first_error = first_error.or(Some(status)),
+            }
+        }
+    }
+    if records.is_empty() {
+        if let Some(status) = first_error {
+            // 0 means nothing was heard at all — say that rather than "API error 0".
+            let error = if status == 0 {
+                crate::i18n::tf("No connection: {error}", &[("error", &origin)])
+            } else {
+                status_error(status, &crate::i18n::t("Token lacks the needed scope"))
+            };
+            emit(&app, IntegrationUpdate {
+                id: "integration_kingeye",
+                data: json!({}),
+                error: Some(error),
+                event: None,
+            });
+        }
+        return;
+    }
+
+    // Deduplicate by issue ID so records added via creator search don't double-count.
+    let mut seen_ids = std::collections::HashSet::new();
+    records.retain(|r| {
+        r.get("id")
+            .and_then(Value::as_str)
+            .map(|id| seen_ids.insert(id.to_string()))
+            .unwrap_or(true)
+    });
+
+    if !prefs.versions.is_empty() {
+        // Pre-filter candidates: only query details for items that belong to the user,
+        // match target states, and don't already have the version in their title.
+        let candidate_indices: Vec<usize> = records
+            .iter()
+            .enumerate()
+            .filter_map(|(idx, record)| {
+                if !crate::kingeye::is_mine(record, &login, &assign_id, prefs.include_touched) {
+                    return None;
+                }
+                let state = record.get("stateCn").and_then(Value::as_str).unwrap_or("");
+                let classify = record.get("typeClassify").and_then(Value::as_str).unwrap_or("");
+                let states = if classify == "DEMAND" {
+                    prefs.effective_demand_states()
+                } else {
+                    prefs.effective_bug_states()
+                };
+                if !crate::kingeye::state_kept(state, states) {
+                    return None;
+                }
+                let title = record.get("title").and_then(Value::as_str).unwrap_or("");
+                if crate::kingeye::title_matches_versions(title, &prefs.versions) {
+                    return None;
+                }
+                let id = record.get("id").and_then(Value::as_str).unwrap_or("");
+                let project = record.get("projectId").and_then(Value::as_str).unwrap_or("");
+                if id.is_empty() || project.is_empty() {
+                    return None;
+                }
+                Some(idx)
+            })
+            .take(15)
+            .collect();
+
+        if !candidate_indices.is_empty() {
+            let mut handles = Vec::new();
+            for &idx in &candidate_indices {
+                let record = &records[idx];
+                let id = record.get("id").and_then(Value::as_str).unwrap_or("").to_string();
+                let project = record.get("projectId").and_then(Value::as_str).unwrap_or("").to_string();
+                let url = format!("{origin}/api/open/CTeam/api/service_open/issue/2.1.0/{project}/{id}?userId={login}");
+                let client = http.clone();
+                let token_clone = token.clone();
+                handles.push(tauri::async_runtime::spawn(async move {
+                    if let Ok(res) = client.get(&url).header("X-DEVOPS-ACCESS-TOKEN", &token_clone).send().await {
+                        if let Ok(val) = res.json::<Value>().await {
+                            if let Some(disp) = val.get("data")
+                                .and_then(|d| d.get("property"))
+                                .and_then(|p| p.get("version"))
+                                .and_then(|v| v.get("displayValue"))
+                                .and_then(Value::as_str)
+                            {
+                                return (idx, Some(disp.to_string()));
+                            }
+                        }
+                    }
+                    (idx, None)
+                }));
+            }
+            for handle in handles {
+                if let Ok((idx, Some(ver))) = handle.await {
+                    if let Some(obj) = records[idx].as_object_mut() {
+                        obj.insert("version".to_string(), json!(ver));
+                    }
+                }
+            }
+        }
+    }
+
+    let (items, requirements, defects) = crate::kingeye::select(
+        &records,
+        &origin,
+        &login,
+        &assign_id,
+        prefs.include_touched,
+        &prefs.versions,
+        prefs.effective_demand_states(),
+        prefs.effective_bug_states(),
+    );
+
+    let ids: Vec<String> = items
+        .iter()
+        .filter_map(|i| i.get("id").and_then(Value::as_str).map(str::to_string))
+        .collect();
+
+    let fresh = {
+        let mut seen = KINGEYE_SEEN.lock().unwrap();
+        let mut seeded = KINGEYE_SEEDED.load(Ordering::Relaxed);
+        let fresh = crate::kingeye::new_ids(&mut seen, &ids, &mut seeded);
+        KINGEYE_SEEDED.store(seeded, Ordering::Relaxed);
+        fresh
+    };
+
+    let fresh_rows: Vec<Value> = items
+        .iter()
+        .filter(|i| {
+            i.get("id")
+                .and_then(Value::as_str)
+                .map(|id| fresh.iter().any(|f| f == id))
+                .unwrap_or(false)
+        })
+        .cloned()
+        .collect();
+
+    let _event = if fresh_rows.is_empty() {
+        None
+    } else {
+        let first = &fresh_rows[0];
+        let label = first
+            .get("number")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string();
+        let detail = first
+            .get("title")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        Some(IntegrationEvent { success: true, label, detail })
+    };
+
+    KINGEYE_FETCHED_AT.store(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0),
+        Ordering::Relaxed,
+    );
+
+    emit(&app, IntegrationUpdate {
+        id: "integration_kingeye",
+        data: json!({
+            "items": items,
+            "requirements": requirements,
+            "defects": defects,
+            "login": login,
+            "host": origin,
+            "fresh": fresh_rows,
+        }),
+        error: None,
+        event: None,
+    });
+    // The rows themselves, so the island's notice can name what is new — the
+    // island handles the badge, the sound and the notice card.
+    if !fresh_rows.is_empty() {
+        let _ = app.emit_to(WINDOW_LABEL, "kingeye-alerts", &fresh_rows);
+    }
+}
+
+/// The card came on screen: refetch if the last answer is more than a minute old.
+pub fn kingeye_refresh_if_stale(app: &AppHandle) {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let fetched = KINGEYE_FETCHED_AT.load(Ordering::Relaxed);
+    if fetched == 0 || now.saturating_sub(fetched) >= 60 {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move { poll_kingeye(app).await });
+    }
+}
+
 
 #[cfg(test)]
 mod tests {

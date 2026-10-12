@@ -16,6 +16,7 @@ mod i18n;
 mod identity;
 mod integrations;
 mod island;
+mod kingeye;
 mod local_chat;
 mod log;
 mod mail;
@@ -592,12 +593,18 @@ fn secret_set(app: AppHandle, key: String, value: String) -> Result<(), String> 
     if key == local_chat::CUSTOM_KEY {
         return Err("use local_set_key".into());
     }
-    let before = matches!(key.as_str(), "github-token" | "gitlab-url" | "gitlab-token").then(|| secrets::get(&key));
+    let watched = matches!(
+        key.as_str(),
+        "github-token" | "gitlab-url" | "gitlab-token" | "kingeye-token" | "kingeye-login"
+    );
+    let before = watched.then(|| secrets::get(&key));
     secrets::set(&key, &value)?;
     if let Some(before) = before {
         if secrets::get(&key) != before {
             if key == "github-token" {
                 integrations::github_token_changed(&app);
+            } else if key.starts_with("kingeye-") {
+                integrations::kingeye_refresh_if_stale(&app);
             } else {
                 integrations::gitlab_refresh_if_stale(&app);
             }

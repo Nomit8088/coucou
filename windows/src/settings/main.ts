@@ -195,6 +195,12 @@ const INTEGRATIONS: IntegrationDef[] = [
       { key: "gitlab-token", label: N_("Access token"), placeholder: "glpat-…", secret: true },
     ],
     hint: N_("Sent as PRIVATE-TOKEN. The card lists your open merge requests, reviews, and the default-branch pipeline.") },
+  { id: "integration_kingeye", name: "Cteams", color: "#2F6BFF",
+    fields: [
+      { key: "kingeye-token", label: N_("Access token"), placeholder: "32 characters", secret: true },
+      { key: "kingeye-login", label: N_("Login"), placeholder: "you", secret: false },
+    ],
+    hint: N_("Your CTeam personal access token. Stored in the Windows Credential Manager, never on disk.") },
   { id: "integration_qqmail", name: "QQ Mail", color: "#12B7F5",
     fields: [
       { key: "qqmail-address", label: N_("Email address"), placeholder: "you@qq.com", secret: false },
@@ -240,6 +246,141 @@ function gitWatchRows(id: "integration_github" | "integration_gitlab"): HTMLElem
     row("review", N_("Review requested")),
     h("div", { class: "hint", text: t("Which pull requests and merge requests the island watches. New ones you opened yourself never pop up.") }),
   );
+}
+
+const ALL_DEMAND_STATES = [
+  "需求收集",
+  "需求评审",
+  "待规划",
+  "规划设计",
+  "设计评审",
+  "研发中",
+  "测试通过",
+] as const;
+
+const ALL_BUG_STATES = [
+  "新",
+  "开发中",
+  "待回归",
+  "重新打开",
+  "已修复（待发布）",
+  "同意拒绝",
+  "已关闭",
+] as const;
+
+/**
+ * What the Kingeye card counts: the projects, the versions its titles must
+ * carry, and the states to keep.
+ */
+function kingeyeRows(): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:6px;padding-top:4px" });
+
+  const listRow = (
+    field: "projects" | "versions",
+    label: string,
+    placeholder: string,
+  ) => {
+    const currentList = settings.kingeye?.[field] ?? [];
+    const input = h("input", {
+      type: "text",
+      value: currentList.join(", "),
+      placeholder,
+      autocomplete: "off",
+      spellcheck: "false",
+      style: "flex:1 1 auto;min-width:0",
+    }) as HTMLInputElement;
+    input.addEventListener("change", () => {
+      const values = input.value
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+      settings.kingeye = { ...(settings.kingeye ?? DEFAULT_SETTINGS.kingeye), [field]: values };
+      void save();
+    });
+    return h(
+      "div",
+      { class: "row" },
+      h("label", { style: "min-width:104px", text: t(label) }),
+      input,
+    );
+  };
+
+  const stateChecksRow = (
+    field: "demandStates" | "bugStates",
+    label: string,
+    allStates: readonly string[],
+    defaultChecked: (s: string) => boolean,
+  ) => {
+    const saved = settings.kingeye?.[field];
+    const isChecked = (s: string): boolean => {
+      if (!saved || saved.length === 0) return defaultChecked(s);
+      return saved.includes(s);
+    };
+
+    const wrap = h("div", {
+      style: "display:flex;flex-wrap:wrap;gap:6px 14px;flex:1 1 auto;padding:2px 0",
+    });
+
+    const cbs: { state: string; input: HTMLInputElement }[] = [];
+
+    for (const s of allStates) {
+      const cb = h("input", {
+        type: "checkbox",
+        checked: isChecked(s),
+        style: "cursor:pointer;margin:0",
+      }) as HTMLInputElement;
+
+      cb.addEventListener("change", () => {
+        const selected = cbs.filter((item) => item.input.checked).map((item) => item.state);
+        const val = selected.length === 0 ? ["__none__"] : selected;
+        settings.kingeye = {
+          ...(settings.kingeye ?? DEFAULT_SETTINGS.kingeye),
+          [field]: val,
+        };
+        void save();
+      });
+
+      cbs.push({ state: s, input: cb });
+
+      const item = h(
+        "label",
+        {
+          style: "display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:12px;user-select:none",
+        },
+        cb,
+        h("span", { text: s }),
+      );
+      wrap.append(item);
+    }
+
+    return h(
+      "div",
+      { class: "row", style: "align-items:flex-start" },
+      h("label", { style: "min-width:104px;padding-top:2px", text: t(label) }),
+      wrap,
+    );
+  };
+
+  body.append(
+    listRow("projects", N_("Project IDs"), "aiops, he"),
+    listRow("versions", N_("Versions"), "4.5.16, 5.3"),
+    stateChecksRow("demandStates", N_("Demand states"), ALL_DEMAND_STATES, () => true),
+    stateChecksRow("bugStates", N_("Bug states"), ALL_BUG_STATES, (s) => s !== "已关闭" && s !== "同意拒绝"),
+  );
+
+  body.append(
+    h("div", { class: "row" },
+      h("label", { style: "min-width:104px", text: t("Include the items I last touched") }),
+      toggle(settings.kingeye?.includeTouched ?? true, (on) => {
+        settings.kingeye = { ...(settings.kingeye ?? DEFAULT_SETTINGS.kingeye), includeTouched: on };
+        void save();
+      }),
+    ),
+    h("div", { class: "hint", text: t("The DevOps login whose requirements and defects the card counts. Your CTeam login, not your Windows account name.") }),
+    h("div", { class: "hint", text: t("Separate values with commas. Empty means all.") }),
+    h("div", { class: "hint", text: t("Which projects, versions and states the card counts. Versions are matched against the title.") }),
+  );
+  return body;
 }
 
 function integrationsSection(present: Record<string, boolean>): HTMLElement {
@@ -302,6 +443,9 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
     if (def.hint) rows.append(h("div", { class: "hint", text: t(def.hint) }));
     if (def.id === "integration_github" || def.id === "integration_gitlab") {
       rows.append(gitWatchRows(def.id));
+    }
+    if (def.id === "integration_kingeye") {
+      rows.append(kingeyeRows());
     }
     if (def.mediaApp != null) {
       // As on the Mac's row: said only when there is no player to launch.
@@ -902,6 +1046,7 @@ async function render() {
 
   const keys = [
     "github-token", "resend-api-key", "gitlab-url", "gitlab-token",
+    "kingeye-token", "kingeye-login",
   ];
   const present: Record<string, boolean> = {};
   for (const k of keys) present[k] = (await Bridge.secretPresent(k)) ?? false;

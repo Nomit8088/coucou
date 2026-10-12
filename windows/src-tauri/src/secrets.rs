@@ -23,6 +23,13 @@ pub const KNOWN_KEYS: &[&str] = &[
     "deepseek-api-key",
     "gitlab-url",
     "gitlab-token",
+    // Kingeye (CTeam DevOps): the personal access token, the DevOps login whose
+    // requirements and defects the card counts, the CTeam host, and — once the
+    // user pastes one of their own work items — the person id `assignId` takes.
+    "kingeye-token",
+    "kingeye-login",
+    "kingeye-url",
+    "kingeye-assign-id",
     // QQ Mail: the mailbox's own address, and the 16-character authorisation
     // code QQ's settings hand out for third-party clients (mail.rs).
     "qqmail-address",
@@ -78,7 +85,16 @@ mod tests {
 
     #[test]
     fn deepseek_and_gitlab_credentials_are_allowed() {
-        for key in ["deepseek-api-key", "gitlab-url", "gitlab-token", "chat-c-abc"] {
+        for key in [
+            "deepseek-api-key",
+            "gitlab-url",
+            "gitlab-token",
+            "kingeye-token",
+            "kingeye-login",
+            "kingeye-url",
+            "kingeye-assign-id",
+            "chat-c-abc",
+        ] {
             assert!(allowed(key), "{key}");
         }
         assert!(!allowed("chat-"));

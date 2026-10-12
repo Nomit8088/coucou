@@ -19,6 +19,7 @@ test("the catalog is the personal fork set, with stable new ids", () => {
       ["integration_github", "GitHub", "#F4505E"],
       ["integration_resend", "Resend", "#22C55E"],
       ["integration_gitlab", "GitLab", "#FC6D26"],
+      ["integration_kingeye", "Cteams", "#2F6BFF"],
       ["integration_spotify", "Spotify", "#1DB954"],
       ["integration_qqmusic", "QQ Music", "#31C27C"],
       ["integration_cloudmusic", "CloudMusic", "#C20C0C"],
@@ -36,6 +37,7 @@ test("the catalog is the personal fork set, with stable new ids", () => {
   assert.equal(pillDefinition("integration_cloudmusic").mediaApp, "cloudmusic.exe");
   assert.equal(pillDefinition("integration_spotify").mediaApp, "Spotify.exe");
   assert.equal(pillDefinition("integration_qqmail").connect.key, "qqmail-auth-code");
+  assert.equal(pillDefinition("integration_kingeye").connect.key, "kingeye-token");
   for (const gone of ["integration_claude", "agent_cursor", "ai_anthropic", "integration_stripe", "integration_music"]) {
     assert.equal(pillDefinition(gone), undefined, gone);
   }

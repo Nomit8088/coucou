@@ -57,6 +57,7 @@ const OPEN_URLS: Record<string, string> = {
   integration_notion: "https://notion.so",
   integration_calcom: "https://app.cal.com/bookings",
   integration_qqmail: "https://wx.mail.qq.com/",
+  integration_kingeye: "https://devops.cwoa.net/vteam/",
 };
 
 /** IntegrationCardView.statusLabel on macOS. */
@@ -408,6 +409,251 @@ function qqmailCard(): HTMLElement {
   return h("div", { class: "int-card" }, header(QQMAIL_BLUE, "QQ Mail", t("Inbox"), extra), rows);
 }
 
+// ── Kingeye (CTeam DevOps) ────────────────────────────────────────────────────
+
+const KINGEYE_BLUE = "#2F6BFF";
+
+let kingeyeTab: "DEMAND" | "BUG" = "DEMAND";
+
+function renderKingeyeList(
+  items: Record<string, unknown>[],
+  activeTab: "DEMAND" | "BUG",
+  container: HTMLElement,
+) {
+  container.innerHTML = "";
+  const filtered = items.filter((i) => i.classify === activeTab);
+  if (filtered.length === 0) {
+    container.append(h("div", { class: "int-empty", text: t("Nothing here") }));
+    return;
+  }
+  for (const item of filtered) {
+    const defect = item.classify === "BUG";
+    const accent = defect ? "#F4505E" : KINGEYE_BLUE;
+    const number = String(item.number ?? "");
+    const title = String(item.title ?? "");
+    const state = String(item.state ?? "");
+    const url = String(item.url ?? "");
+
+    const stateSpan = state
+      ? h("span", {
+          style: `font-size:10px;padding:1px 5px;border-radius:4px;background:${accent}18;color:${accent};white-space:nowrap;margin-right:4px;font-weight:500;`,
+          text: state,
+        })
+      : h("span");
+
+    const line = listRow(
+      accent,
+      false,
+      h("span", { class: "int-ago", text: number }),
+      stateSpan,
+      h("span", { class: "int-name", text: title || t("Nothing here") }),
+    );
+    if (url) {
+      line.style.cursor = "pointer";
+      line.addEventListener("click", () => void Bridge.openUrl(url));
+    }
+    container.append(line);
+  }
+}
+
+function kingeyeTabBar(
+  requirements: number,
+  defects: number,
+  onSwitch: (tab: "DEMAND" | "BUG") => void,
+): HTMLElement {
+  const bar = h("div", {
+    style: "display:flex;gap:6px;padding:2px 0 6px 0;align-items:center;",
+  });
+
+  const makeBtn = (type: "DEMAND" | "BUG", label: string, count: number, color: string) => {
+    const active = kingeyeTab === type;
+    const el = h("button", {
+      type: "button",
+      style: active
+        ? `background:${color}20;color:${color};font-weight:600;border:1px solid ${color}40;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;`
+        : `background:transparent;color:var(--text-secondary,#888);border:1px solid transparent;border-radius:5px;padding:2px 8px;font-size:11px;cursor:pointer;`,
+      text: `${label} (${count})`,
+    });
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      kingeyeTab = type;
+      onSwitch(type);
+    });
+    return el;
+  };
+
+  bar.append(
+    makeBtn("DEMAND", t("Requirements"), requirements, KINGEYE_BLUE),
+    makeBtn("BUG", t("Defects"), defects, "#F4505E"),
+  );
+  return bar;
+}
+
+function kingeyeContent(
+  items: Record<string, unknown>[],
+  requirements: number,
+  defects: number,
+  isDetail: boolean,
+  openSettings: () => void,
+): HTMLElement {
+  const info = State.integrations["integration_kingeye"];
+  if (!info?.configured) {
+    return h(
+      "div",
+      {
+        class: "int-idle",
+        style: "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100px;gap:8px;",
+      },
+      h("span", { style: "color:var(--dim-2);font-size:12px;", text: "未配置个人访问令牌" }),
+      h("button", {
+        class: "link-btn",
+        style: `color:${KINGEYE_BLUE}d9;cursor:pointer;`,
+        text: "打开设置",
+        onclick: openSettings,
+      }),
+    );
+  }
+  if (info.error) {
+    return h(
+      "div",
+      {
+        class: "int-idle",
+        style: "display:flex;flex-direction:column;align-items:center;justify-content:center;height:100px;gap:8px;padding:0 12px;text-align:center;",
+      },
+      h("span", { style: "color:#F4505E;font-size:12px;word-break:break-all;", text: info.error }),
+      h("button", {
+        class: "link-btn",
+        style: `color:${KINGEYE_BLUE}d9;cursor:pointer;`,
+        text: "检查设置",
+        onclick: openSettings,
+      }),
+    );
+  }
+  if (!info.loaded) {
+    return h(
+      "div",
+      {
+        class: "int-idle",
+        style: "display:flex;align-items:center;justify-content:center;height:100px;gap:6px;color:var(--dim-2);font-size:12px;",
+      },
+      dot(KINGEYE_BLUE, 6),
+      h("span", { text: "正在加载 Cteams 数据…" }),
+    );
+  }
+
+  const hasReqs = items.some((i) => i.classify === "DEMAND");
+  const hasBugs = items.some((i) => i.classify === "BUG");
+  if (kingeyeTab === "DEMAND" && !hasReqs && hasBugs) {
+    kingeyeTab = "BUG";
+  } else if (kingeyeTab === "BUG" && !hasBugs && hasReqs) {
+    kingeyeTab = "DEMAND";
+  }
+
+  const maxH = isDetail ? "185px" : "85px";
+  const rows = h("div", {
+    class: "int-rows tight",
+    style: `max-height:${maxH};overflow-y:auto;overflow-x:hidden;padding-right:2px;`,
+  });
+  renderKingeyeList(items, kingeyeTab, rows);
+
+  let barEl: HTMLElement;
+  const updateTab = (type: "DEMAND" | "BUG") => {
+    kingeyeTab = type;
+    renderKingeyeList(items, type, rows);
+    const newBar = kingeyeTabBar(requirements, defects, updateTab);
+    barEl.replaceWith(newBar);
+    barEl = newBar;
+  };
+
+  barEl = kingeyeTabBar(requirements, defects, updateTab);
+  return h("div", { style: "display:flex;flex-direction:column;" }, barEl, rows);
+}
+
+/**
+ * The counts the task line shows, with Demand/Defect tabs and a scrollable list.
+ */
+function kingeyeCard(onDetail: () => void, openSettings: () => void): HTMLElement {
+  const d = get("integration_kingeye");
+  const requirements = Number(d.requirements ?? 0);
+  const defects = Number(d.defects ?? 0);
+  const items = arr("integration_kingeye", "items");
+
+  const expandBtn = h(
+    "button",
+    {
+      class: "int-toggle-btn",
+      title: "展开至大窗口 (Detail)",
+      onclick: onDetail,
+    },
+    svg(ICONS.arrowUpRight, 8, { stroke: 2 }),
+    h("span", { text: "展开" }),
+  );
+
+  const left = h(
+    "div",
+    { style: "display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;" },
+    dot(KINGEYE_BLUE, 7),
+    h("b", { text: "Cteams" }),
+    expandBtn,
+  );
+
+  const head = h(
+    "div",
+    { class: "int-head", style: "display:flex;align-items:center;justify-content:space-between;" },
+    left,
+  );
+
+  const cardBody = kingeyeContent(items, requirements, defects, false, openSettings);
+  return h("div", { class: "int-card" }, head, cardBody);
+}
+
+function kingeyeDetail(onBack: () => void, openSettings: () => void): HTMLElement {
+  const d = get("integration_kingeye");
+  const requirements = Number(d.requirements ?? 0);
+  const defects = Number(d.defects ?? 0);
+  const items = arr("integration_kingeye", "items");
+
+  const collapseBtn = h(
+    "button",
+    {
+      class: "int-toggle-btn",
+      title: "缩小至小窗口 (Esc)",
+      onclick: onBack,
+    },
+    svg(ICONS.chevronLeft, 8, { stroke: 2.2 }),
+    h("span", { text: "缩小" }),
+  );
+
+  const left = h(
+    "div",
+    { style: "display:inline-flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0;" },
+    dot(KINGEYE_BLUE, 7),
+    h("b", { text: "Cteams" }),
+    collapseBtn,
+  );
+
+  const collapseIcon = h(
+    "button",
+    {
+      class: "icon-btn",
+      title: "缩小至小窗口 (Esc)",
+      style: "cursor:pointer;display:inline-flex;align-items:center;flex-shrink:0;",
+      onclick: onBack,
+    },
+    svg(ICONS.chevronUp, 8, { stroke: 2.2 }),
+  );
+
+  const head = h(
+    "div",
+    { class: "int-detail-head", style: "display:flex;align-items:center;justify-content:space-between;" },
+    left,
+    collapseIcon,
+  );
+
+  const cardBody = kingeyeContent(items, requirements, defects, true, openSettings);
+  return h("div", { class: "int-card detail" }, head, cardBody);
+}
+
 // ── Dispatch ──────────────────────────────────────────────────────────────────
 
 export interface IntegrationCardHooks {
@@ -438,6 +684,8 @@ export function hasIntegrationData(id: string): boolean {
       return info.loaded;
     case "integration_qqmail":
       return info.loaded;
+    case "integration_kingeye":
+      return info.loaded;
     default:
       return false;
   }
@@ -452,6 +700,11 @@ export function renderIntegrationCard(task: AgentTask, hooks: IntegrationCardHoo
   }
   if (task.id === "integration_vercel" && hasIntegrationData(task.id)) {
     return hooks.detailOpen ? vercelDetail(hooks.closeDetail) : vercelCard(hooks.openDetail);
+  }
+  if (task.id === "integration_kingeye") {
+    return hooks.detailOpen
+      ? kingeyeDetail(hooks.closeDetail, hooks.openSettings)
+      : kingeyeCard(hooks.openDetail, hooks.openSettings);
   }
   if (!hasIntegrationData(task.id)) return idleCard(task, hooks.openSettings);
 

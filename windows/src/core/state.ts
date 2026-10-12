@@ -165,6 +165,8 @@ export interface Settings {
   githubWatch: GitWatch;
   /** Which GitLab MRs the island watches. */
   gitlabWatch: GitWatch;
+  /** What the Kingeye (CTeam DevOps) card counts. */
+  kingeye: KingeyePrefs;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;
@@ -176,6 +178,21 @@ export interface GitWatch {
   created: boolean;
   assigned: boolean;
   review: boolean;
+}
+
+/**
+ * What Kingeye shows (src-tauri/src/kingeye.rs). `projects`, `versions` and
+ * `states` are the user's own picks; an empty `versions` or `states` means "do
+ * not filter on that", while an empty `projects` falls back to "aiops".
+ */
+export interface KingeyePrefs {
+  projects: string[];
+  versions: string[];
+  demandStates?: string[];
+  bugStates?: string[];
+  states?: string[];
+  /** Also count the items this login last touched, not only those it created. */
+  includeTouched: boolean;
 }
 
 export interface GitNotice {
@@ -216,6 +233,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "",
   githubWatch: { created: true, assigned: true, review: true },
   gitlabWatch: { created: true, assigned: true, review: true },
+  kingeye: { projects: [], versions: [], demandStates: [], bugStates: [], states: [], includeTouched: true },
 };
 
 type Listener = () => void;
@@ -285,6 +303,8 @@ class AppState {
   sessionDiffs = new Map<string, FileDiff[]>();
   /** The overview is showing the full-width editor-style diff detail. */
   showingDiffDetail = false;
+  /** The overview is showing a full-width integration detail (e.g. Kingeye). */
+  showingIntegrationDetail = false;
   private sessionDiffTimers = new Map<string, number>();
   /** Never reset, so an id can never point at a newer diff than the one tapped. */
   private nextDiffId = 0;

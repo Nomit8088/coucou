@@ -1863,6 +1863,25 @@ input[type="range"]::-webkit-slider-thumb {
   font-variant-numeric: tabular-nums;
 }
 
+.int-toggle-btn {
+  border: 0;
+  background: transparent;
+  font: 500 11px var(--font);
+  color: var(--dim-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.int-toggle-btn:hover {
+  color: var(--ink);
+}
+
 .pulse {
   width: 4px;
   height: 4px;

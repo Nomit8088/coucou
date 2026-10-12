@@ -29,6 +29,9 @@ pub struct GitlabMr {
     pub ci: CiState,
     pub head_sha: Option<String>,
     pub pipeline_url: Option<String>,
+    /// REST `project_id`, used to fetch pipelines when GraphQL is unavailable.
+    #[serde(skip_serializing, default)]
+    pub project_id: Option<i64>,
     #[serde(skip_serializing, default)]
     pub comments: Vec<GitlabComment>,
 }
@@ -78,27 +81,38 @@ pub enum GitlabEvent {
     },
 }
 
+/// Minimal query: enterprise GitLab often rejects `notes(filter:)` or
+/// `reviewRequestedMergeRequests`, which used to fail the whole pulse.
 pub const GRAPHQL_QUERY: &str = r#"
 fragment MrFields on MergeRequest {
   iid title webUrl
   author { username }
   project { fullPath }
-  headPipeline { id status webUrl sha }
-  notes(last: 15, filter: ONLY_COMMENTS) {
-    nodes { id author { username } createdAt system }
-  }
+  headPipeline { status webUrl sha }
 }
 query {
   currentUser {
     username
-    authoredMergeRequests(state: opened, first: 8, sort: UPDATED_DESC) {
+    authoredMergeRequests(state: opened, first: 20) {
       nodes { ...MrFields }
     }
-    assignedMergeRequests(state: opened, first: 8, sort: UPDATED_DESC) {
+    assignedMergeRequests(state: opened, first: 20) {
       nodes { ...MrFields }
     }
-    reviewRequestedMergeRequests(state: opened, first: 8, sort: UPDATED_DESC) {
-      nodes { ...MrFields }
+  }
+}
+"#;
+
+pub const GRAPHQL_REVIEW_QUERY: &str = r#"
+query {
+  currentUser {
+    reviewRequestedMergeRequests(state: opened, first: 20) {
+      nodes {
+        iid title webUrl
+        author { username }
+        project { fullPath }
+        headPipeline { status webUrl sha }
+      }
     }
   }
 }
@@ -173,8 +187,20 @@ fn parse_mr(node: &Value) -> Option<GitlabMr> {
         ci,
         head_sha,
         pipeline_url,
+        project_id: node.get("project_id").and_then(Value::as_i64),
         comments: comments_of(node),
     })
+}
+
+/// Fill CI from a REST pipeline row (`GET .../merge_requests/:iid/pipelines`).
+pub fn apply_pipeline_row(mr: &mut GitlabMr, row: &Value) {
+    mr.ci = ci_from_gitlab(str_at(row, "status"));
+    if let Some(sha) = str_at(row, "sha") {
+        mr.head_sha = Some(sha.to_string());
+    }
+    if let Some(url) = str_at(row, "web_url").or_else(|| str_at(row, "webUrl")) {
+        mr.pipeline_url = Some(url.to_string());
+    }
 }
 
 fn collect_mrs(parent: Option<&Value>) -> Vec<GitlabMr> {
@@ -220,6 +246,12 @@ impl GitlabPulse {
             review: collect_mrs(user.get("reviewRequestedMergeRequests")),
             fetched_at: now,
         })
+    }
+
+    pub fn merge_review(&mut self, root: &Value) {
+        if let Some(user) = root.get("data").and_then(|d| d.get("currentUser")) {
+            self.review = collect_mrs(user.get("reviewRequestedMergeRequests"));
+        }
     }
 
     /// REST list payloads already shaped as arrays of MR JSON.
@@ -410,6 +442,7 @@ mod tests {
             ci,
             head_sha: sha.map(str::to_string),
             pipeline_url: Some("https://gitlab.example.com/g/p/-/pipelines/9".into()),
+            project_id: Some(1),
             comments: Vec::new(),
         }
     }
@@ -534,5 +567,27 @@ mod tests {
         assert_eq!(p.mine[0].ci, CiState::Success);
         assert_eq!(p.mine[0].comments.len(), 1);
         assert_eq!(p.fetched_at, 3);
+    }
+
+    #[test]
+    fn rest_list_without_pipeline_is_unknown_until_enriched() {
+        let list = json!([{
+            "iid": 14895,
+            "title": "failing",
+            "web_url": "https://code.cwoa.net/g/p/-/merge_requests/14895",
+            "project_id": 77,
+            "author": { "username": "me" },
+            "references": { "full": "g/p!14895" }
+        }]);
+        let mut pulse = GitlabPulse::from_rest("me".into(), Some(&list), None, None, 1);
+        assert_eq!(pulse.mine[0].ci, CiState::Unknown);
+        assert_eq!(pulse.mine[0].project_id, Some(77));
+        apply_pipeline_row(&mut pulse.mine[0], &json!({
+            "status": "failed",
+            "sha": "dead",
+            "web_url": "https://code.cwoa.net/g/p/-/pipelines/9"
+        }));
+        assert_eq!(pulse.mine[0].ci, CiState::Failure);
+        assert_eq!(pulse.mine[0].head_sha.as_deref(), Some("dead"));
     }
 }

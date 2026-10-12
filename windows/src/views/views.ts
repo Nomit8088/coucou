@@ -280,13 +280,21 @@ function buildOverview(actions: ViewActions): ViewHost {
       State.showingDiffDetail = false;
     }
   });
-  // Escape steps back out of the diff before it closes the island.
+  // Escape steps back out of the diff or integration detail before it closes the island.
   window.addEventListener(
     "keydown",
     (e) => {
-      if (e.key !== "Escape" || activeDiffId == null || State.view !== "overview") return;
-      e.stopImmediatePropagation();
-      closeDiff();
+      if (e.key !== "Escape" || State.view !== "overview") return;
+      if (activeDiffId != null) {
+        e.stopImmediatePropagation();
+        closeDiff();
+        return;
+      }
+      if (detailOpen) {
+        e.stopImmediatePropagation();
+        hooks.closeDetail();
+        return;
+      }
     },
     true,
   );
@@ -297,11 +305,13 @@ function buildOverview(actions: ViewActions): ViewHost {
     },
     openDetail() {
       detailOpen = true;
+      State.showingIntegrationDetail = true;
       cardKey = "";
       State.notify();
     },
     closeDetail() {
       detailOpen = false;
+      State.showingIntegrationDetail = false;
       cardKey = "";
       State.notify();
     },
@@ -355,6 +365,7 @@ function buildOverview(actions: ViewActions): ViewHost {
       if (task?.id !== lastFocus) {
         lastFocus = task?.id ?? null;
         detailOpen = false;
+        State.showingIntegrationDetail = false;
         activeDiffId = null;
         cardKey = "";
         mode = null;
@@ -383,7 +394,7 @@ function buildOverview(actions: ViewActions): ViewHost {
         activeDiffId = null;
         State.showingDiffDetail = false;
       }
-      el.classList.toggle("diff-open", !!diff);
+      el.classList.toggle("diff-open", !!diff || detailOpen);
 
       if (planOpen) {
         if (mode !== "plan") {
