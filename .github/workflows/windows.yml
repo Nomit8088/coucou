@@ -26,7 +26,7 @@ jobs:
     runs-on: windows-latest
     defaults:
       run:
-        working-directory: windows
+        working-directory: desktop
 
     steps:
       - uses: actions/checkout@v4
@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: windows/package-lock.json
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -45,8 +45,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            windows/target
-          key: windows-cargo-${{ hashFiles('windows/Cargo.lock') }}
+            desktop/target
+          key: windows-cargo-${{ hashFiles('desktop/Cargo.lock') }}
           restore-keys: windows-cargo-
 
       - name: Install dependencies
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: Coucou-Windows-${{ steps.sync_version.outputs.version }}
-          path: windows/release/*
+          path: desktop/release/*
           retention-days: 14
 
       # Publish or update GitHub Release for the tag

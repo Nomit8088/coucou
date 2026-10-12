@@ -2,7 +2,7 @@
 
 <img src="src-tauri/icons/128x128.png" width="96" alt="Coucou icon">
 
-# Coucou for Windows (DSH & Media Enhanced)
+# Coucou for desktop (Windows · macOS · Linux)
 
 > **macOS users:** this Tauri enhanced edition now has its own Mac backend and DMG build configuration. Use [MACOS.md](<MACOS.md>) for setup, platform limitations and validation. Do not use the legacy Swift/Xcode build instructions for this edition; unsupported Mac music and desktop features are intentionally hidden.
 
@@ -348,10 +348,10 @@ You need [Rust](https://rustup.rs), [Node 20+](https://nodejs.org), and the
 C++"). WebView2 ships with Windows 10/11.
 
 ```powershell
-cd windows
+cd desktop
 npm install
 npm run tauri dev      # live-reloading development build
-npm run pack           # builds the installer and drops it in windows/release/
+npm run pack           # builds the installer and drops it in desktop/release/
 ```
 
 `npm run dev` alone serves the front end in an ordinary browser, which is enough
@@ -361,7 +361,7 @@ otherwise needs a real drag from Explorer to see — and `dev/recap-preview.html
 the weekly recap card and its shared image on a sample week. None of these pages
 ships in the app.
 
-`npm run pack` leaves two files in `windows/release/`, the same names the release
+`npm run pack` leaves two files in `desktop/release/`, the same names the release
 workflow publishes:
 
 ```
@@ -386,7 +386,7 @@ npm run icons          # regenerates src-tauri/icons from scripts/gen-icons.mjs
 ### Layout
 
 ```
-windows/
+desktop/
   src/                 island front end (TypeScript, no framework)
     mochi/             Mochi and the launch greeting, in Canvas 2D
     desktop/           Mochi's own little window, when he lives on the desktop
@@ -417,7 +417,7 @@ Linux.
 | Agent | Installs | Permissions |
 |---|---|---|
 | Claude Code | `.claude\settings.json` (**Settings → Claude Code**) | Allow / Deny and questions in the island |
-| DeepSeek Harness (DSH) | plugin `windows/dsh-plugin/` | Allow / Deny and questions (sync with Web GUI), context gauge, jobs, reminders |
+| DeepSeek Harness (DSH) | plugin `desktop/dsh-plugin/` | Allow / Deny and questions (sync with Web GUI), context gauge, jobs, reminders |
 | Codex | `.codex\hooks.json` — then trust the hooks once with `/hooks` in Codex | Allow / Deny in the island |
 | GitHub Copilot CLI | `.copilot\hooks\coucou.json` | Allow / Deny in the island |
 | Muse Code | `.config\muse\settings.json` | Allow / Deny in the island |
@@ -559,14 +559,14 @@ sudo apt install build-essential pkg-config \
   gstreamer1.0-plugins-base gstreamer1.0-plugins-good
 npm install
 npm run tauri dev      # live-reloading development build
-npm run pack           # AppImage, .deb and .rpm in windows/release/
+npm run pack           # AppImage, .deb and .rpm in desktop/release/
 ```
 
-On Arch Linux, build and install the package from `linux/arch/`:
+On Arch Linux, build and install the package from `packaging/linux/arch/`:
 
 ```bash
 git clone https://github.com/Louis-CFM/coucou.git
-cd coucou/linux/arch
+cd coucou/packaging/linux/arch
 makepkg -si
 ```
 

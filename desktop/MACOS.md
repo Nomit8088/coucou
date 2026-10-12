@@ -19,7 +19,7 @@
 
 ```sh
 xcode-select --install
-cd windows
+cd desktop
 npm ci
 npm run tauri dev
 ```
@@ -27,11 +27,11 @@ npm run tauri dev
 Tauri 自动合并 macOS 平台配置，无需手动带 `--config`。启动前会生成 Mac 图标并构建宿主架构的 `coucou-hook`。
 
 ```sh
-cd windows
+cd desktop
 npm run pack
 ```
 
-产物位于 `windows/release/`：
+产物位于 `desktop/release/`：
 
 - Apple Silicon：`Coucou-macOS-0.1.3-aarch64.dmg`
 - Intel：`Coucou-macOS-0.1.3-x86_64.dmg`
@@ -52,10 +52,21 @@ Mac bundle ID 保持 `fr.louisraille.NotchBuddy`。不要同时运行原生版�
 
 如果目录被不正确的程序预先创建，请先退出 Coucou/DSH，确认所有者和用途后处理该目录；应用不会自动更改可疑目录的权限。
 
+## 发布与签名（待决策）
+
+`macos-v*` tag 会像 Windows / Linux 的 tag 一样触发 macOS 构建（见 [macos-tauri.yml](<../.github/workflows/macos-tauri.yml>)），但**只产出 DMG artifact，不创建 Release**：CI 与本地默认产物都没有 Developer ID 签名和公证，直接发布会让下载的人被 Gatekeeper 拦下。
+
+要和另外两个平台在发布上对等，需要先定两件事：
+
+1. 是否申请 Apple Developer ID 并为 CI 配置签名/公证凭据（Tauri 的 `APPLE_SIGNING_IDENTITY`、`APPLE_ID`、`APPLE_PASSWORD`、`APPLE_TEAM_ID`，只放 CI Secrets）；
+2. 若决定长期不签名，是否接受在 Release 说明里显式标注“未签名”，并给出“隐私与安全性 → 仍要打开”的放行步骤。
+
+决策落定前，`macos-v*` tag 只用于产出可供人工签名/验收的 DMG artifact。
+
 ## 验证
 
 ```sh
-cd windows
+cd desktop
 node scripts/prepare-build.mjs
 npx tsc --noEmit
 npm test

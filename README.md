@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="windows/src-tauri/icons/128x128.png" width="96" alt="Coucou icon">
+<img src="desktop/src-tauri/icons/128x128.png" width="96" alt="Coucou icon">
 
 # Coucou — DSH Enhanced Edition
 
@@ -26,7 +26,7 @@
 - **Mochi**：保留现有角色、灵动岛、换装、声音、文件拖入、差异展示和周报，不重做已发布界面。
 - **Windows 音乐增强**：网易云音乐、QQ 音乐、Spotify 系统媒体会话、播放控制与舞蹈动效；独立安装包 / 绿色便携版。
 
-**macOS 使用同一套 `windows/` TypeScript / Rust 代码，不是原生 Swift 版本。** Apple Music、iPhone / iCloud 同步、语音听写、贴附前台窗口等原生版本专属能力不属于此版。Mac 上没有后端实现的音乐与桌面悬浮入口会隐藏；完整差异与验收见 [macOS 适配说明](<windows/MACOS.md>)。
+**macOS 使用同一套 `desktop/` TypeScript / Rust 代码，不是原生 Swift 版本。** Apple Music、iPhone / iCloud 同步、语音听写、贴附前台窗口等原生版本专属能力不属于此版。Mac 上没有后端实现的音乐与桌面悬浮入口会隐藏；完整差异与验收见 [macOS 适配说明](<desktop/MACOS.md>)。
 
 ## 安装与运行
 
@@ -34,7 +34,7 @@
 
 从 [本 Fork Releases](https://github.com/Nomit8088/coucou/releases) 下载对应版本的 `Coucou-Windows-setup.exe`、`.msi` 或 `Coucou-Windows-portable.zip`，不需要 Node / Rust 开发环境。设置和托盘菜单可以检查更新。
 
-未签名包可能触发 SmartScreen；请先确认来源可信，再根据系统提示决定是否运行。也可以自行从源码构建。详见 [Windows / Linux 使用说明](<windows/README.md>)。
+未签名包可能触发 SmartScreen；请先确认来源可信，再根据系统提示决定是否运行。也可以自行从源码构建。详见 [Windows / Linux 使用说明](<desktop/README.md>)。
 
 ### macOS（Tauri 增强版）
 
@@ -42,11 +42,11 @@
 
 在 Mac 上构建，或在 [macOS CI](<.github/workflows/macos-tauri.yml>) 运行后下载对应 Apple Silicon / Intel 的 DMG artifact。安装时将 `Coucou.app` 拖入 Applications。CI artifact 未经 Developer ID 公证；正式分发需配置 Apple 签名/公证。
 
-Mac 更新为明确的对应架构 DMG 下载 / 手动安装，不执行 Windows 安装程序。源码和实机检查步骤见 [Mac 指南](<windows/MACOS.md>)。
+Mac 更新为明确的对应架构 DMG 下载 / 手动安装，不执行 Windows 安装程序。源码和实机检查步骤见 [Mac 指南](<desktop/MACOS.md>)。
 
 ### Linux
 
-继续使用同一个 Tauri 工程及现有 AppImage / deb / rpm 打包配置；系统依赖和 Wayland 差异见 [Linux 说明](<windows/README.md#linux>)。上游的发行包不一定包含这个 Fork 的最新 DSH 增强。
+继续使用同一个 Tauri 工程及现有 AppImage / deb / rpm 打包配置；系统依赖和 Wayland 差异见 [Linux 说明](<desktop/README.md#linux>)。上游的发行包不一定包含这个 Fork 的最新 DSH 增强。
 
 ## 从源码构建
 
@@ -54,7 +54,7 @@ Mac 更新为明确的对应架构 DMG 下载 / 手动安装，不执行 Windows
 
 ```sh
 git clone https://github.com/Nomit8088/coucou.git
-cd coucou/windows
+cd coucou/desktop
 npm ci
 npm run tauri dev
 ```
@@ -65,7 +65,7 @@ npm run tauri dev
 npm run pack
 ```
 
-Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS-<version>-aarch64.dmg` 或 `Coucou-macOS-<version>-x86_64.dmg`，放在 `windows/release/`；请分别在对应架构的 Mac 构建，hook 必须与主程序架构一致。
+Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS-<version>-aarch64.dmg` 或 `Coucou-macOS-<version>-x86_64.dmg`，放在 `desktop/release/`；请分别在对应架构的 Mac 构建，hook 必须与主程序架构一致。
 
 ## 配置与安全
 
@@ -87,12 +87,12 @@ Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS
 
 ## 代码位置与验证
 
-- [Tauri 工程](<windows/Cargo.toml>)：共享前端、Rust 后端及 hook；[Mac 指南](<windows/MACOS.md>)。
+- [Tauri 工程](<desktop/Cargo.toml>)：共享前端、Rust 后端及 hook；[Mac 指南](<desktop/MACOS.md>)。
 - [macOS CI](<.github/workflows/macos-tauri.yml>)：分别检查 Intel / Apple Silicon，生成 DMG，不自动发布。
 - 原生 Swift / iPhone / relay 源码只作为历史项目保留，不参与本 Fork 的 Mac Tauri 构建；相关旧文档不代表此版功能。
 
 ```sh
-cd windows
+cd desktop
 node scripts/prepare-build.mjs
 npx tsc --noEmit
 npm test

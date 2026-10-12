@@ -1,10 +1,25 @@
 name: Build
 
+# The legacy native macOS/iPhone (Swift) target. The fork's active app is
+# `desktop/` (Tauri), covered by windows-ci.yml, linux.yml and macos-tauri.yml.
+# This workflow used to build on every push to main; scope it to the files it
+# actually compiles so a change elsewhere no longer pays for an Xcode build.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
+    paths:
+      - 'NotchBuddy/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
   pull_request:
     branches: [main]
+    paths:
+      - 'NotchBuddy/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - '.github/workflows/build.yml'
 
 jobs:
   build:

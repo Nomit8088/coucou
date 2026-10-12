@@ -2,7 +2,43 @@
 
 Thanks for wanting to help Mochi grow up! 🫶
 
-## Getting started
+## Two apps live here
+
+- **`desktop/`** — the active app, and where almost every change belongs: one
+  Tauri project (TypeScript front end in `src/`, Rust backend in `src-tauri/`,
+  the `coucou-hook` relay in `hook/`) that builds for Windows, macOS and Linux.
+- **`NotchBuddy/`**, the `*Tests.swift` files in `tests/` and the
+  `scripts/test-*.sh` helpers — the legacy native macOS/iPhone app. Kept for
+  history and the App Store build; it is **not** part of the enhanced edition,
+  and its CI (`build.yml`, `release.yml`) only runs when those files change, or
+  by hand.
+
+## Getting started (desktop app)
+
+```bash
+cd desktop
+npm ci
+npm run tauri dev      # live-reloading development build
+```
+
+Never restyle a view that already ships: the house rules are in `CLAUDE.md`.
+
+Check your work the way CI does:
+
+```bash
+cd desktop
+node scripts/prepare-build.mjs
+npx tsc --noEmit
+npm test
+cargo test --workspace --locked
+```
+
+`npm test` pins the host OS the suite answers for in `tests/setup.mjs` (Windows
+by default; the `tests/macos*.test.mjs` files pin a Mac themselves). Keep it that
+way: a suite that reads the developer's real OS passes on Windows and fails on
+the macOS runner.
+
+## Getting started (legacy Swift app)
 
 ```bash
 brew install xcodegen
@@ -24,7 +60,7 @@ Check auto-close timing and live setting changes:
 bash scripts/test-auto-close.sh
 ```
 
-## Good first contributions
+## Good first contributions (legacy Swift app)
 
 - A new service integration (a poller + an entry in `PillCatalog.swift` in the `.service` category + a detail card). Look at `StripePoller.swift` for a compact example.
 - A new agent: any agent already gets its own automatic pill by sending `coucou_agent` in its hook payload (see `docs/AGENTS.md`). Add an entry in `PillCatalog.swift` in the `.agent` or `.workspace` category only if you want it to be declarable in Settings → Active pills.

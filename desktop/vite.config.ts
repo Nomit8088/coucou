@@ -11,7 +11,7 @@ export const SOUNDS_DIR = resolve(__dirname, "../NotchBuddy/Resources/sounds");
 
 /**
  * Serves SOUNDS_DIR at /sounds/*.wav in dev, and copies it into dist/sounds on build.
- * Keeps the WAVs out of windows/ while still shipping them inside the installer.
+ * Keeps the WAVs out of desktop/ while still shipping them inside the installer.
  */
 function sharedSounds(): Plugin {
   const prefix = "/sounds/";
