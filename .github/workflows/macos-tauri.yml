@@ -9,12 +9,14 @@ on:
       - '.github/workflows/macos-tauri.yml'
   push:
     branches: [main]
-    # A `macos-v*` tag builds both architectures' DMGs so they can be signed
-    # and notarized by hand. It publishes nothing: see "发布与签名（待决策）"
-    # in desktop/MACOS.md.
+    # A shared `v*` release tag builds both architectures' DMGs and attaches them
+    # to that tag's release, so one release carries every platform's installer —
+    # which is what /releases/latest needs to serve both updaters. A `macos-v*`
+    # tag builds the same DMGs but touches no release.
     tags:
+      - 'v*'
       - 'macos-v*'
-    # A path filter is not evaluated for tag pushes, so the tag above always builds.
+    # A path filter is not evaluated for tag pushes, so the tags above always build.
     paths:
       - 'desktop/**'
       - '.github/workflows/macos-tauri.yml'
@@ -60,6 +62,23 @@ jobs:
           key: macos-tauri-${{ matrix.arch }}-${{ hashFiles('desktop/Cargo.lock') }}
       - name: Install frontend dependencies
         run: npm ci
+      # Same guard as the Linux workflow. A shared tag has to agree with the three
+      # files that carry the version, otherwise the DMG ships a version the release
+      # does not name and the Mac updater offers the same update forever.
+      - name: Check the tag and every version agree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          tag="${GITHUB_REF_NAME#macos-v}"
+          tag="${tag#v}"
+          conf=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          pkg=$(node -p "require('./package.json').version")
+          cargo=$(sed -nE 's/^version\s*=\s*"(.+)"/\1/p' Cargo.toml | head -1)
+          echo "tag=$tag tauri.conf=$conf package.json=$pkg Cargo.toml=$cargo"
+          bad=""
+          [ "$tag" = "$conf" ]  || bad="$bad tauri.conf.json says $conf;"
+          [ "$tag" = "$pkg" ]   || bad="$bad package.json says $pkg;"
+          [ "$tag" = "$cargo" ] || bad="$bad Cargo.toml says $cargo;"
+          if [ -n "$bad" ]; then echo "tag says $tag but$bad"; exit 1; fi
       - name: Type check and test frontend / DSH plugin
         run: |
           npx tsc --noEmit
@@ -78,6 +97,46 @@ jobs:
         run: |
           npm run pack
           shasum -a 256 release/Coucou-macOS-*.dmg > release/SHA256SUMS-macOS-${{ matrix.arch }}
+          shasum -a 256 -c release/SHA256SUMS-macOS-${{ matrix.arch }}
+      # The cheapest half of "it installs": the DMG mounts, the bundle inside is
+      # the app we think it is, and both the app and the hook it ships are built
+      # for this runner's architecture (MACOS.md's own warning). Gatekeeper's
+      # verdict is reported, not enforced: these DMGs stay unsigned until Apple
+      # credentials are configured (desktop/MACOS.md, "发布与签名").
+      - name: Preflight the DMG
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          dmg="release/Coucou-macOS-${version}-${{ matrix.arch }}.dmg"
+          test -f "$dmg"
+          mkdir -p /tmp/coucou-dmg
+          hdiutil attach -nobrowse -readonly -mountpoint /tmp/coucou-dmg "$dmg" >/dev/null
+          trap 'hdiutil detach /tmp/coucou-dmg >/dev/null 2>&1 || true' EXIT
+          app=$(find /tmp/coucou-dmg -maxdepth 1 -name '*.app' | head -1)
+          test -n "$app" || { echo "::error::no .app inside $dmg"; exit 1; }
+          bundle=$(plutil -extract CFBundleIdentifier raw "$app/Contents/Info.plist")
+          short=$(plutil -extract CFBundleShortVersionString raw "$app/Contents/Info.plist")
+          minimum=$(plutil -extract LSMinimumSystemVersion raw "$app/Contents/Info.plist" 2>/dev/null || echo unset)
+          ui=$(plutil -extract LSUIElement raw "$app/Contents/Info.plist" 2>/dev/null || echo unset)
+          exe=$(plutil -extract CFBundleExecutable raw "$app/Contents/Info.plist")
+          echo "app=$app bundle=$bundle version=$short minimum=$minimum LSUIElement=$ui"
+          [ "$bundle" = "fr.louisraille.NotchBuddy" ] || { echo "::error::unexpected bundle id $bundle"; exit 1; }
+          case "$ui" in true|1) ;; *) echo "::error::not a menu-bar app: LSUIElement is '$ui'"; exit 1;; esac
+          [ "$short" = "$version" ] || { echo "::error::$app says $short, the DMG is named $version"; exit 1; }
+          want=arm64
+          if [ '${{ matrix.arch }}' = x86_64 ]; then want=x86_64; fi
+          for bin in "$app/Contents/MacOS/$exe" "$app/Contents/Resources/coucou-hook"; do
+            test -f "$bin" || { echo "::error::missing $bin"; exit 1; }
+            archs=$(lipo -archs "$bin")
+            echo "$bin: $archs (want $want)"
+            echo "$archs" | grep -qw "$want" || { echo "::error::$bin has no $want slice"; exit 1; }
+          done
+          codesign -dv --verbose=2 "$app" 2>&1 | sed -n '1,6p' || true
+          if spctl -a -vv --type execute "$app" 2>&1; then
+            echo "Gatekeeper: accepted"
+          else
+            echo "::warning::Gatekeeper rejects this build (unsigned and not notarized) — expected until Apple credentials are configured; users must allow it in System Settings."
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: Coucou-macOS-${{ matrix.arch }}
@@ -85,3 +144,39 @@ jobs:
             desktop/release/Coucou-macOS-*.dmg
             desktop/release/SHA256SUMS-macOS-*
           retention-days: 7
+
+  # One release per shared `v*` tag, carrying every platform: windows.yml creates
+  # it, this attaches the DMGs. Without them /releases/latest has no .dmg and the
+  # Mac updater can only send people to a release page with nothing for them.
+  publish:
+    needs: build
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: Coucou-macOS-*
+          merge-multiple: true
+          path: dmg
+      - name: Attach the DMGs to the tag's release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          ls -l dmg
+          for i in $(seq 1 60); do
+            if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then break; fi
+            echo "waiting for the Windows job to create $GITHUB_REF_NAME ($i)…"
+            sleep 20
+          done
+          if ! gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "::error::no release for $GITHUB_REF_NAME after 20 minutes"
+            exit 1
+          fi
+          # Versioned names only, as the Windows release does; the rolling
+          # `Coucou-macOS-<arch>.dmg` belongs to a macos-latest release, not here.
+          gh release upload "$GITHUB_REF_NAME" dmg/Coucou-macOS-[0-9]*.dmg dmg/SHA256SUMS-macOS-* --clobber
+          echo "assets now:"
+          gh release view "$GITHUB_REF_NAME" --json assets -q '.assets[].name'

@@ -131,6 +131,10 @@ jobs:
           > 💡 **提示**: Windows SmartScreen 首次打开若提示「未知发布者」，点击「更多信息」->「仍要运行」即可。
           "@
 
+          # Only the shared `v*` release owns the Latest slot: it is the one that
+          # also carries Mac DMGs, and /releases/latest is what both updaters read.
+          # A platform-only tag must never take it. linux.yml applies the same rule.
+          $latest = if ($tag -like "windows-v*") { "false" } else { "true" }
           $exists = gh release view "$tag" 2>$null
           if ($LASTEXITCODE -eq 0) {
             Write-Host "Updating existing release $tag..."
@@ -146,7 +150,8 @@ jobs:
               "release/Coucou-Windows-$v.msi" `
               "release/Coucou-Windows-$v-portable.zip" `
               --title "Coucou for Windows v$v" `
-              --notes $notes
+              --notes $notes `
+              --latest=$latest
           }
 
       # Update the rolling windows-latest release
@@ -171,5 +176,6 @@ jobs:
               "release/Coucou-Windows.msi" `
               "release/Coucou-Windows-$v-portable.zip" `
               --title "Coucou for Windows (latest)" `
-              --notes "Always the newest Windows build — currently v$v."
+              --notes "Always the newest Windows build — currently v$v." `
+              --latest=false
           }

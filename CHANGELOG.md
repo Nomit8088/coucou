@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0 — October 12, 2026
 
 - **macOS（Tauri 增强版）**：以现有 Windows 版为基础，新增 AppKit/CoreGraphics 窗口适配、macOS Keychain、Finder 原生拖拽及 Retina 坐标转换；DSH 事件与反向指令通过当前用户的私有 Unix socket 通信，保留双端审批和提问。Mac 隐藏未实现的音乐、模拟点赞热键与桌面悬浮入口；局部快捷键采用 Command。新增 Intel / Apple Silicon DMG 打包与 Mac CI，更新仅打开对应架构 DMG / Release 页面，不下载 Windows 安装程序。原生 Swift 工程不参与此版构建；Mac 实机验收尚待完成。
 
@@ -8,7 +8,11 @@
 
 - **修复 macOS CI 前端单测失败**：Node 21+ 提供全局 `navigator`，其 `userAgent`/`platform` 反映的是**宿主机**，而 `src/core/platform.ts` 用它判定平台，于是 Windows 取向的测试在 macOS runner 上以 Mac 语义运行（`shortcuts` / `spotify` 共 13 个断言失败，Windows runner 上则通过）。`tests/setup.mjs` 现在固定测试的基准宿主与语言；`tests/macos*.test.mjs` 仍自行固定 Mac 环境。
 
-- **仓库布局整理（无行为变化）**：`windows/` 改名为 `desktop/`——它是 Windows / macOS / Linux 共用的 Tauri 应用，旧名字容易让人误以为只支持 Windows；根目录 `linux/` 的打包文件移到 `packaging/linux/arch/`。macOS 新增 `macos-v*` tag 触发构建，但只上传 DMG artifact、不创建 Release（签名/公证决策见 `desktop/MACOS.md`）。遗留 Swift 工程与其 CI 明确归入历史目标：`build.yml` 只在 `NotchBuddy/`、`tests/`、`scripts/` 变化时运行，不再每次 push 都跑一次 Xcode 构建。Windows / Linux 的 tag 名与 `windows-latest` / `linux-latest` 发布名保持不变。
+- **仓库布局整理（无行为变化）**：`windows/` 改名为 `desktop/`——它是 Windows / macOS / Linux 共用的 Tauri 应用，旧名字容易让人误以为只支持 Windows；根目录 `linux/` 的打包文件移到 `packaging/linux/arch/`。macOS 新增 tag 触发（共享 `v*` 与 `macos-v*`）：`v*` 会把两个架构的 DMG 附到同一个 Release，这样一个 Release 同时提供 Windows 安装包与 Mac DMG，`/releases/latest` 才能同时服务两端的更新器；DMG 仍未签名/未公证，决策见 `desktop/MACOS.md`。遗留 Swift 工程与其 CI 明确归入历史目标：`build.yml` 只在 `NotchBuddy/`、`tests/`、`scripts/` 变化时运行，不再每次 push 都跑一次 Xcode 构建。Windows / Linux 的 tag 名与 `windows-latest` / `linux-latest` 发布名保持不变。
+
+- **多会话隔离与权限请求队列**：同一个 pill 可能同时有多个会话（同一个 agent 开两个终端）。状态现在按「pill + 会话」记录并按优先级聚合：某个会话 Stop / SessionEnd 不再把仍在工作的兄弟会话打成 idle 或清掉 pill，「打开终端」也不会被最后一个说话者覆盖。卡片显示期间到达的第二个权限请求改为**按到达顺序排队**（上限 5，队满仍立刻退回终端），当前卡片答复后自动提升下一张。审计后补强：110 秒超时统一由 hooks.ts 持有（此前 island 另起一个定时器，提前答复会把下一张卡按上一张的截止时间拒掉）；会话结束时丢弃并拒绝它排队的请求；SessionEnd 对未登记的会话（应用中途重启）也会清掉 pill；聚合优先级改为 `Record<BotStateName, number>`，新增状态漏配会直接编译报错（此前漏掉的状态因 `indexOf` 返回 -1 反而排在 `error` 前面）。
+
+- **macOS CI 预检与首批 Mac 安装包**：Mac runner 上新增预检步骤，实际挂载 DMG 并校验 `.app` 的 bundle id（`fr.louisraille.NotchBuddy`）、`LSUIElement`、最低系统版本、版本号与 DMG 文件名一致，以及主程序与随包 `coucou-hook` 是否都含本 runner 架构的切片；`codesign` / `spctl` 结果打印但不作为失败条件（未配置 Apple 凭据前必然被 Gatekeeper 拒绝）。同时新增 tag 与三个版本文件的一致性校验，DMG 的 SHA256 在 CI 内自校验。`v0.2.0` 起 Release 同时提供 Windows 安装包与两个架构的 DMG。
 
 ## 0.1.1 — October 10, 2026
 
