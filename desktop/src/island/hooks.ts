@@ -33,14 +33,28 @@ function dropPendingCard(island: Island): void {
   State.notify();
 }
 
-function armPendingTimeout(island: Island): void {
-  if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
+/**
+ * The relay gives up on a request after ~108 s, so a card left up longer is
+ * lying. One timer owns the card on screen — the island promotes a queued card
+ * through here too — and a deadline stays with the request that armed it, so
+ * answering a card early can never shorten the next one's window.
+ */
+export function armPendingTimeout(island: Island): void {
+  clearPendingTimeout();
+  const requestId = State.pendingApproval?.requestId ?? null;
+  if (!requestId) return;
   pendingTimeout = window.setTimeout(() => {
     pendingTimeout = null;
-    const req = State.pendingApproval;
-    if (req) void Bridge.approvalDecline(req.requestId);
+    if (State.pendingApproval?.requestId !== requestId) return;
+    void Bridge.approvalDecline(requestId);
     dropPendingCard(island);
   }, 110_000);
+}
+
+/** The card was answered or withdrawn: its deadline goes with it. */
+export function clearPendingTimeout(): void {
+  if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
+  pendingTimeout = null;
 }
 
 /** The return to idle that Stop arms, per pill, so the next turn can cancel it. */
@@ -352,8 +366,7 @@ function handleHook(island: Island, payload: HookPayload) {
     pending.pillId === agentId &&
     pending.sessionId === (payload.session_id ?? "")
   ) {
-    if (pendingTimeout != null) window.clearTimeout(pendingTimeout);
-    pendingTimeout = null;
+    clearPendingTimeout();
     if (pending.requestId) void Bridge.approvalDecline(pending.requestId);
     for (const requestId of State.discardQueuedApprovals(agentId, pending.sessionId)) {
       void Bridge.approvalDecline(requestId);
@@ -541,6 +554,11 @@ function handleHook(island: Island, payload: HookPayload) {
             State.updateTask(agentId, "idle");
             State.setPillBadge(agentId, null);
           } else {
+            // The pill goes with it: nothing could answer a request still queued
+            // behind it, so the terminal takes those back now.
+            for (const requestId of State.discardQueuedApprovals(agentId, "")) {
+              void Bridge.approvalDecline(requestId);
+            }
             State.removeTask(agentId);
           }
         }, 5200),
@@ -572,10 +590,15 @@ function handleHook(island: Island, payload: HookPayload) {
       // pill recreated within 5.2 s would be removed by it. clearSession keeps a
       // declared pill (idle, no session) and removes any other.
       cancelStopTimer(agentId, sessionId);
-      if (sessionId) {
-        if (!State.hasSession(agentId, sessionId)) break;
-        if (!State.removeSession(agentId, sessionId)) break;
+      // Nothing can answer a request whose session is over: the terminal has it.
+      for (const requestId of State.discardQueuedApprovals(agentId, sessionId)) {
+        void Bridge.approvalDecline(requestId);
       }
+      if (sessionId && State.hasSession(agentId, sessionId)) State.removeSession(agentId, sessionId);
+      // Another live session still needs the pill; the last one clears it. A
+      // session we never registered (app restarted mid-session) clears it as
+      // before, so a missed SessionStart can no longer strand a pill for good.
+      if (State.hasAnySession(agentId)) break;
       State.clearSessionDiffs(agentId);
       clearSession(agentId);
       break;

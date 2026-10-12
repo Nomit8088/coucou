@@ -336,6 +336,47 @@ test("permission requests queue in arrival order instead of replacing the card",
   assert.equal(State.pendingApproval.requestId, "r2");
 });
 
+test("answering a card early never shortens the next queued card's window", () => {
+  dsh({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "write" });
+  seconds(100);
+  dsh({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "pwsh" });
+  assert.deepEqual(State.approvalQueue.map((x) => x.requestId), ["r2"]);
+  State.endApproval(); // the human answers r1
+  assert.equal(State.pendingApproval.requestId, "r2");
+  // Past the deadline r1's own timer carried: r2 keeps its full 110 s.
+  seconds(15);
+  assert.equal(State.pendingApproval.requestId, "r2");
+  assert.deepEqual(sent("approval_decline"), []);
+});
+
+test("a session ending declines the requests still queued behind another card", () => {
+  dsh({ hook_event_name: "PermissionRequest", request_id: "r0", session_id: "s2", tool_name: "write" });
+  dsh({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "pwsh" });
+  dsh({ hook_event_name: "PermissionRequest", request_id: "r2", session_id: "s1", tool_name: "Bash" });
+  assert.equal(State.pendingApproval.requestId, "r0");
+  assert.deepEqual(State.approvalQueue.map((x) => x.requestId), ["r1", "r2"]);
+  dsh({ hook_event_name: "SessionEnd", session_id: "s1" });
+  assert.deepEqual(State.approvalQueue, []);
+  assert.deepEqual(sent("approval_decline").map((x) => x.requestId).sort(), ["r1", "r2"]);
+  assert.equal(State.pendingApproval.requestId, "r0", "the other session's card stays");
+});
+
+test("a SessionEnd for a session we never registered still idles the pill", () => {
+  dsh({ hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Bash", tool_input: { command: "build" } });
+  assert.equal(task().state, "working");
+  State.resetLiveSessions(); // app restarted mid-session: the SessionStart was missed
+  dsh({ hook_event_name: "SessionEnd", session_id: "s1" });
+  assert.equal(task().state, "idle");
+  assert.deepEqual(task().steps, []);
+});
+
+test("a state with no rank never outranks a live error on the same pill", () => {
+  dsh({ hook_event_name: "SessionStart", session_id: "s1" });
+  State.sessionState(DSH, "s1", "sleeping");
+  State.sessionState(DSH, "s2", "error");
+  assert.equal(task().state, "error");
+});
+
 test("an unanswered card is withdrawn after 110 s", () => {
   dsh({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "write" });
   State.view = "approval";
