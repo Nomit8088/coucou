@@ -6,7 +6,7 @@ import "./settings.css";
 import { Bridge, onEvent, type HookStatus, type ShortcutsReport } from "../core/bridge";
 import { ensureProviders, newProviderId, urlAllowed } from "../core/providers";
 import {
-  ISLAND_SHORTCUTS, SHORTCUTS, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
+  availableShortcuts, islandShortcuts, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
   recordPress, type Binding,
 } from "../core/shortcuts";
 import { DEFAULT_SETTINGS, type GitWatch, type Settings } from "../core/state";
@@ -19,14 +19,16 @@ import { h, clear } from "../views/dom";
 import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
 import { statusDot } from "./parts";
+import { HOST_OS, platformCapabilities } from "../core/platform";
+import { updateAction } from "../core/updater";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
 } from "../i18n/i18n";
 
 /** Where secrets.rs keeps the keys on this OS. */
-const KEY_STORE = navigator.userAgent.includes("Windows")
+const keyStore = () => HOST_OS === "windows"
   ? "Windows Credential Manager"
-  : "Secret Service (GNOME Keyring, KWallet)";
+  : HOST_OS === "macos" ? "macOS Keychain" : "Secret Service (GNOME Keyring, KWallet)";
 
 let settings: Settings = { ...DEFAULT_SETTINGS };
 let version = "";
@@ -248,7 +250,7 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
 
   function updateNote() {
     const used = settings.activeIntegrations.length;
-    note.textContent = t("Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: KEY_STORE });
+    note.textContent = t("Pick up to {max} pills to show next to Mochi — {used}/{max} in use. Keys are stored in the {store}, never on disk.", { max: MAX_ACTIVE, used, store: keyStore() });
   }
   declaredViews.push(updateNote);
 
@@ -310,7 +312,9 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
       void Bridge.spotifyInstalled(def.id).then((ok) => {
         hint.textContent = ok === false ? t("Not installed") : "";
       });
+    }
 
+    if (def.mediaApp != null && platformCapabilities().musicLikeHotkeys) {
       const defaultHotkey =
         def.id === "integration_cloudmusic" ? "Ctrl+Alt+L" :
         def.id === "integration_spotify" ? "Alt+Shift+B" : "Ctrl+Alt+V";
@@ -582,7 +586,7 @@ const SHORTCUTS_UI = {
   types: (ch: string) => t("Types “{char}”", { char: ch }),
   typesNote: (keys: string, ch: string) =>
     t("{keys} types “{char}” on your keyboard, so it can't be a shortcut. Pick another key.", { keys, char: ch }),
-  get needsModifier() { return t("Hold Ctrl, Alt or the Windows key with it."); },
+  get needsModifier() { return HOST_OS === "macos" ? "Ctrl / Option / Command" : t("Hold Ctrl, Alt or the Windows key with it."); },
   get unsupportedKey() { return t("That key can't be used in a shortcut."); },
   get wayland() {
     return t("Your Wayland desktop doesn't let apps listen for keys outside their own windows. Add the shortcuts in your system's keyboard settings instead, with these commands:");
@@ -602,6 +606,13 @@ const SHORTCUTS_UI = {
 };
 
 function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
+  const islandList = h("div", { class: "shortcut-list" });
+  for (const row of islandShortcuts()) {
+    islandList.append(h("div", { class: "row shortcut" },
+      h("span", { class: "shortcut-name", text: t(row.description) }),
+      h("span", { class: "keycap static", text: row.keys }),
+    ));
+  }
   let report = initial;
   const list = h("div", { class: "shortcut-list" });
   const feedback = h("div", {});
@@ -688,8 +699,7 @@ function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
   function draw() {
     clear(list);
     const dups = duplicates(activeKeys(settings.shortcuts));
-    for (const d of SHORTCUTS) {
-      if (!d.ported) continue;
+    for (const d of availableShortcuts()) {
       const binding = effective(d, settings.shortcuts);
       const keycap = h("button", {
         class: "keycap",
@@ -710,8 +720,8 @@ function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
     clear(blockedNote);
     const commands = (command: string) => {
       const list = h("div", { class: "diff" });
-      for (const d of SHORTCUTS) {
-        if (d.ported) list.append(h("div", { class: "ctx", text: `${command} ${d.id}` }));
+      for (const d of availableShortcuts()) {
+        list.append(h("div", { class: "ctx", text: `${command} ${d.id}` }));
       }
       return list;
     };
@@ -732,14 +742,6 @@ function shortcutsSection(initial: ShortcutsReport | null): HTMLElement {
     } else if (report?.blocked) {
       blockedNote.append(h("div", { class: "notice warn", text: SHORTCUTS_UI.noDisplay }));
     }
-  }
-
-  const islandList = h("div", { class: "shortcut-list" });
-  for (const row of ISLAND_SHORTCUTS) {
-    islandList.append(h("div", { class: "row shortcut" },
-      h("span", { class: "shortcut-name", text: t(row.description) }),
-      h("span", { class: "keycap static", text: row.keys }),
-    ));
   }
 
   const reset = h("button", {
@@ -884,7 +886,7 @@ async function main() {
 
   void onEvent<ShortcutsReport>("shortcuts-status", (fresh) => shortcutsListener?.report(fresh));
   void onEvent<Settings>("settings-changed", (s) => {
-    settings = { ...settings, ...s };
+    settings = { ...settings, ...s, ...sanitizeDeclared(s) };
     shortcutsListener?.settingsChanged();
     for (const redraw of declaredViews) redraw();
     applyLanguage();
@@ -898,7 +900,7 @@ async function render() {
   };
   const agents = await Bridge.agentHooksList();
 
-  const shortcutReport = await Bridge.shortcutsStatus();
+  const shortcutReport = platformCapabilities().globalShortcuts ? await Bridge.shortcutsStatus() : null;
 
   const keys = [
     "github-token", "resend-api-key", "gitlab-url", "gitlab-token",
@@ -989,19 +991,26 @@ function updaterSection(): HTMLElement {
 
       const actions = h("div", { style: "display: flex; gap: 8px; align-items: center;" });
 
-      if (info.downloadUrl) {
+      const action = updateAction(info);
+      if (action.kind !== "release") {
         const downloadBtn = h("button", {
-          text: t("Download and install"),
+          text: action.kind === "install" ? t("Download and install") : t("Open {name}", { name: info.fileName || "DMG" }),
           style: "cursor: pointer; font-weight: 500; border-radius: 6px; padding: 5px 12px;",
         });
         downloadBtn.onclick = async () => {
+          if (action.kind === "download") {
+            // The user installs the DMG themselves; never report an installer
+            // started when all we did was open their browser.
+            await Bridge.openUrl(action.url);
+            return;
+          }
           downloadBtn.textContent = t("Downloading installer…");
-          const res = await Bridge.downloadAndInstallUpdate(info.downloadUrl!);
+          const res = await Bridge.downloadAndInstallUpdate(action.url);
           if (res) {
             downloadBtn.textContent = t("Installer started!");
           } else {
             downloadBtn.textContent = t("Download failed, try in browser");
-            void Bridge.openUrl(info.downloadUrl!);
+            void Bridge.openUrl(action.url);
           }
         };
         actions.append(downloadBtn);

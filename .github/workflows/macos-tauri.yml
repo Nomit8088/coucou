@@ -1,0 +1,81 @@
+name: macOS (Tauri enhanced edition)
+
+# The shared enhanced app; deliberately does not build the legacy Swift target.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'windows/**'
+      - '.github/workflows/macos-tauri.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'windows/**'
+      - '.github/workflows/macos-tauri.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: aarch64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        working-directory: windows
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: windows/package-lock.json
+      - name: Verify runner architecture
+        run: |
+          expected=x86_64
+          if [ '${{ matrix.arch }}' = aarch64 ]; then expected=arm64; fi
+          test "$(uname -m)" = "$expected"
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            windows/target
+          key: macos-tauri-${{ matrix.arch }}-${{ hashFiles('windows/Cargo.lock') }}
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Type check and test frontend / DSH plugin
+        run: |
+          npx tsc --noEmit
+          npm test
+      - name: Prepare icon, native hook and frontend assets
+        run: |
+          node scripts/prepare-build.mjs
+          npx vite build
+      - name: Rust tests (including private sockets)
+        run: cargo test --workspace --locked
+      - name: Build app and DMG
+        # Unsigned validation artifacts. Real distribution should supply Apple's
+        # signing/notarization credentials through repository secrets.
+        env:
+          APPLE_SIGNING_IDENTITY: '-'
+        run: |
+          npm run pack
+          shasum -a 256 release/Coucou-macOS-*.dmg > release/SHA256SUMS-macOS-${{ matrix.arch }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Coucou-macOS-${{ matrix.arch }}
+          path: |
+            windows/release/Coucou-macOS-*.dmg
+            windows/release/SHA256SUMS-macOS-*
+          retention-days: 7

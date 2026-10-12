@@ -28,6 +28,7 @@ async function main() {
 
   const boot = await Bridge.boot();
   if (boot) {
+    if (boot.os) State.os = boot.os;
     State.settings = { ...State.settings, ...boot.settings };
   }
   // A language change redraws the island in place: the texts given as tl(…)

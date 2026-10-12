@@ -102,7 +102,7 @@ pub fn start(app: AppHandle) {
     });
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub fn start(app: AppHandle) {
     use std::os::unix::fs::PermissionsExt;
     use tokio::net::UnixListener;
@@ -188,7 +188,7 @@ impl Relay for NamedPipeServer {
 }
 
 /// Dropping the stream closes it; the relay reads up to our newline first.
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 impl Relay for tokio::net::UnixStream {
     /// SO_PEERCRED: the process that connected, as the kernel saw it.
     fn client_pid(&self) -> Option<u32> {

@@ -17,6 +17,7 @@
 // (Ctrl, Alt, Space…) are never translated.
 
 import { N_ } from "../i18n/i18n";
+import { HOST_OS, platformCapabilities, type HostOs } from "./platform";
 
 export const SHORTCUT_TEXT = {
   toggleIsland: N_("Open or close the island"),
@@ -83,6 +84,12 @@ export const SHORTCUTS: readonly ShortcutDef[] = [
   def("wardrobeToggle", "Ctrl+Alt+G", true, true),
 ];
 
+/** Keep stable action IDs, but offer only actions this backend can perform. */
+export function availableShortcuts(os: HostOs = HOST_OS): ShortcutDef[] {
+  const caps = platformCapabilities(os);
+  return caps.globalShortcuts ? SHORTCUTS.filter((d) => d.ported && (d.id !== "desktopToggle" || caps.desktopMochi)) : [];
+}
+
 export interface Binding {
   /** Canonical accelerator, e.g. "Ctrl+Alt+Space"; empty for no key. */
   keys: string;
@@ -148,7 +155,7 @@ function canonicalKey(token: string): string | null {
  * Option, Super/Cmd, ArrowLeft…). `null` for anything else, and for a bare key:
  * a global shortcut always needs Ctrl, Alt or the Windows key.
  */
-export function parseKeys(text: string): Combo | null {
+export function parseKeys(text: string, os: HostOs = HOST_OS): Combo | null {
   if (!text.trim()) return null;
   // "Ctrl+Alt++" doesn't happen: the plus key is spelled Equal.
   const tokens = text.split("+").map((t) => t.trim());
@@ -157,7 +164,12 @@ export function parseKeys(text: string): Combo | null {
   for (const [i, token] of tokens.entries()) {
     const last = i === tokens.length - 1;
     switch (token.toUpperCase()) {
-      case "CTRL": case "CONTROL": case "COMMANDORCONTROL": case "CMDORCTRL":
+      case "COMMANDORCONTROL": case "CMDORCTRL":
+        if (last) return null;
+        if (os === "macos") combo.meta = true;
+        else combo.ctrl = true;
+        continue;
+      case "CTRL": case "CONTROL":
         if (last) return null;
         combo.ctrl = true;
         continue;
@@ -195,22 +207,22 @@ export function formatKeys(c: Combo): string {
 }
 
 /** Canonical form of an accelerator, or null when it isn't one. */
-export function normalizeKeys(text: string): string | null {
-  const c = parseKeys(text);
+export function normalizeKeys(text: string, os: HostOs = HOST_OS): string | null {
+  const c = parseKeys(text, os);
   return c ? formatKeys(c) : null;
 }
 
 const KEY_GLYPHS: Record<string, string> = { Up: "↑", Down: "↓", Left: "←", Right: "→", ...PUNCTUATION };
 
 /** What a person reads: "Ctrl+Alt+→", "Ctrl+Shift+K", "Win+Space". */
-export function displayKeys(text: string): string {
-  const c = parseKeys(text);
+export function displayKeys(text: string, os: HostOs = HOST_OS): string {
+  const c = parseKeys(text, os);
   if (!c) return text.trim() ? text : "—";
   const parts: string[] = [];
   if (c.ctrl) parts.push("Ctrl");
   if (c.alt) parts.push("Alt");
   if (c.shift) parts.push("Shift");
-  if (c.meta) parts.push("Win");
+  if (c.meta) parts.push(os === "macos" ? "Command" : "Win");
   parts.push(KEY_GLYPHS[c.key] ?? c.key);
   return parts.join("+");
 }
@@ -256,7 +268,7 @@ function pressedKey(e: KeyPress): string | null {
 }
 
 /** Turns a key press in the recorder into what to do with it. */
-export function recordPress(e: KeyPress): Recorded {
+export function recordPress(e: KeyPress, os: HostOs = HOST_OS): Recorded {
   if (MODIFIER_KEYS.has(e.key)) return { kind: "pending" };
   const bare = !e.ctrlKey && !e.altKey && !e.metaKey && !e.shiftKey;
   if (e.key === "Escape" && bare) return { kind: "cancel" };
@@ -267,7 +279,7 @@ export function recordPress(e: KeyPress): Recorded {
   const keys = formatKeys({ ctrl: e.ctrlKey, alt: e.altKey, shift: e.shiftKey, meta: e.metaKey, key });
   // Ctrl+Alt is AltGr on Windows. When the press typed something other than a
   // plain letter, digit or space, this combination is how the user types it.
-  if (e.ctrlKey && e.altKey && !e.metaKey) {
+  if (os !== "macos" && e.ctrlKey && e.altKey && !e.metaKey) {
     if (e.key === "Dead") return { kind: "typesCharacter", typed: "´", keys };
     if ([...e.key].length === 1 && !/^[a-z0-9 ]$/i.test(e.key)) {
       return { kind: "typesCharacter", typed: e.key, keys };
@@ -279,11 +291,11 @@ export function recordPress(e: KeyPress): Recorded {
 // ── Conflicts ─────────────────────────────────────────────────────────────────
 
 /** Actions whose combination another enabled action also uses. */
-export function duplicates(entries: Iterable<[string, string]>): Set<string> {
+export function duplicates(entries: Iterable<[string, string]>, os: HostOs = HOST_OS): Set<string> {
   const seen = new Map<string, string>();
   const dups = new Set<string>();
   for (const [id, keys] of entries) {
-    const norm = normalizeKeys(keys);
+    const norm = normalizeKeys(keys, os);
     if (!norm) continue;
     const other = seen.get(norm);
     if (other != null) {
@@ -297,8 +309,8 @@ export function duplicates(entries: Iterable<[string, string]>): Set<string> {
 }
 
 /** The (id, keys) pairs Coucou would register with `stored`. */
-export function activeKeys(stored: Bindings | undefined): [string, string][] {
-  return SHORTCUTS.filter((d) => d.ported)
+export function activeKeys(stored: Bindings | undefined, os: HostOs = HOST_OS): [string, string][] {
+  return availableShortcuts(os)
     .map((d) => [d.id, effective(d, stored)] as const)
     .filter(([, b]) => b.enabled && b.keys)
     .map(([id, b]) => [id, b.keys]);
@@ -366,6 +378,20 @@ export const ISLAND_SHORTCUTS: readonly { keys: string; description: string }[] 
   { keys: "Esc", description: SHORTCUT_TEXT.island.close },
 ];
 
+/** Keep the shipped table on Windows/Linux; label the actual Mac modifier. */
+export function islandShortcuts(os: HostOs = HOST_OS) {
+  return ISLAND_SHORTCUTS.map((row) => ({
+    ...row, keys: os === "macos" ? row.keys.replaceAll("Ctrl", "Command") : row.keys,
+  }));
+}
+
+/** Command on macOS, Ctrl elsewhere; never steal mixed-modifier text editing. */
+export function primaryShortcutPressed(e: KeyPress, os: HostOs = HOST_OS): boolean {
+  return !e.altKey && !e.shiftKey && (os === "macos"
+    ? e.metaKey && !e.ctrlKey
+    : e.ctrlKey && !e.metaKey);
+}
+
 export type IslandKeyAction =
   | { kind: "cycle"; delta: 1 | -1 }
   | { kind: "pill"; number: number }
@@ -381,14 +407,15 @@ export type IslandKeyAction =
 
 /**
  * A key pressed while the island has the keyboard → what it does, or null to
- * leave it alone. Ctrl stands in for ⌘. In a text field Ctrl+← and Ctrl+→
- * keep moving by word, and Ctrl+↑ and Ctrl+↓ by paragraph.
+ * leave it alone. Command on macOS, Ctrl elsewhere. Modified arrows in a
+ * text field stay with the editor rather than navigating Coucou.
  */
 export function islandKeyAction(
   e: KeyPress,
   ctx: { view: string; inTextField: boolean },
+  os: HostOs = HOST_OS,
 ): IslandKeyAction | null {
-  if (!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey) return null;
+  if (!primaryShortcutPressed(e, os)) return null;
   if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
     if (ctx.inTextField) return null;
     return { kind: "cycle", delta: e.key === "ArrowRight" ? 1 : -1 };

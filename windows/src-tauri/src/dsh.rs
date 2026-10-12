@@ -11,6 +11,10 @@ use crate::config_file::{self, FileEdit, Plan};
 use crate::platform;
 use crate::settings;
 
+#[cfg(unix)]
+#[path = "../../shared/unix_connect.rs"]
+mod transport;
+
 const PLUGIN_JS: &str = include_str!("../../dsh-plugin/index.js");
 const PLUGIN_MANIFEST: &str = include_str!("../../dsh-plugin/package.json");
 const MARKER_BEGIN: &str = "# coucou-dsh-begin";
@@ -51,6 +55,7 @@ fn patch_path(profile: &Path) -> PathBuf {
     profile.join("cordis.patch.yml")
 }
 
+#[cfg(windows)]
 fn pipe_names() -> (String, String) {
     let key = platform::current_user_sid()
         .unwrap_or_else(|| std::env::var("USERNAME").unwrap_or_else(|_| "user".into()));
@@ -58,6 +63,14 @@ fn pipe_names() -> (String, String) {
         format!(r"\\.\pipe\coucou-{key}"),
         format!(r"\\.\pipe\coucou-dsh-{key}"),
     )
+}
+
+#[cfg(unix)]
+fn pipe_names() -> (String, String) {
+    let path = platform::relay_socket_path();
+    let steer = path.as_ref().and_then(|p| p.parent()).map(|p| p.join("coucou-dsh.sock"));
+    (path.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default(),
+     steer.map(|p| p.to_string_lossy().into_owned()).unwrap_or_default())
 }
 
 fn yaml_quote(value: &str) -> String {
@@ -237,10 +250,17 @@ fn send(payload: &serde_json::Value) -> bool {
         line.push('\n');
         file.write_all(line.as_bytes()).is_ok()
     }
-    #[cfg(not(windows))]
+    #[cfg(unix)]
     {
-        let _ = payload;
-        false
+        use std::io::Write;
+        use std::time::Duration;
+        let (_, endpoint) = pipe_names();
+        let Some(mut stream) = transport::connect(Path::new(&endpoint), Duration::from_millis(300)) else {
+            return false;
+        };
+        if stream.set_write_timeout(Some(Duration::from_millis(300))).is_err() { return false; }
+        let line = format!("{}\n", payload);
+        stream.write_all(line.as_bytes()).is_ok()
     }
 }
 

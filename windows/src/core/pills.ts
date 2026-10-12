@@ -6,6 +6,8 @@
 
 import type { AgentSource } from "./state";
 import { N_ } from "../i18n/i18n";
+import { HOST_OS, platformCapabilities, type HostOs } from "./platform";
+export { HOST_OS, type HostOs } from "./platform";
 
 export type PillCategory = "workspace" | "agent" | "ai" | "service";
 
@@ -38,8 +40,6 @@ export interface PillDefinition {
    */
   mediaApp?: string;
 }
-
-export type HostOs = "windows" | "linux";
 
 const hooks: PillConnect = { kind: "hooks" };
 const key = (k: string): PillConnect => ({ kind: "key", key: k });
@@ -78,14 +78,12 @@ export const DEFAULT_MAIN_PILL = "agent_dsh";
 /** How many declared pills may sit next to the main one. */
 export const MAX_DECLARED = 4;
 
-export const HOST_OS: HostOs =
-  typeof navigator !== "undefined" && /Windows/.test(navigator.userAgent ?? "") ? "windows" : "linux";
-
 export function pillDefinition(id: string): PillDefinition | undefined {
   return PILL_CATALOG.find((p) => p.id === id);
 }
 
 function offeredOn(def: PillDefinition, os: HostOs): boolean {
+  if (def.mediaApp != null && !platformCapabilities(os).music) return false;
   return def.support === "yes" || def.support === "soon" || def.support === os;
 }
 

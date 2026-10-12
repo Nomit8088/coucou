@@ -5,9 +5,11 @@
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo, listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Settings } from "./state";
 import type { RecapHistory, RecapPrefs } from "../recap/summary";
 import type { SpotifyState } from "./spotify";
+import { setNativeHost, type HostOs } from "./platform";
 
 export const IS_TAURI =
   typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -23,6 +25,8 @@ async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T |
 }
 
 export interface BootInfo {
+  /** Native host, independent of a customized WebView user agent. */
+  os?: HostOs;
   settings: Settings;
   /** Logical screen rect of the monitor the island lives on. */
   screen: { x: number; y: number; width: number; height: number; scale: number };
@@ -33,7 +37,11 @@ export interface BootInfo {
 }
 
 export const Bridge = {
-  boot: () => call<BootInfo>("boot"),
+  boot: async () => {
+    const info = await call<BootInfo>("boot");
+    if (info) setNativeHost(info.os);
+    return info;
+  },
   /** The system's languages as the webview sees them, for Rust's own texts (i18n.rs). */
   setSystemLanguages: (languages: string[]) => call<void>("set_system_languages", { languages }),
 
@@ -376,6 +384,14 @@ export type BridgeEvent =
 export interface DragDropPayload {
   type: "enter" | "over" | "drop" | "leave";
   paths?: string[];
+  /** Window-logical position, normalized from Tauri's native physical pixels. */
+  position?: { x: number; y: number };
+}
+
+export function nativeDragDrop(payload: DragDropPayload, scale: number): DragDropPayload {
+  if (!payload.position) return payload;
+  const factor = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return { ...payload, position: { x: payload.position.x / factor, y: payload.position.y / factor } };
 }
 
 interface WebView2Bridge {
@@ -395,9 +411,15 @@ export async function onDragDrop(handler: (e: DragDropPayload) => void) {
   if (!IS_TAURI) return () => {};
   const webview = (window as unknown as { chrome?: { webview?: WebView2Bridge } }).chrome?.webview;
   if (!webview) {
-    return getCurrentWebview().onDragDropEvent((event) => {
-      handler(event.payload as DragDropPayload);
-    });
+    const current = getCurrentWindow();
+    let scale = await current.scaleFactor();
+    const unscale = await current.onScaleChanged(({ payload }) => { scale = payload.scaleFactor; });
+    try {
+      const undrag = await getCurrentWebview().onDragDropEvent((event) => {
+        handler(nativeDragDrop(event.payload as DragDropPayload, scale));
+      });
+      return () => { undrag(); unscale(); };
+    } catch (error) { unscale(); throw error; }
   }
   const hasFiles = (e: DragEvent) => e.dataTransfer?.types.includes("Files") ?? false;
   // dragenter/dragleave fire for every element crossed; only the outermost pair counts.

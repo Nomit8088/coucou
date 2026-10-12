@@ -1,359 +1,110 @@
 <div align="center">
 
-<img src="NotchBuddy/Assets.xcassets/AppIcon.appiconset/icon_256x256.png" width="96" alt="Coucou icon">
+<img src="windows/src-tauri/icons/128x128.png" width="96" alt="Coucou icon">
 
-# Coucou (DSH & Windows Enhanced Edition)
+# Coucou — DSH Enhanced Edition
 
-**A tiny friend that lives in your Mac's notch — or at the top of your screen on Windows and Linux — and keeps an eye on your AI coding agent sessions.**
-
-> 🚀 **Personalized Fork by [@Nomit8088](https://github.com/Nomit8088)**: 深度适配 **DeepSeek Harness (DSH)** 代理开发环境，强化 Windows 本地音乐集成（网易云音乐、QQ 音乐、Spotify），提供免源码环境的独立 Windows 可执行安装包（.exe / .msi）及免安装绿色版，内置轻量级应用内在线更新。
+**屏幕顶部的 AI 开发助手：Windows、macOS、Linux 共用一套 Tauri 增强版。**
 
 [![Latest Release](https://img.shields.io/github/v/release/Nomit8088/coucou?label=version&color=0A84FF)](https://github.com/Nomit8088/coucou/releases)
-![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4?logo=windows&logoColor=white)
-![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131?logo=tauri&logoColor=black)
-![Rust](https://img.shields.io/badge/Rust-backend-000?logo=rust)
+![Windows 10/11](https://img.shields.io/badge/Windows-10%2F11-0078D4)
+![macOS 13+](https://img.shields.io/badge/macOS-13%2B-333333)
+![Tauri 2](https://img.shields.io/badge/Tauri-2-FFC131)
 ![Code: MIT](https://img.shields.io/badge/code-MIT-green)
-[![GitHub stars](https://img.shields.io/github/stars/Nomit8088/coucou?style=social)](https://github.com/Nomit8088/coucou)
 
 <img src="docs/media/demo.gif" width="760" alt="Coucou in action">
 
 </div>
 
----
+## 这个 Fork 做什么
 
-## Why
+由 [@Nomit8088](https://github.com/Nomit8088) 基于 [Louis Raillé 的 Coucou](https://github.com/Louis-CFM/coucou) 增强，重点服务 DeepSeek Harness（DSH）开发场景。
 
-Some studios showed off gorgeous notch companions… and never let anyone use them.
-**Coucou is the open version.** Every line of code is open source under the MIT License: read it, fork it, learn from it. The Coucou name, Mochi and the sounds stay © Louis Raillé (see [License](#license)).
+- **DSH 双向交互**：灵动岛与 Web GUI 同时显示权限请求/问题，明确点击后作出决策；继续输入、取消、权限预设、上下文占用、后台任务、定时提醒与会话状态。
+- **AI 会话与聊天**：DSH / Codex hook 与 plugin 集成；DeepSeek 内置及自定义 OpenAI-compatible provider，支持本地模型服务。
+- **开发服务**：GitHub / GitLab 流水线与请求通知、QQ 邮箱等可选集成。凭据进入系统安全存储，不写入普通设置。
+- **Mochi**：保留现有角色、灵动岛、换装、声音、文件拖入、差异展示和周报，不重做已发布界面。
+- **Windows 音乐增强**：网易云音乐、QQ 音乐、Spotify 系统媒体会话、播放控制与舞蹈动效；独立安装包 / 绿色便携版。
 
-Meet **Mochi**: a soft little squircle with big eyes that pops out of your notch, waves hello, follows your cursor with its eyes, gets annoyed when you poke it (and dizzy if you insist), and tells you the moment Claude Code needs you.
+**macOS 使用同一套 `windows/` TypeScript / Rust 代码，不是原生 Swift 版本。** Apple Music、iPhone / iCloud 同步、语音听写、贴附前台窗口等原生版本专属能力不属于此版。Mac 上没有后端实现的音乐与桌面悬浮入口会隐藏；完整差异与验收见 [macOS 适配说明](<windows/MACOS.md>)。
 
-## 🌟 本 Fork 专属特性 (Personalized Fork Highlights)
+## 安装与运行
 
-- 🤖 **DeepSeek Harness (DSH) 深度交互集成**：
-  - **双向协同审批**：权限请求（Allow/Deny）与提问在灵动岛与 DSH Web GUI（http://127.0.0.1:3080）同步展现，任意一端点击决策即时同步生效。
-  - **专属 DSH 会话卡片与自适应布局**：卡片高度自适应，独立展示 Context 仪表盘、后台任务（Jobs）、定时提醒（Reminders）与权限预设（Presets）快捷切换，指令输入框完整呈现。
-  - **通信与防误退优化**：过滤内部上下文注入事件，彻底解决卡片意外闪退或提前关闭；优化管道通信，解决审批卡住问题。
-- 🎵 **Windows 原生音乐全适配（网易云音乐、QQ 音乐、Spotify）**：
-  - 原生接入 Windows 系统媒体传输控件（SMTC），精准捕捉播放状态与封面。
-  - **紧凑型灵动岛音乐控件**：集成封面、播放/暂停、快进/切歌、进度条拖拽，支持“常驻展开（Stay-open）”。
-  - Mochi 伴随音乐节奏动感起舞。
-- 📦 **免配置独立 EXE 运行（开箱即用）**：
-  - 新电脑**完全无需配置 Node.js、Rust、Git 等开发环境**，也不必拉取源码本地启动。
-  - 直接下载 `Coucou-Windows-setup.exe`（双击安装）或 `Coucou-Windows-portable.zip`（免安装绿色版），解压双击即可运行。
-- 🔄 **应用内在线更新**：
-  - 系统托盘菜单提供「检查更新…」快捷入口。
-  - 设置页面内置更新检测模块，自动比对 GitHub 最新 Release，支持一键在后台静默下载安装包并自动覆盖升级。
+### Windows
 
-## Features
+从 [本 Fork Releases](https://github.com/Nomit8088/coucou/releases) 下载对应版本的 `Coucou-Windows-setup.exe`、`.msi` 或 `Coucou-Windows-portable.zip`，不需要 Node / Rust 开发环境。设置和托盘菜单可以检查更新。
 
-- 🤖 **Claude Code, Cursor, Codex, Gemini CLI, Antigravity, Copilot CLI, Muse Code, OpenCode, Amp, Hermes, Claude Desktop and other agents, live** — see every session in your notch: what it reads, edits and runs, step by step. Tag a hook payload with `coucou_agent` to give any agent its own pill (see [`docs/AGENTS.md`](docs/AGENTS.md)). Finished? Mochi does a happy little jump.
-- See what Claude is editing, live in the notch: each file modification shows the file name and +N −M counts in the ticker, tap to read the full diff
-- ✅ **Approve and answer from the notch** — Claude Code permission requests show up with **Allow / Deny / Always**; `AskUserQuestion` prompts show the choices right in the notch (single or multi-select, up to 4 questions). One click, or "Reply in terminal" to fall back to the CLI. Codex also gets Allow / Deny.
-- 🧑‍💻 **Jump to the right terminal** — open the exact terminal window of a session *(macOS)*.
-- 💬 **Chat with Claude, Gemini, OpenAI, or a local model (Ollama / LM Studio)** — click the model name above the chat box to switch provider and pick a model. Cloud providers use your own API key; local providers connect to a server running on your Mac. *(Gemini, OpenAI and local models: macOS)*
-- 📊 **Claude plan usage** *(macOS, GitHub build)* — a small pill in the notch header shows your 5-hour and weekly Claude plan limits. Enable it from Settings → Agents → Plan usage. Pro and Max plans only.
-- 📊 **Codex plan usage** *(macOS, GitHub build)* — a Codex pill next to it shows your Codex limits and how many free resets you have left, read from the Codex CLI. Turn it on in Settings → Agents → Plan usage.
-- 📋 **Declare the tools you use** — open Settings → Active pills and pick your main workspace tool (VS Code, Cursor, Codex or Antigravity), then toggle up to 4 more: Gemini CLI, Anthropic, Google AI, OpenAI, Ollama, LM Studio and service integrations *(macOS)*.
-- 📎 **Drop a file on the notch** — Mochi turns into a box and swallows it, then ask a question about it or send it by email *(email: macOS, Mail.app)*.
-- 🖥️ **Mochi on the desktop** — drag Mochi out of the island to set him loose on your desktop: he floats as a 120 pt companion, follows your cursor, wears his outfit, reacts to alerts by flying home and flying back, and comes back where you left him on next launch.
-- 🪟 **Drag Mochi onto any window** — attach that window as context for Claude *(macOS)*.
-- 🔌 **Integrations** — Stripe payments, n8n workflows, GitHub (open PRs, reviews requested, CI status), Vercel deployments, Resend emails, Notion, Cal.com. Each one gets its own little colored Mochi.
-- 🎵 **Apple Music pill** *(macOS, GitHub build)* — add the Apple Music pill in Settings → Active pills to see what's playing and control playback from the notch; Mochi dances while it plays.
-- 🎧 **Spotify pill** *(macOS, GitHub build)* — add the Spotify pill in Settings → Active pills: album cover, title and artist, a progress bar you drag to seek, play/pause, previous/next, shuffle, repeat and volume, right from the notch; Mochi dances while it plays.
-- 👗 **Dress Mochi up** — right-click him for the wardrobe. He also dresses up for the seasons on his own.
-- ⌨️ **Keyboard shortcuts** — open the chat, jump to an alert or a terminal, switch pills, mute, send Mochi to the desktop or open the wardrobe from anywhere; all customizable in Settings → Shortcuts.
-- 🎭 **A real character** — idle breathing, blinks, eyes on a sphere that follow your mouse, emotes, 28 handcrafted sounds, a greeting on launch.
-- 🔊 **Your own sounds** *(macOS)* — drop a file named like one of Mochi's sounds (`finish.wav`, `approval.mp3`…) in Settings → General → Sound → **Open sounds folder** to replace it.
-- 🎙️ **Dictate in the chat** *(macOS, GitHub build)* — click the mic next to the chat field and talk in any of your languages (Coucou picks the one you spoke, or right-click the mic to choose); speech recognition runs on your Mac when it supports it.
-- 🫥 **Invisible when idle** — hides away when nothing is running, peeks out when you hover the notch (the top edge of the screen on Windows and Linux).
-- 🖥️ **Any Mac, notch or not** — on an iMac, a Mac mini, or a MacBook with its lid closed on an external display, Mochi sits in a small bar at the top of the screen. With several displays, pick his screen in Settings → General, or let him follow your mouse *(macOS)*.
-- 📱 **Coucou on iPhone** — your sessions, approvals and services in your pocket, with Live Activities, widgets and Siri. See [Coucou on iPhone](#coucou-on-iphone).
-- 📅 **Weekly recap** *(macOS)* — every Monday morning Coucou shows a summary of the past week: time coding, sessions, files, lines changed, commands, permissions, top agent and project, busiest day and longest session. Share it as a 1080 × 1920 image with Mochi — project names optional. All local, no sync.
-- 🌍 **10 languages** — English, 中文, हिन्दी, Español, العربية, Français, বাংলা, Português, Русский, Bahasa Indonesia. Pick one in Settings → General → Language; community translations welcome.
-- 🔒 **Private by design** — no telemetry, no account. Keys live in your macOS Keychain, Windows Credential Manager or Linux Secret Service (GNOME Keyring, KWallet). The app only talks to the services you plug in.
+未签名包可能触发 SmartScreen；请先确认来源可信，再根据系统提示决定是否运行。也可以自行从源码构建。详见 [Windows / Linux 使用说明](<windows/README.md>)。
 
-## Coucou on iPhone
+### macOS（Tauri 增强版）
 
-The Mac app does the work; the iPhone app keeps you in the loop when you step away. It goes as far into the Apple ecosystem as a dev tool can:
+要求 macOS 13+。当前适配尚未发布正式 Mac 安装包，**不要把上游原生 `Coucou.zip` 当成本 Fork 的 DSH 增强版**。
 
-<table>
-<tr>
-<td colspan="3" align="center"><img src="docs/media/iphone-live-activity.jpg" width="520" alt="Mochi on the Lock Screen, waiting for your OK with Deny and Allow"></td>
-</tr>
-<tr>
-<td width="33%"><img src="docs/media/iphone-approval.jpg" alt="A permission request on the iPhone, Allow with Face ID"></td>
-<td width="33%"><img src="docs/media/iphone-session.jpg" alt="A Claude Code session on the iPhone: the prompt, what it did, Claude's answer and the next instruction"></td>
-<td width="33%"><img src="docs/media/iphone-widgets.jpg" alt="Home Screen widgets with each agent's and service's Mochi"></td>
-</tr>
-</table>
+在 Mac 上构建，或在 [macOS CI](<.github/workflows/macos-tauri.yml>) 运行后下载对应 Apple Silicon / Intel 的 DMG artifact。安装时将 `Coucou.app` 拖入 Applications。CI artifact 未经 Developer ID 公证；正式分发需配置 Apple 签名/公证。
 
-- 🏝️ **Live Activity and Dynamic Island** — lock your Mac while an agent works and Mochi moves to your iPhone's Lock Screen and Dynamic Island with the agent's state, then comes back to the notch when you unlock. **Allow** or **Deny** a permission right from the Lock Screen, without opening the app.
-- 🔔 **Notifications you can act on** — Allow, Review or Deny a permission, pick an answer to Claude's question, or reply to a finished agent, straight from the notification.
-- 🔐 **Face ID on every Allow** — nothing runs on your Mac without your explicit tap; your Mac only applies a decision meant for the exact request it is waiting on.
-- 💬 **Talk to your agents** — follow each session live (steps, diffs, the last turn), answer questions, and send the next instruction to your Mac by text or voice.
-- 🧩 **Widgets, Control Center, Siri and Shortcuts** — home and Lock Screen widgets, a Control Center control, ask Siri how your agents are doing or send Claude an instruction, in Siri and Shortcuts.
-- 🔎 **Spotlight and Focus** — find past turns in Spotlight; a Focus filter shows only the agents waiting for you.
-- 📊 **Your services up close** — GitHub, Vercel, Stripe, Cal.com, n8n, Notion, Resend: your Mac reads their APIs with the keys in its Keychain and the iPhone shows the figures and lists. Safe actions (re-run CI, redeploy, merge a PR, pause a workflow) behind Face ID; nothing that moves money or sends an email.
-- 🫧 **Liquid Glass, native to the bone** — SwiftUI, tabs, zoom transitions, context menus, swipe actions, alternate icons, Mochi at 120 Hz.
-- 🔒 **Through your own iCloud** — sessions sync through your private CloudKit database; project names, commands and questions are encrypted with your iCloud keys. No Coucou server sees your projects, commands or keys. Turn it on in the Mac app: Settings → General → iPhone.
-
-**Get it on your iPhone in 3 steps:** install Coucou on your iPhone ([Join the TestFlight beta](https://testflight.apple.com/join/3GpeHv2b) — free, App Store coming soon), turn on **Settings → General → iPhone** in the Mac app (0.1.9 or later), and use the same Apple Account in iCloud on both. Full guide, troubleshooting and build-it-yourself: [docs/IPHONE.md](docs/IPHONE.md).
-
-<table>
-<tr>
-<td><img src="docs/media/claude-code.png" alt="Claude Code session"></td>
-<td><img src="docs/media/stripe.png" alt="Stripe payments"></td>
-</tr>
-<tr>
-<td><img src="docs/media/chat.png" alt="Chat with Claude"></td>
-<td><img src="docs/media/dizzy.png" alt="Too many hits"></td>
-</tr>
-</table>
-
-## Versions
-
-### Coucou (DSH & Windows Enhanced) Releases
-
-| Version | Date | Highlights |
-|---|---|---|
-| [v0.1.1](https://github.com/Nomit8088/coucou/releases/tag/v0.1.1) | Oct 10, 2026 | 应用内在线更新（托盘菜单 + 设置页面检测），一键静默下载安装包并自动覆盖升级 |
-| [v0.1.0](https://github.com/Nomit8088/coucou/releases/tag/v0.1.0) | Oct 10, 2026 | 深度适配 DeepSeek Harness (DSH)、网易云音乐/QQ音乐/Spotify 原生媒体控制与 Mochi 起舞动效、独立免源码 EXE 安装包与绿色便携版 |
-
-### Upstream Versions (Mac / Linux)
-
-macOS releases are published as `v*` tags. See [CHANGELOG.md](CHANGELOG.md) for the full notes of each version.
-
-| Version | Date | Highlights |
-|---------|------|------------|
-| [0.2.3](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.3) | Oct 8, 2026 | Terminal sessions, Spotify, a colour per Mochi, dictation in any language, open on hover, your own sounds |
-| [0.2.2](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.2) | Oct 8, 2026 | Choose Mochi's screen, Claude Desktop pill, Codex plan usage, full questions, safer settings.json |
-| [0.2.1](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.1) | Oct 7, 2026 | Hermes Agent support |
-| [0.2.0](https://github.com/Louis-CFM/coucou/releases/tag/v0.2.0) | Oct 6, 2026 | Copilot CLI, Muse Code, OpenCode and Amp, weekly recap, 10 languages |
-| [0.1.9](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.9) | Oct 6, 2026 | iPhone services with live details and actions, smarter Live Activity |
-| [0.1.8](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.8) | Oct 5, 2026 | Coucou on iPhone: sessions, widgets, approvals with Face ID, Mochi in the Dynamic Island |
-| [0.1.7](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.7) | Oct 4, 2026 | Keyboard shortcuts |
-| [0.1.6](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.6) | Oct 4, 2026 | Mochi on the desktop |
-| [0.1.5](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.5) | Oct 4, 2026 | Wardrobe and seasonal outfits, new launch greeting |
-| [0.1.4](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.4) | Oct 3, 2026 | Live diffs, GitHub pull requests, CI, reviews and contribution grid |
-| [0.1.3](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.3) | Oct 3, 2026 | Answer Claude's questions from the notch, plan usage, local models, Apple Music |
-| [0.1.2](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.2) | Oct 2, 2026 | Codex and Cursor support, the permission card stays until you answer |
-| [0.1.1](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.1) | Oct 2, 2026 | Gemini and OpenAI chat, Linux build, more agents and pills, security hardening |
-| [0.1.0](https://github.com/Louis-CFM/coucou/releases/tag/v0.1.0) | Sep 27, 2026 | First release: Mochi, Claude Code sessions, chat, file drop, integrations |
-
-Windows and Linux are released together, under the `windows-v*` and `linux-v*` tags. The newest Windows installer is always at [`windows-latest`](https://github.com/Louis-CFM/coucou/releases/tag/windows-latest), the newest Linux AppImage at [`linux-latest`](https://github.com/Louis-CFM/coucou/releases/tag/linux-latest).
-
-| Windows & Linux | Date | Highlights |
-|---------|------|------------|
-| 0.3.0 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.3.0) · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.3.0) | Oct 9, 2026 | Linux catches up: Spotify with Mochi dancing, global shortcuts on Wayland, Open terminal brings the terminal back; open on hover, your own sounds, a colour per Mochi |
-| 0.2.0 · [Windows](https://github.com/Louis-CFM/coucou/releases/tag/windows-v0.2.0) | Oct 8, 2026 | Catches up with the Mac: nine agents with approvals, chat with any AI, plan usage, GitHub, wardrobe, 10 languages |
-| 0.1.1 · [Linux](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.1.1) | Oct 1, 2026 | First Linux build (beta) |
-
-## Demo mode
-
-No API key, no Claude Code, no setup — open **Settings → General → Demo**, click **Try demo mode**, and Coucou walks through a scripted session: a Claude Code session with live steps and a diff you can read, a permission request, an AskUserQuestion, a parallel Codex session, the GitHub, Stripe, Vercel and other integration pills loaded with sample data, the chat with a streamed response, the weekly recap with a share image you can actually save.
-
-Nothing is written to disk during the demo — no Keychain entries, no hook files, no recap history. Your real sessions and keys are saved and restored exactly as they were when you stop.
-
-## Install
-
-### App Store
-
-Coucou is coming to the **Mac App Store** and the **iPhone App Store**: one click to install, automatic updates, and the iPhone app pairs with your Mac through your iCloud account, with nothing to configure. The links will be here as soon as Apple publishes them.
-
-The App Store build of the Mac app runs in Apple's sandbox, so a few features stay in the GitHub build: Claude plan usage, the Apple Music pill and attaching the front window to the chat.
-
-### iPhone
-
-1. **Install Coucou on your iPhone** (iOS 18 or later): install [TestFlight](https://apps.apple.com/app/testflight/id899247664) from the App Store, then [Join the TestFlight beta](https://testflight.apple.com/join/3GpeHv2b). The beta is free; Apple limits it to 10,000 testers. The App Store version is coming soon.
-   *Apple is reviewing the beta: it opens within a day or two — if the link isn't accepting testers yet, check back soon.*
-2. **On your Mac**, with Coucou 0.1.9 or later: **Settings… → General → iPhone**, turn on **Show my agent sessions on my iPhone**, and **Move Mochi to my iPhone's Dynamic Island when my Mac is locked** for the Lock Screen.
-3. **Same Apple Account** in iCloud on the Mac and the iPhone. That's the whole link: no account, no pairing code.
-4. Open Coucou on the iPhone, allow notifications, and start a Claude Code session on the Mac.
-
-Everything else, troubleshooting included, is in [docs/IPHONE.md](docs/IPHONE.md).
-
-### Download for macOS
-
-1. Grab the latest `Coucou.zip` from [Releases](https://github.com/Louis-CFM/coucou/releases).
-2. Unzip and move **Coucou.app** to `/Applications`.
-3. Launch it, and click **Open** when macOS asks you to confirm. Updating from 0.1.0? macOS may ask you, once for each key you saved, to let Coucou use it: enter your Mac password and click **Always Allow**.
-
-### Windows (DSH Enhanced Edition)
-
-新电脑**无需拉取源码，无需配置 Node.js、Rust、Git 等开发环境**，直接下载即可开箱即用：
-
-- **[Coucou-Windows-0.1.1-setup.exe](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-setup.exe)**（安装版，推荐，双击自动安装至用户目录，无需管理员权限）
-- **[Coucou-Windows-0.1.1-portable.zip](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1-portable.zip)**（绿色免安装版，解压后双击 `coucou.exe` 直接运行）
-- **[Coucou-Windows-0.1.1.msi](https://github.com/Nomit8088/coucou/releases/latest/download/Coucou-Windows-0.1.1.msi)**（Windows Installer）
-
-> 💡 **在线更新**：安装完成后，后续可在系统托盘右键菜单选择「检查更新…」或在设置窗口一键检查并在线升级。
-
-**Windows 首次运行提示（SmartScreen）**：由于开源软件尚未购买付费商业签名，首次启动时 Windows Defender / SmartScreen 可能会提示 *“Windows 已保护你的电脑”*（未知发布者）：
-1. 界面弹出 **“Windows 已保护你的电脑”**，点击 **“更多信息” (More info)**；
-2. 点击出现的 **“仍要运行” (Run anyway)** 按钮即可正常进入。
-
-本软件为完全开源透明项目，不包含任何恶意代码或遥测跟踪。你也可以选择从源码[自行构建](#build-from-source)。
-
-**Windows and Linux 0.3.0** add open on hover, your own sounds, a colour of your own for each Mochi and the Mochi-to-desktop shortcut; on Linux, the Spotify pill with Mochi dancing to it, global shortcuts on Wayland and "Open terminal" that brings the terminal forward. 0.2.0 caught up with the Mac: Codex, Copilot CLI, Muse Code and six more agents with approvals from the island, answers to Claude's questions, live diffs, GitHub pull requests and CI, plan usage, local models, the wardrobe, Mochi on the desktop, keyboard shortcuts, the weekly recap and 10 languages. See the [changelog](CHANGELOG.md).
-
-There is no notch on a PC, so the island slides out of the top edge of the screen
-instead of hiding inside one. See [`windows/README.md`](windows/README.md) for the
-rest of the differences.
+Mac 更新为明确的对应架构 DMG 下载 / 手动安装，不执行 Windows 安装程序。源码和实机检查步骤见 [Mac 指南](<windows/MACOS.md>)。
 
 ### Linux
 
-**Coucou for Linux 0.3.0** is out (x86_64): [AppImage](https://github.com/Louis-CFM/coucou/releases/download/linux-v0.3.0/Coucou-Linux-0.3.0-x86_64.AppImage) · [.deb](https://github.com/Louis-CFM/coucou/releases/download/linux-v0.3.0/Coucou-Linux-0.3.0-amd64.deb) · [.rpm](https://github.com/Louis-CFM/coucou/releases/download/linux-v0.3.0/Coucou-Linux-0.3.0-x86_64.rpm) · [all files and checksums](https://github.com/Louis-CFM/coucou/releases/tag/linux-v0.3.0). The newest AppImage is always at [`linux-latest`](https://github.com/Louis-CFM/coucou/releases/download/linux-latest/Coucou-Linux-x86_64.AppImage).
+继续使用同一个 Tauri 工程及现有 AppImage / deb / rpm 打包配置；系统依赖和 Wayland 差异见 [Linux 说明](<windows/README.md#linux>)。上游的发行包不一定包含这个 Fork 的最新 DSH 增强。
 
-- **AppImage** (any distribution): `chmod +x Coucou-Linux-*.AppImage`, then run it.
-- **Debian / Ubuntu**: `sudo apt install ./Coucou-Linux-*.deb`
-- **Fedora / openSUSE**: `sudo dnf install ./Coucou-Linux-*.rpm`
+## 从源码构建
 
-Check a download with `sha256sum -c SHA256SUMS --ignore-missing`. On Arch Linux, build it with the [PKGBUILD](linux/arch/PKGBUILD).
+共同要求 Node.js 24、Rust stable；Windows 还需 MSVC Build Tools，Mac 需 Xcode Command Line Tools（无需 XcodeGen），Linux 需 WebKitGTK / GTK 等开发库。
 
-The island sits on the top edge on compositors with layer-shell — COSMIC, KDE
-Plasma, Hyprland, Sway and other wlroots compositors. GNOME has no layer-shell,
-so there it runs through XWayland as a dock window at the top of the screen. See [`windows/README.md`](windows/README.md#linux).
-
-### Build from source
-
-**macOS** — requirements: macOS 15+, Xcode 16+, [XcodeGen](https://github.com/yonaskolb/XcodeGen).
-
-```bash
-brew install xcodegen
-git clone https://github.com/Louis-CFM/coucou.git
-cd coucou/NotchBuddy
-xcodegen
-open NotchBuddy.xcodeproj   # then ⌘R
-```
-
-**Windows** — requirements: [Rust](https://rustup.rs), Node 20+, MSVC build tools.
-
-```powershell
-git clone https://github.com/Louis-CFM/coucou.git
+```sh
+git clone https://github.com/Nomit8088/coucou.git
 cd coucou/windows
-npm install
-npm run pack                # installer lands in windows/release/
+npm ci
+npm run tauri dev
 ```
 
-**Linux** — requirements: [Rust](https://rustup.rs), Node 20+, and the WebKitGTK,
-gtk-layer-shell and appindicator development packages (Debian/Ubuntu names below).
+打包：
 
-```bash
-sudo apt install build-essential pkg-config \
-  libwebkit2gtk-4.1-dev libgtk-layer-shell-dev libayatana-appindicator3-dev \
-  librsvg2-dev libssl-dev libdbus-1-dev patchelf \
-  gstreamer1.0-plugins-base gstreamer1.0-plugins-good
-git clone https://github.com/Louis-CFM/coucou.git
-cd coucou/windows
-npm install
-npm run pack                # AppImage, .deb and .rpm land in windows/release/
+```sh
+npm run pack
 ```
 
-## Setup
+Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS-<version>-aarch64.dmg` 或 `Coucou-macOS-<version>-x86_64.dmg`，放在 `windows/release/`；请分别在对应架构的 Mac 构建，hook 必须与主程序架构一致。
 
-Click the Coucou icon in the menu bar (macOS) or in the system tray (Windows, Linux) → **Settings…**
+## 配置与安全
 
-| What | Why | Where the key goes |
+- 打开系统托盘 / Mac 菜单栏中的 Coucou → Settings。
+- 在 Agents 中安装 DSH 插件或相应 Agent hooks：先看差异、备份，再明确确认写入，不覆盖已有配置。
+- DSH 默认 profile 是 `~/.dsh/profiles/web`；安装后重启 DSH。
+- 密钥使用 Windows Credential Manager / macOS Keychain / Linux Secret Service；普通设置与日志留在本机。
+- 不自动同意权限，不自动发送邮件，不添加遥测。应用未启动或连接超时时，hook 退出并交回 Agent 自己处理。
+
+## Versions
+
+| Version | Date | Highlights |
 |---|---|---|
-| **Claude Code hooks** | live sessions and approvals | **Install hooks** — Coucou backs up `~/.claude/settings.json`, merges its hooks and shows you the diff before writing anything |
-| **Claude plan** *(macOS, GitHub build)* | Plan usage gauge in the notch header | **Install relay** in Settings → Agents → Plan usage, then enable "Show in the notch" |
-| **Gemini CLI hooks** *(macOS)* | Gemini CLI sessions in the island | **Install hooks** in Settings → Gemini CLI — backs up `~/.gemini/settings.json` |
-| **Antigravity (agy) hooks** *(macOS)* | agy sessions in the island | **Install hooks** in Settings → Antigravity — backs up `~/.gemini/config/hooks.json` |
-| **Anthropic API key** | chat and questions about files | Settings → Anthropic API · Keychain / Windows Credential Manager / Secret Service |
-| **Google AI API key** *(macOS)* | chat with Google AI (Gemini) | Settings → Chat — other providers · Keychain |
-| **OpenAI API key** *(macOS)* | chat with OpenAI | Settings → Chat — other providers · Keychain |
-| **Ollama server** *(macOS)* | chat with local models via Ollama | Settings → Chat → Local models → **Connect** |
-| **LM Studio server** *(macOS)* | chat with local models via LM Studio | Settings → Chat → Local models → **Connect** |
-| **iPhone** *(macOS)* | sessions, approvals, questions and Mochi on your iPhone | Settings → General → iPhone · your private iCloud, see [docs/IPHONE.md](docs/IPHONE.md) |
-| **Active pills** *(macOS)* | choose which tools and agents appear in the island | Settings → Active pills |
-| Stripe, n8n, GitHub, Vercel, Resend, Notion, Cal.com | the service pills | Keychain / Windows Credential Manager / Secret Service, all optional |
+| Unreleased | — | 基于现有 Tauri 增强版的 macOS 适配、私有 Unix socket 双向 DSH、Keychain、Finder 拖拽、对应架构 DMG / Mac CI；移除 Mac 不支持的功能入口 |
+| [v0.1.1](https://github.com/Nomit8088/coucou/releases/tag/v0.1.1) | Oct 10, 2026 | Windows 托盘与设置内更新检测、一键拉起安装包 |
+| [v0.1.0](https://github.com/Nomit8088/coucou/releases/tag/v0.1.0) | Oct 10, 2026 | DSH 深度适配、Windows 原生媒体控制、独立安装包 |
 
-If Coucou isn't running, the hook exits immediately: **Claude Code is never blocked.**
+当前源码版本为 0.1.3；本次没有改版号或发布 Release。历史上游版本见 [CHANGELOG](<CHANGELOG.md>)。
 
-### Supported agents
+## 代码位置与验证
 
-| Agent | How it connects | Mac-only? |
-|---|---|---|
-| Claude Code | Settings → Claude Code → **Install hooks** | No |
-| Gemini CLI | Settings → Gemini CLI → **Install hooks** | Mac only |
-| Antigravity | Settings → Antigravity → **Install hooks** | Mac only |
-| Cursor | Hooks installed automatically alongside Claude Code | No |
-| Codex | `--agent codex` flag; Settings → Codex → **Install hooks** | No |
-| Copilot CLI | `--agent copilot` flag + camelCase events | No |
-| Muse Code | `--agent muse` flag | No |
-| OpenCode | Plugin — **Settings → OpenCode Plugin → Install** | Mac only |
-| Amp | Plugin — **Settings → Amp Plugin → Install** | Mac only |
-| Hermes | Plugin — **Settings → Agents → Hermes → Install** | Mac only |
-| Any other | `--agent <name>` flag; see [`docs/AGENTS.md`](docs/AGENTS.md) | No |
+- [Tauri 工程](<windows/Cargo.toml>)：共享前端、Rust 后端及 hook；[Mac 指南](<windows/MACOS.md>)。
+- [macOS CI](<.github/workflows/macos-tauri.yml>)：分别检查 Intel / Apple Silicon，生成 DMG，不自动发布。
+- 原生 Swift / iPhone / relay 源码只作为历史项目保留，不参与本 Fork 的 Mac Tauri 构建；相关旧文档不代表此版功能。
 
-OpenCode, Amp and Hermes use a plugin model rather than a hook command. Coucou installs the plugin file into `~/.config/opencode/plugins/`, `~/.config/amp/plugins/` and `~/.hermes/plugins/coucou/` respectively. On Windows and Linux the plugins start the `coucou-hook` relay directly — see [`windows/README.md`](windows/README.md#supported-agents).
+```sh
+cd windows
+node scripts/prepare-build.mjs
+npx tsc --noEmit
+npm test
+npx vite build
+cargo test --workspace --locked
+```
 
-## Things to try
+Windows 回归通过不等同于 Mac 验收完成：Mac 后端编译、WKWebView / AppKit 窗口、混合缩放多屏、全屏 Space、开机启动与签名/公证仍需 Mac CI 和实机确认。
 
-| Do this | Mochi does that |
-|---|---|
-| Hover the notch (top edge on Windows and Linux) | peeks out and says hi 👋 |
-| Click it | opens |
-| Hover Mochi | blinks, eyes grow |
-| Click Mochi | squish + annoyed |
-| Click 3 times fast | 😵‍💫 dizzy for a few seconds |
-| Drag a file onto the island | turns into a box and swallows it |
-| Drag Mochi onto a window *(macOS)* | attaches it as context |
-| Click the model name above the chat box *(macOS)* | switch AI provider or model |
+## Credits & License
 
-## How it works
+原始项目由 [Louis Raillé](https://louisraille.fr) 使用 Claude Code 构建，本 Fork 由 [@Nomit8088](https://github.com/Nomit8088) 增强。项目独立于 notch-companion 设计概念所属工作室。
 
-**macOS**
-
-- **Island**: a borderless `NSPanel` hugging the notch, driven by a small state machine (`hidden → petit → home`).
-- **Character**: drawn in SwiftUI `Canvas` + `TimelineView` at 60 fps — squircle body, eyes projected on a sphere, spring animations. No Rive, no Lottie, no images.
-- **Claude Code**: a tiny `nb-hook` script receives hook events and forwards them over a Unix socket to the app. For approvals it waits for your click, then answers the hook.
-- **Integrations**: lightweight pollers, paused when nothing is watching.
-- **Declared pills**: `PillCatalog.swift` is the single source of truth — every pill (coding tools, agents, AI providers, services) is declared there with its ID, color and category.
-- **Sounds**: 28 short WAVs played through preloaded `AVAudioPlayer`s.
-
-The macOS app is native Swift 6 / SwiftUI / AppKit with **zero third-party dependencies**.
-
-**iPhone**
-
-- A native SwiftUI app sharing Mochi's engine, the pills and the diff engine with the Mac through `CoucouKit`.
-- The Mac publishes sessions, turns and services to a private CloudKit zone in your iCloud (sensitive fields encrypted with your iCloud keys); the iPhone reads them and writes back decisions, answers and instructions, which the Mac only applies when they match what it is waiting on.
-- Live Activities are started and updated by APNs pushes through [`relay/`](relay/), a stateless Cloudflare Worker that holds the APNs key and only sees the agent's name and state.
-
-**Windows**
-
-- A [Tauri 2](https://tauri.app) app (Rust + TypeScript): the island is a transparent, always-on-top window that never steals focus, Mochi is drawn in Canvas 2D with the same shapes, timings and sounds as on the Mac.
-- Claude Code hooks go through a tiny `coucou-hook.exe` and a named pipe; keys live in Windows Credential Manager.
-- Details and differences in [`windows/README.md`](windows/README.md).
-
-**Linux**
-
-- The same Tauri app as Windows. On Wayland the island is a gtk-layer-shell
-  overlay anchored to the top edge, and click-through is its input region.
-- Claude Code hooks go through the same `coucou-hook`, over a Unix socket in
-  `$XDG_RUNTIME_DIR`; keys live in the Secret Service.
-
-## Contributing
-
-Issues and PRs are very welcome — new integrations, new emotes, new sounds, bug fixes. See [CONTRIBUTING.md](CONTRIBUTING.md).
-
-Want to add or improve a translation? Open a PR with changes to `NotchBuddy/Resources/Localizable.xcstrings`.
-
-## Credits
-
-Built by [Louis Raillé](https://louisraille.fr) with Claude Code.
-Inspired by the notch-companion concepts shared by design studios — this project is independent and not affiliated with any of them.
-
-## License
-
-- **Code:** [MIT](LICENSE) — use it, fork it, learn from it, just keep the copyright notice.
-- **Name, Mochi character, icon, sounds and media:** © Louis Raillé, all rights reserved — see [LICENSE-ASSETS.md](LICENSE-ASSETS.md). Shipping your own fork? Give it your own name and character.
-
-<div align="center">
-
-**If Mochi made you smile, a ⭐ helps a lot.**
-
-[Website](https://louis-cfm.github.io/coucou/) · [Privacy](https://louis-cfm.github.io/coucou/privacy.html) · [Terms](https://louis-cfm.github.io/coucou/terms.html) · [Support](https://louis-cfm.github.io/coucou/support.html)
-
-</div>
+- **代码**：[MIT](<LICENSE>)，保留版权声明。
+- **名称、Mochi、图标、声音与媒体**：© Louis Raillé，保留所有权利；见 [LICENSE-ASSETS](<LICENSE-ASSETS.md>)。分发自己的 Fork 时请遵守资产许可要求。

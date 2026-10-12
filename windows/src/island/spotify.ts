@@ -5,7 +5,8 @@
 // comes on screen (seeks made in the player's own window are never signalled).
 
 import { Bridge, onEvent } from "../core/bridge";
-import { pillDefinition } from "../core/pills";
+import { availablePills, pillDefinition } from "../core/pills";
+import { platformCapabilities } from "../core/platform";
 import { Spotify, isAd, pillIdOf, type SpotifyState } from "../core/spotify";
 import { State } from "../core/state";
 import { t } from "../i18n/i18n";
@@ -16,6 +17,7 @@ export interface SpotifyHost {
 }
 
 export function registerSpotifyHandlers(island: SpotifyHost) {
+  if (!platformCapabilities(State.os).music) return;
   void onEvent<SpotifyState>("spotify", (s) => applySpotify(island, s));
   void onEvent<{ artUrl: string; dataUrl: string }>("spotify-artwork", (art) => {
     Spotify.artwork = art;
@@ -29,6 +31,7 @@ export function registerSpotifyHandlers(island: SpotifyHost) {
 
 /** A report from Rust (or the answer to a refresh). */
 export function applySpotify(island: SpotifyHost, next: SpotifyState) {
+  if (!availablePills(State.os).some((p) => p.id === pillIdOf(next))) return;
   const wasPlaying = State.spotifyPlaying;
   Spotify.state = next;
   syncPillName();

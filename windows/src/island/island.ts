@@ -618,9 +618,17 @@ export class Island {
 
   // ── File drop ───────────────────────────────────────────────────────────────
 
-  private onDragDrop(e: { type: string; paths?: string[] }) {
+  private onDragDrop(e: { type: string; paths?: string[]; position?: { x: number; y: number } }) {
     if (e.type !== "over") void Bridge.log(`drag ${e.type} ${e.paths?.length ?? 0} file(s)`);
     if (State.paused) return;
+    if (e.position && Number.isFinite(e.position.x) && Number.isFinite(e.position.y)) {
+      const rect = this.islandRect();
+      State.mouse = e.position;
+      State.mouseInIsland = { x: e.position.x - rect.x, y: e.position.y - rect.y };
+      if (UploadSeq.isActive && !UploadSeq.dropped) {
+        UploadSeq.updateCursor(State.mouseInIsland.x, State.mouseInIsland.y);
+      }
+    }
     switch (e.type) {
       case "enter":
       case "over": {

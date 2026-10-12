@@ -4,6 +4,8 @@
 
 # Coucou for Windows (DSH & Media Enhanced)
 
+> **macOS users:** this Tauri enhanced edition now has its own Mac backend and DMG build configuration. Use [MACOS.md](<MACOS.md>) for setup, platform limitations and validation. Do not use the legacy Swift/Xcode build instructions for this edition; unsupported Mac music and desktop features are intentionally hidden.
+
 **Mochi doesn't get a notch on a PC — so it lives at the top of your screen instead.**
 
 > 🚀 **Personalized Fork by [@Nomit8088](https://github.com/Nomit8088)**:

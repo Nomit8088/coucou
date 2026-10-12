@@ -458,6 +458,10 @@ class AppState {
     const d = sanitizeDeclared(this.settings, this.os);
     this.settings.mainPill = d.mainPill;
     this.settings.activeIntegrations = d.activeIntegrations;
+    // Unsupported catalog pills cannot survive an imported preference or a
+    // stale runtime task, even when that task previously looked busy.
+    const offered = new Set(availablePills(this.os).map((p) => p.id));
+    this.tasks = this.tasks.filter((t) => !pillDefinition(t.id) || offered.has(t.id));
     for (const def of availablePills(this.os)) {
       const shouldLoad = def.id === d.mainPill || d.activeIntegrations.includes(def.id);
       const idx = this.tasks.findIndex((t) => t.id === def.id);

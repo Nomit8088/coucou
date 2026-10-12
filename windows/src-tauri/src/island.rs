@@ -244,6 +244,17 @@ fn target_monitor(app: &AppHandle, pref: &str) -> Option<Monitor> {
         return Some(monitors[i].clone());
     }
     if pref == "cursor" {
+        #[cfg(target_os = "macos")]
+        if let Some((cx, cy)) = platform::cursor_logical() {
+            if let Some(m) = monitors.iter().find(|m| {
+                let scale = m.scale_factor();
+                let p = m.position();
+                let size = m.size();
+                cx >= p.x as f64 / scale && cx < (p.x as f64 + size.width as f64) / scale
+                    && cy >= p.y as f64 / scale && cy < (p.y as f64 + size.height as f64) / scale
+            }) { return Some(m.clone()); }
+        }
+        #[cfg(not(target_os = "macos"))]
         if let Some((cx, cy)) = cursor_physical() {
             if let Some(m) = monitors.iter().find(|m| monitor_contains(m, cx, cy)) {
                 return Some(m.clone());
@@ -329,6 +340,9 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
+    #[cfg(target_os = "macos")]
+    let y = mp.y + (platform::monitor_top_inset(&m) * scale).round() as i32;
+    #[cfg(not(target_os = "macos"))]
     let y = mp.y;
 
     // GTK never sizes a non-resizable window below its natural size (200 px
@@ -338,12 +352,22 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     // still offers the user nothing to resize it by. (Found by @YossiYad, #44.)
     #[cfg(target_os = "linux")]
     let _ = win.set_resizable(true);
-    let _ = win.set_size(PhysicalSize::new(pw, ph));
-    let _ = win.set_position(PhysicalPosition::new(x, y));
+    #[cfg(target_os = "macos")]
+    {
+        // AppKit converts physical arguments with the CURRENT window scale,
+        // not the destination monitor's. Logical points survive Retina moves.
+        let _ = win.set_size(tauri::LogicalSize::new(lw, lh));
+        let _ = win.set_position(tauri::LogicalPosition::new(x as f64 / scale, y as f64 / scale));
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let _ = win.set_size(PhysicalSize::new(pw, ph));
+        let _ = win.set_position(PhysicalPosition::new(x, y));
+        // Moving across displays can rescale the window: re-assert its size.
+        let _ = win.set_size(PhysicalSize::new(pw, ph));
+    }
     let (lx, ly) = logical_origin(&m);
     platform::pin_to_monitor(&win, lx, ly);
-    // Moving across displays can rescale the window: re-assert the physical size.
-    let _ = win.set_size(PhysicalSize::new(pw, ph));
     let _ = win.set_always_on_top(true);
 }
 
@@ -399,9 +423,12 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 let Some(win) = window(&app) else { continue };
                 let Ok(origin) = win.outer_position() else { continue };
                 let scale = win.scale_factor().unwrap_or(1.0);
-                let Some((cx, cy)) = cursor_physical() else { continue };
-                let x = (cx - origin.x as f64) / scale;
-                let y = (cy - origin.y as f64) / scale;
+                #[cfg(target_os = "macos")]
+                let Some((x, y)) = platform::cursor_logical().map(|(cx, cy)|
+                    (cx - origin.x as f64 / scale, cy - origin.y as f64 / scale)) else { continue };
+                #[cfg(not(target_os = "macos"))]
+                let Some((x, y)) = cursor_physical().map(|(cx, cy)|
+                    ((cx - origin.x as f64) / scale, (cy - origin.y as f64) / scale)) else { continue };
                 let size = match win.inner_size() {
                     Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
                     Err(_) => (PANEL_W, PANEL_H),

@@ -60,6 +60,7 @@ pub struct Shared {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct BootInfo {
+    os: &'static str,
     settings: Settings,
     screen: ScreenInfo,
     version: String,
@@ -78,6 +79,7 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
     settings.plan_relay_installed = hooks_status.plan_relay_installed;
     let screen = island::screen_info(&app, &settings.screen);
     BootInfo {
+        os: std::env::consts::OS,
         settings,
         screen,
         version: env!("CARGO_PKG_VERSION").to_string(),
@@ -261,6 +263,11 @@ fn open_session(session_id: Option<String>, path: Option<String>) -> bool {
     // Linux asks the display server, KWin or the terminal, which can take a
     // moment: never on the UI thread a sync command runs on. VS Code still
     // opens when none of them could bring the window forward.
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (owners, folder);
+        open_in_vscode(path)
+    }
     #[cfg(target_os = "linux")]
     {
         std::thread::spawn(move || {
@@ -849,6 +856,8 @@ pub fn run() {
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            #[cfg(target_os = "macos")]
+            app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             tray::build(&handle)?;
             // Before the island: see create_settings_window.
             create_settings_window(&handle);

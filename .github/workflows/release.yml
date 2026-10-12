@@ -1,12 +1,12 @@
-name: Release (build check)
+name: Legacy native macOS (manual build check)
 
+# Historical Swift target only. Shared release tags no longer build the unused
+# native application; the active Tauri Mac checks live in macos-tauri.yml.
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
 
-# Notarization is done locally with scripts/release.sh.
-# This workflow only verifies the build compiles on a clean machine.
+# Notarization for the legacy target is done locally with scripts/release.sh.
+# This manual workflow only verifies its build on a clean machine.
 jobs:
   build-check:
     runs-on: macos-latest

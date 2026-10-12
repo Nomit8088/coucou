@@ -1,6 +1,6 @@
 [package]
 name = "coucou"
-description = "Coucou for Windows and Linux — Mochi lives at the top of your screen"
+description = "Coucou for Windows, macOS and Linux — Mochi lives at the top of your screen"
 authors = ["Louis Raille"]
 version.workspace = true
 edition.workspace = true
@@ -14,7 +14,9 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = ["tray-icon"] }
+# Keep the private-API feature in the common dependency: tauri-build validates
+# that section even for a target-specific Mac config. Ignored on Windows/Linux.
+tauri = { version = "2", features = ["tray-icon", "macos-private-api"] }
 tauri-plugin-single-instance = "2"
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
@@ -57,6 +59,13 @@ windows = { version = "0.61", features = [
   "Win32_UI_Input_KeyboardAndMouse",
   "Win32_UI_WindowsAndMessaging",
 ] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+keyring = { version = "3", features = ["apple-native"] }
+libc = "0.2"
+# Already used by Tauri; typed Objective-C messaging for the floating window.
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Secret Service (GNOME Keyring, KWallet) over D-Bus, encrypted in transit.
