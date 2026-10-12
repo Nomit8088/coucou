@@ -1,18 +1,18 @@
 # Coucou — guide for AI coding agents
 
-This fork's active desktop app is `windows/`: the shared Tauri enhanced edition for Windows, macOS and Linux. macOS setup, limitations and acceptance checks are in `windows/MACOS.md`; do not implement the Mac port in Swift or claim native-only feature parity. `NotchBuddy/` remains the legacy native macOS/iPhone source, excluded from the enhanced edition's build. Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer, chat and drop files from the notch.
+This fork's active desktop app is `desktop/`: the shared Tauri enhanced edition for Windows, macOS and Linux. macOS setup, limitations and acceptance checks are in `desktop/MACOS.md`; do not implement the Mac port in Swift or claim native-only feature parity. `NotchBuddy/` remains the legacy native macOS/iPhone source, excluded from the enhanced edition's build. Mochi, a small animated character living in the MacBook notch, shows AI coding agent sessions (Claude Code, Gemini CLI, Antigravity and more) and a few integrations, and lets the user approve, answer, chat and drop files from the notch.
 
 ## Where things are
 - `NotchBuddy/Sources/App/` — Mac-only Swift code. `NotchBuddy/Sources/CoucouKit/` — code shared with the iPhone app (Mochi's BotEngine and outfits, pills, diff, models). `NotchBuddy/Sources/Phone/` — iPhone app (`CoucouPhone` target), with its widgets in `Sources/Widgets/` and the expanded approval notification in `Sources/NotificationContent/`. `NotchBuddy/Resources/sounds/` — the 28 WAV sounds. `NotchBuddy/project.yml` — XcodeGen project (never edit the `.xcodeproj` by hand).
 - `NotchBuddy/Sources/CoucouKit/PillCatalog.swift` — single source of truth for all declared pills (workspace tools, agents, AI providers, services). Every pill ID, color, category and subtitle lives here.
 - `docs/SPEC.md`, `docs/INTEGRATIONS.md` — behaviour, views, states, integrations (in French).
 - `design/prototype/notch-buddy.html` — original prototype, the visual source of truth. `design/captures/` — target screenshots.
-- `windows/` — the active Tauri app for Windows, macOS and Linux: Rust in `src-tauri/`, TypeScript in `src/`, relay in `hook/`, Unix transport helpers in `shared/`. `src-tauri/tauri.macos.conf.json` is auto-merged by Tauri; `windows/MACOS.md` covers the Mac port.
+- `desktop/` — the active Tauri app for Windows, macOS and Linux: Rust in `src-tauri/`, TypeScript in `src/`, relay in `hook/`, Unix transport helpers in `shared/`. `src-tauri/tauri.macos.conf.json` is auto-merged by Tauri; `desktop/MACOS.md` covers the Mac port.
 - `docs/*.html` — the GitHub Pages site (privacy, terms, support, legal notice).
 - `relay/` — the Coucou relay, a stateless Cloudflare Worker that forwards the iPhone Live Activity pushes (it holds the APNs key, which must never ship in an app). See `relay/README.md`.
 
 ## Build
-Active enhanced app on Windows/macOS/Linux: `cd windows && npm ci && npm run tauri dev`; package with `npm run pack`.
+Active enhanced app on Windows/macOS/Linux: `cd desktop && npm ci && npm run tauri dev`; package with `npm run pack`.
 
 Legacy native source only (not this fork's Mac adaptation):
 ```

@@ -2,7 +2,7 @@
 
 写于 2026-10-09。仓库上游是 [Louis-CFM/coucou](https://github.com/Louis-CFM/coucou)，个人 fork 是 [Nomit8088/coucou](https://github.com/Nomit8088/coucou)。本文件是个性化改造的唯一施工依据；官方 `docs/SPEC.md` / `docs/AGENTS.md` / `docs/INTEGRATIONS.md` 描述的是上游产品，不要按它们恢复已删功能。
 
-**本轮只做 Windows**（`windows/`）。Mac（`NotchBuddy/`）、iPhone、`relay/` 不改；Mac 适配备忘见文末。
+**本轮只做 Windows**（`desktop/`）。Mac（`NotchBuddy/`）、iPhone、`relay/` 不改；Mac 适配备忘见文末。
 
 ---
 
@@ -95,7 +95,7 @@ Codex 不走 DSH 插件。
 - Base URL 只允许 `https://`，或指向本机的 `http://`
 - key 不进 settings JSON、不进日志、不进界面明文（Credential Manager）
 
-实现落点（Windows）：重写 `windows/src/core/providers.ts`、`windows/src-tauri/src/openai_compat.rs`、设置页 Chat 段；删除 Anthropic 专用 Messages 客户端作为默认聊天路径。
+实现落点（Windows）：重写 `desktop/src/core/providers.ts`、`desktop/src-tauri/src/openai_compat.rs`、设置页 Chat 段；删除 Anthropic 专用 Messages 客户端作为默认聊天路径。
 
 ---
 
@@ -125,7 +125,7 @@ Codex 不走 DSH 插件。
 
 GitHub 个人项目：现有 GraphQL pulse、贡献格子、token `github-token` **不动**。
 
-实现落点：`windows/src-tauri/src/integrations.rs` 新 poller、`windows/src/views/` 新卡片、`pills.ts` / Settings Integrations 增一项。不要改 GitHub poller 打补丁。
+实现落点：`desktop/src-tauri/src/integrations.rs` 新 poller、`desktop/src/views/` 新卡片、`pills.ts` / Settings Integrations 增一项。不要改 GitHub poller 打补丁。
 
 ---
 
@@ -173,7 +173,7 @@ Settings → Agents → DeepSeek Harness：
 
 IPC：Windows 上插件直接写 `\\.\pipe\coucou-<SID>`（与 hook 同一行 JSON）。Coucou 没开就丢掉，DSH 继续。展示路径不得对工具返回 `deny` / `ask`。
 
-小写工具名：`windows/src/island/hooks.ts`、`windows/src/core/diff.ts`、**以及** `windows/hook/src/main.rs` 的 `DIFF_TOOLS`（必须同时认 `edit` / `write` 与 `Edit` / `Write`）。Codex 仍是 PascalCase，两套都留。
+小写工具名：`desktop/src/island/hooks.ts`、`desktop/src/core/diff.ts`、**以及** `desktop/hook/src/main.rs` 的 `DIFF_TOOLS`（必须同时认 `edit` / `write` 与 `Edit` / `Write`）。Codex 仍是 PascalCase，两套都留。
 
 **批准**
 
@@ -182,7 +182,7 @@ IPC：Windows 上插件直接写 `\\.\pipe\coucou-<SID>`（与 hook 同一行 JS
 - Allow → `allowed-once`，Deny → `rejected`（DSH 没有 Always）
 - Coucou 与 Web GUI 同时问：插件立刻 `next()`，也把请求打到岛上；先点的算数，后点的忽略。Coucou 没开或超时不单独劫持，Web 继续等
 - **禁止**默认放行；没有人工点击不得 `allowed-once`
-- `dsh` 加入 `takes_decisions`（`windows/hook/src/reply.rs`）和 `APPROVAL_AGENTS`（`windows/src/island/agents.ts`）
+- `dsh` 加入 `takes_decisions`（`desktop/hook/src/reply.rs`）和 `APPROVAL_AGENTS`（`desktop/src/island/agents.ts`）
 
 **提问**
 
@@ -258,7 +258,7 @@ DSH 颜色：`#4D6BFE`。GitLab 颜色：`#FC6D26`。
 
 | Windows | Mac 以后 |
 |---|---|
-| `windows/src/core/pills.ts` 等 | `NotchBuddy/Sources/CoucouKit/PillCatalog.swift` 同一套 ID / 颜色 |
+| `desktop/src/core/pills.ts` 等 | `NotchBuddy/Sources/CoucouKit/PillCatalog.swift` 同一套 ID / 颜色 |
 | `agents.rs` 只剩 Codex + DSH | `HookServer` 安装检测对齐 |
 | GitLab poller in `integrations.rs` | `GitlabPoller.swift`，卡片抄 GitHub pulse 结构 |
 | 插件写 named pipe | 同一插件改写 `nb.sock`（或调 Mac relay） |
@@ -274,5 +274,5 @@ DSH 颜色：`#4D6BFE`。GitLab 颜色：`#FC6D26`。
 - 远程：`origin` = `https://github.com/Nomit8088/coucou.git`（个人 fork）；`upstream` = `https://github.com/Louis-CFM/coucou.git`
 - 不要往 upstream 提这些个性化删除 / DSH / GitLab 的 PR
 - 不要长期 rebase upstream：删除面大，冲突会很烦
-- 开发：在**独立终端或计划任务**里 `cd windows && npm run tauri dev`，不要挂在 DSH 进程树下
+- 开发：在**独立终端或计划任务**里 `cd desktop && npm run tauri dev`，不要挂在 DSH 进程树下
 - 日志：`%LOCALAPPDATA%\Coucou\coucou.log`

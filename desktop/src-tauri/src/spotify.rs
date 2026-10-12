@@ -35,7 +35,7 @@ const ARTWORK_LIMIT: usize = 3 * 1024 * 1024;
 // One pill per player. On Linux every player reaches Coucou through MPRIS, so the
 // Spotify pill is the only one there; on Windows the media session names the
 // application, and these are the pills that follow one. Mirrors `mediaApp` in
-// windows/src/core/pills.ts.
+// desktop/src/core/pills.ts.
 
 /// (pill id, the application id Windows' media session reports).
 #[cfg(any(windows, test))]

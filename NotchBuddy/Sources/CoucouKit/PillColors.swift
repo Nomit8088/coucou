@@ -5,7 +5,7 @@ import Foundation
 /// `PillCatalog` keeps every default. This holds only what the user changed, by
 /// pill ID, so an empty preference paints the island exactly as the catalog
 /// says. Same key and values on Windows and Linux (`pillColors` in
-/// settings.json, read by windows/src/core/pill-colors.ts).
+/// settings.json, read by desktop/src/core/pill-colors.ts).
 enum PillColors {
 
     /// What the palette offers, in the order it is shown. Every colour is one

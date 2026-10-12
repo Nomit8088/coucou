@@ -2,7 +2,7 @@ name: Linux
 
 # Builds the Linux app (AppImage, .deb, .rpm) from the same Tauri project as
 # Windows. Triggered by tags like `linux-v0.1.0`, by hand, and by pull requests
-# that touch windows/ or this file (build and test only); the macOS and Windows
+# that touch desktop/ or this file (build and test only); the macOS and Windows
 # workflows are untouched.
 #
 # Two jobs on purpose. `build` runs npm, cargo and the AppImage tooling (which
@@ -19,7 +19,7 @@ on:
   # read-only anyway.
   pull_request:
     paths:
-      - 'windows/**'
+      - 'desktop/**'
       - '.github/workflows/linux.yml'
 
 permissions:
@@ -40,7 +40,7 @@ jobs:
       publish: ${{ steps.gate.outputs.publish }}
     defaults:
       run:
-        working-directory: windows
+        working-directory: desktop
 
     steps:
       - uses: actions/checkout@v4
@@ -63,7 +63,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: windows/package-lock.json
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Cache cargo
         uses: actions/cache@v4
@@ -71,8 +71,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            windows/target
-          key: linux-cargo-${{ hashFiles('windows/Cargo.lock') }}
+            desktop/target
+          key: linux-cargo-${{ hashFiles('desktop/Cargo.lock') }}
           restore-keys: linux-cargo-
 
       - name: Install dependencies
@@ -126,8 +126,8 @@ jobs:
         with:
           name: Coucou-Linux
           path: |
-            windows/release/Coucou-Linux-*
-            windows/release/SHA256SUMS
+            desktop/release/Coucou-Linux-*
+            desktop/release/SHA256SUMS
           retention-days: 3
 
   publish:

@@ -13,11 +13,11 @@
 - `upstream` = https://github.com/Louis-CFM/coucou.git （只读，不要提个性化 PR）
 - 不要 rebase upstream
 
-先读 [`docs/PERSONAL-PLAN.md`](PERSONAL-PLAN.md)，再读 `windows/README.md`、`windows/src-tauri/src/agents.rs`、`windows/src/core/pills.ts`、`windows/src/island/agents.ts`、`windows/hook/src/reply.rs`。施工以 PERSONAL-PLAN 为准，不以官方 SPEC / AGENTS 为准。
+先读 [`docs/PERSONAL-PLAN.md`](PERSONAL-PLAN.md)，再读 `desktop/README.md`、`desktop/src-tauri/src/agents.rs`、`desktop/src/core/pills.ts`、`desktop/src/island/agents.ts`、`desktop/hook/src/reply.rs`。施工以 PERSONAL-PLAN 为准，不以官方 SPEC / AGENTS 为准。
 
 ## 范围（锁死）
 
-Windows only（`windows/`）。壳（岛、Mochi、服装、桌面、声音、周报、快捷键、10 语、文件拖放）不精简。
+Windows only（`desktop/`）。壳（岛、Mochi、服装、桌面、声音、周报、快捷键、10 语、文件拖放）不精简。
 
 1. **删减**：去掉 Claude Code 安装器与主 pill、Cursor / Gemini / Antigravity / Copilot / Muse / OpenCode / Amp / Hermes / Claude Desktop；去掉 Anthropic / Google / OpenAI / OpenRouter / Ollama / LM Studio 聊天；去掉 Stripe / n8n / Vercel / Notion / Cal.com / Music。留下 `coucou-hook` + pipe。无 `coucou_agent` 的 hook 丢弃。`takes_decisions` / `APPROVAL_AGENTS` 只认 `codex` 和 `dsh`。
 2. **Codex**：现有安装器、Allow/Deny、套餐用量保留。不往 Codex 注入文本。
@@ -35,7 +35,7 @@ Windows only（`windows/`）。壳（岛、Mochi、服装、桌面、声音、�
 6. DSH steer + 拖文件
 7. 回归 Codex / GitHub / Resend / Pause 零出站
 
-每完成一步再开下一步。提交只推 `origin`。独立终端跑 `cd windows && npm run tauri dev`，不要挂在 DSH 进程树下。
+每完成一步再开下一步。提交只推 `origin`。独立终端跑 `cd desktop && npm run tauri dev`，不要挂在 DSH 进程树下。
 
 ## 红线
 

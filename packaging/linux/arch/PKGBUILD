@@ -1,5 +1,5 @@
 # Maintainer: FabioLukas123
-# Coucou for Arch Linux — built from the Tauri app in windows/, which runs on
+# Coucou for Arch Linux — built from the Tauri app in desktop/, which runs on
 # Windows and Linux alike.
 
 pkgname=coucou-git
@@ -36,19 +36,19 @@ sha256sums=('SKIP')
 pkgver() {
   cd "$_pkgname"
   local v
-  v=$(sed -n 's/^version = "\(.*\)"/\1/p' windows/Cargo.toml | head -1)
+  v=$(sed -n 's/^version = "\(.*\)"/\1/p' desktop/Cargo.toml | head -1)
   printf "%s.r%s.%s" "$v" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
 }
 
 prepare() {
-  cd "$_pkgname/windows"
+  cd "$_pkgname/desktop"
   export RUSTUP_TOOLCHAIN=stable
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
   npm ci
 }
 
 build() {
-  cd "$_pkgname/windows"
+  cd "$_pkgname/desktop"
   export RUSTUP_TOOLCHAIN=stable
   export CARGO_TARGET_DIR="$PWD/target"
   # beforeBuildCommand builds the front end and the coucou-hook relay.
@@ -57,13 +57,13 @@ build() {
 
 package() {
   cd "$_pkgname"
-  install -Dm755 windows/target/release/coucou "$pkgdir/usr/bin/coucou"
+  install -Dm755 desktop/target/release/coucou "$pkgdir/usr/bin/coucou"
   # Found next to the app, then copied into ~/.local/share/coucou/bin at launch.
-  install -Dm755 windows/target/release/coucou-hook "$pkgdir/usr/bin/coucou-hook"
-  install -Dm644 linux/arch/coucou.desktop "$pkgdir/usr/share/applications/coucou.desktop"
-  install -Dm644 windows/src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/coucou.png"
-  install -Dm644 windows/src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/coucou.png"
-  install -Dm644 windows/src-tauri/icons/128x128@2x.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/coucou.png"
+  install -Dm755 desktop/target/release/coucou-hook "$pkgdir/usr/bin/coucou-hook"
+  install -Dm644 packaging/linux/arch/coucou.desktop "$pkgdir/usr/share/applications/coucou.desktop"
+  install -Dm644 desktop/src-tauri/icons/32x32.png "$pkgdir/usr/share/icons/hicolor/32x32/apps/coucou.png"
+  install -Dm644 desktop/src-tauri/icons/128x128.png "$pkgdir/usr/share/icons/hicolor/128x128/apps/coucou.png"
+  install -Dm644 desktop/src-tauri/icons/128x128@2x.png "$pkgdir/usr/share/icons/hicolor/256x256/apps/coucou.png"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
   install -Dm644 LICENSE-ASSETS.md "$pkgdir/usr/share/licenses/$pkgname/LICENSE-ASSETS.md"
 }

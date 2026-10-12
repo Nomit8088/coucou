@@ -6,6 +6,10 @@
 
 - **GitHub / GitLab 灵动岛通知**：流水线成功或失败会展开灵动岛，主按钮可跳转到流水线（对标 DSH「打开终端」）。关联的 PR/MR（我创建的 / 指派给我的 / 请我审的，设置里可分别开关）有新条目时提示——自己开的不弹。关联请求上的新评论会合并成一次提示，并忽略自己的评论。GitLab 改为走 GraphQL 读取 MR 的 head pipeline 与评论。
 
+- **修复 macOS CI 前端单测失败**：Node 21+ 提供全局 `navigator`，其 `userAgent`/`platform` 反映的是**宿主机**，而 `src/core/platform.ts` 用它判定平台，于是 Windows 取向的测试在 macOS runner 上以 Mac 语义运行（`shortcuts` / `spotify` 共 13 个断言失败，Windows runner 上则通过）。`tests/setup.mjs` 现在固定测试的基准宿主与语言；`tests/macos*.test.mjs` 仍自行固定 Mac 环境。
+
+- **仓库布局整理（无行为变化）**：`windows/` 改名为 `desktop/`——它是 Windows / macOS / Linux 共用的 Tauri 应用，旧名字容易让人误以为只支持 Windows；根目录 `linux/` 的打包文件移到 `packaging/linux/arch/`。macOS 新增 `macos-v*` tag 触发构建，但只上传 DMG artifact、不创建 Release（签名/公证决策见 `desktop/MACOS.md`）。遗留 Swift 工程与其 CI 明确归入历史目标：`build.yml` 只在 `NotchBuddy/`、`tests/`、`scripts/` 变化时运行，不再每次 push 都跑一次 Xcode 构建。Windows / Linux 的 tag 名与 `windows-latest` / `linux-latest` 发布名保持不变。
+
 ## 0.1.1 — October 10, 2026
 
 - **应用内在线更新**：

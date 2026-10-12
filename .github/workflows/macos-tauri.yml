@@ -5,12 +5,18 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - 'windows/**'
+      - 'desktop/**'
       - '.github/workflows/macos-tauri.yml'
   push:
     branches: [main]
+    # A `macos-v*` tag builds both architectures' DMGs so they can be signed
+    # and notarized by hand. It publishes nothing: see "发布与签名（待决策）"
+    # in desktop/MACOS.md.
+    tags:
+      - 'macos-v*'
+    # A path filter is not evaluated for tag pushes, so the tag above always builds.
     paths:
-      - 'windows/**'
+      - 'desktop/**'
       - '.github/workflows/macos-tauri.yml'
 
 permissions:
@@ -29,7 +35,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     defaults:
       run:
-        working-directory: windows
+        working-directory: desktop
     steps:
       - uses: actions/checkout@v4
         with:
@@ -38,7 +44,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
-          cache-dependency-path: windows/package-lock.json
+          cache-dependency-path: desktop/package-lock.json
       - name: Verify runner architecture
         run: |
           expected=x86_64
@@ -50,8 +56,8 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            windows/target
-          key: macos-tauri-${{ matrix.arch }}-${{ hashFiles('windows/Cargo.lock') }}
+            desktop/target
+          key: macos-tauri-${{ matrix.arch }}-${{ hashFiles('desktop/Cargo.lock') }}
       - name: Install frontend dependencies
         run: npm ci
       - name: Type check and test frontend / DSH plugin
@@ -76,6 +82,6 @@ jobs:
         with:
           name: Coucou-macOS-${{ matrix.arch }}
           path: |
-            windows/release/Coucou-macOS-*.dmg
-            windows/release/SHA256SUMS-macOS-*
+            desktop/release/Coucou-macOS-*.dmg
+            desktop/release/SHA256SUMS-macOS-*
           retention-days: 7

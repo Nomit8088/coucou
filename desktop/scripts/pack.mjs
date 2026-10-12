@@ -1,5 +1,5 @@
 // Copies the packages Tauri buries in target/release/bundle/ into
-// windows/release/, with the names they ship under. Used by `npm run pack` and
+// desktop/release/, with the names they ship under. Used by `npm run pack` and
 // by the release workflows, so both produce exactly the same file names.
 
 import { readFileSync, mkdirSync, copyFileSync, readdirSync, statSync } from "node:fs";
