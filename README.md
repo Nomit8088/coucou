@@ -79,11 +79,11 @@ Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS
 
 | Version | Date | Highlights |
 |---|---|---|
-| Unreleased | — | 基于现有 Tauri 增强版的 macOS 适配、私有 Unix socket 双向 DSH、Keychain、Finder 拖拽、对应架构 DMG / Mac CI；移除 Mac 不支持的功能入口 |
+| [v0.2.0](https://github.com/Nomit8088/coucou/releases/tag/v0.2.0) | Oct 12, 2026 | macOS（Tauri 增强版）首批正式包：Apple Silicon / Intel DMG、私有 Unix socket 双向 DSH、Keychain、Finder 拖拽；同一个 Release 同时提供 Windows 安装包与 Mac DMG。另含多会话隔离与权限请求队列 |
 | [v0.1.1](https://github.com/Nomit8088/coucou/releases/tag/v0.1.1) | Oct 10, 2026 | Windows 托盘与设置内更新检测、一键拉起安装包 |
 | [v0.1.0](https://github.com/Nomit8088/coucou/releases/tag/v0.1.0) | Oct 10, 2026 | DSH 深度适配、Windows 原生媒体控制、独立安装包 |
 
-当前源码版本为 0.1.3；本次没有改版号或发布 Release。历史上游版本见 [CHANGELOG](<CHANGELOG.md>)。
+当前源码版本为 0.2.0。历史上游版本见 [CHANGELOG](<CHANGELOG.md>)。
 
 ## 代码位置与验证
 
