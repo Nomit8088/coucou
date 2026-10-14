@@ -216,8 +216,10 @@ test("the Claude pill needs the switch and the relay, and the overview", () => {
   assert.equal(claudePillVisible(), false);
 });
 
-test("the Codex pill needs only its switch, on the overview", () => {
+test("the Codex pill needs its switch and Codex as a declared tool, on the overview", () => {
   State.settings.showCodexPlanInNotch = true;
+  assert.equal(codexPillVisible(), false);
+  State.settings.activeIntegrations = ["agent_codex"];
   assert.equal(codexPillVisible(), true);
   State.view = "settings";
   assert.equal(codexPillVisible(), false);
@@ -233,6 +235,8 @@ test("an open card follows its pill, and Mochi wears that plan's colour", () => 
   State.planDetailIsCodex = true;
   assert.equal(planCardOpen(), false);
   State.settings.showCodexPlanInNotch = true;
+  assert.equal(planCardOpen(), false);
+  State.settings.activeIntegrations = ["agent_codex"];
   assert.equal(planCardOpen(), true);
   State.codexPlanUsage = { sevenDay: win(85, Date.now() / 1000 + 3600), updatedAt: Date.now() };
   assert.equal(openPlanColor(), "#F4505E");

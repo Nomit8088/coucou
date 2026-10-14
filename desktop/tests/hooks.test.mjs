@@ -111,9 +111,18 @@ test("lowercase DSH tools are labelled like their PascalCase twins", () => {
   assert.equal(step("write", { file_path: "C:\\p\\b.ts" }), "Writes · b.ts");
   assert.equal(step("grep", { pattern: "x", path: "src/island/" }), "Searches · island");
   assert.equal(task().state, "working");
-  // Codex keeps its PascalCase names.
+  // Codex keeps its PascalCase names, and only once it is a declared pill.
+  State.settings.activeIntegrations = ["agent_codex"];
+  State.loadIntegrationTasks();
   hook({ hook_event_name: "PreToolUse", cwd: "/p", coucou_agent: "codex", tool_name: "Bash", tool_input: { command: "ls" } });
   assert.equal(task(CODEX).steps.at(-1), "Runs · ls");
+});
+
+test("an undeclared Codex session does not take a pill", () => {
+  hook({ hook_event_name: "SessionStart", cwd: "/p", coucou_agent: "codex" });
+  hook({ hook_event_name: "PreToolUse", cwd: "/p", coucou_agent: "codex", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(task(CODEX), undefined);
+  assert.equal(State.tasks.some((t) => t.id === CODEX), false);
 });
 
 test("only the last 20 steps are kept", () => {

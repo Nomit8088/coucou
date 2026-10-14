@@ -1348,7 +1348,7 @@ export class Island {
     this.dismissBtn.style.opacity = showGrid ? "1" : "0";
     this.dismissBtn.style.pointerEvents = showGrid ? "auto" : "none";
     if (showGrid) {
-      const others = State.otherTasks.slice(0, 4);
+      const others = State.visibleOtherPills;
       const key = others.map((t) => t.id).join("|");
       if (this.miniGrid.dataset.key !== key) {
         this.miniGrid.dataset.key = key;

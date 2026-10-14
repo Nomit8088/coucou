@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **活跃标签页**：未在设置里开启的 Codex 不再占用岛上的 4 个格子（套餐用量查询触发的幽灵会话也不会再把 QQ Mail 挤掉）。顶栏「Codex 套餐」只在 Codex 是主要工具或已开启的标签时显示。
+
 ## 0.2.0 — October 12, 2026
 
 - **macOS（Tauri 增强版）**：以现有 Windows 版为基础，新增 AppKit/CoreGraphics 窗口适配、macOS Keychain、Finder 原生拖拽及 Retina 坐标转换；DSH 事件与反向指令通过当前用户的私有 Unix socket 通信，保留双端审批和提问。Mac 隐藏未实现的音乐、模拟点赞热键与桌面悬浮入口；局部快捷键采用 Command。新增 Intel / Apple Silicon DMG 打包与 Mac CI，更新仅打开对应架构 DMG / Release 页面，不下载 Windows 安装程序。原生 Swift 工程不参与此版构建；Mac 实机验收尚待完成。

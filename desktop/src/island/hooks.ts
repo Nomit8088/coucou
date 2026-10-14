@@ -332,10 +332,10 @@ function handleHook(island: Island, payload: HookPayload) {
     }
   };
 
-  /** Ensure the agent pill exists (no-op for Claude Code). */
-  const ensurePill = () => {
+  /** Ensure the agent pill exists. Catalog tools stay off unless declared, or `evenIfOff` for a permission card. */
+  const ensurePill = (evenIfOff = false) => {
     if (isExternalAgent) {
-      State.upsertExternalAgent(agentId, agentName(validAgent!), agentColor(validAgent!));
+      State.upsertExternalAgent(agentId, agentName(validAgent!), agentColor(validAgent!), evenIfOff);
       const t = State.tasks.find((x) => x.id === agentId);
       if (t && cwd) t.sessionCwd = cwd;
       if (t && sessionId) {
@@ -623,7 +623,7 @@ function handleHook(island: Island, payload: HookPayload) {
       }
 
       const requestId = payload.request_id ?? "";
-      ensurePill();
+      ensurePill(true);
       supersedeStop();
       const tool = payload.tool_name ?? "Tool";
       const input = payload.tool_input ?? {};

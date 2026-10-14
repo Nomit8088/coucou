@@ -122,3 +122,43 @@ test("the main pill always loads", () => {
   assert.deepEqual(State.tasks.map((t) => t.id), ["agent_dsh", "integration_github"]);
   assert.equal(State.focusId, "agent_dsh");
 });
+
+test("an undeclared catalog tool is not created for a session", () => {
+  State.settings.activeIntegrations = ["integration_gitlab", "integration_spotify", "integration_qqmail", "integration_qqmusic"];
+  State.loadIntegrationTasks();
+  State.upsertExternalAgent("agent_codex", "Codex", "#2DD4BF");
+  State.upsertWorkspacePill("agent_codex", "side-project", "");
+  assert.equal(State.tasks.some((t) => t.id === "agent_codex"), false);
+  assert.deepEqual(State.tasks.map((t) => t.id), [
+    "agent_dsh", "integration_gitlab", "integration_spotify", "integration_qqmusic", "integration_qqmail",
+  ]);
+});
+
+test("a busy undeclared Codex does not keep a slot after settings reload", () => {
+  State.settings.activeIntegrations = ["integration_gitlab", "integration_spotify", "integration_qqmail", "integration_qqmusic"];
+  State.loadIntegrationTasks();
+  State.tasks.splice(1, 0, {
+    id: "agent_codex", name: "Codex", color: "#2DD4BF",
+    state: "working", stepIndex: 0, steps: ["Runs · ls"], source: "agent", isIntegration: false,
+  });
+  State.loadIntegrationTasks();
+  assert.equal(State.tasks.some((t) => t.id === "agent_codex"), false);
+  assert.deepEqual(State.visibleOtherPills.map((t) => t.id), [
+    "integration_gitlab", "integration_spotify", "integration_qqmusic", "integration_qqmail",
+  ]);
+});
+
+test("declared pills keep the four slots; unknown agents only fill leftovers", () => {
+  State.settings.activeIntegrations = ["integration_gitlab", "integration_spotify", "integration_qqmail", "integration_qqmusic"];
+  State.loadIntegrationTasks();
+  State.upsertExternalAgent("agent_homemade", "Homemade", "#60A5FA");
+  assert.equal(State.tasks.some((t) => t.id === "agent_homemade"), true);
+  assert.deepEqual(State.visibleOtherPills.map((t) => t.id), [
+    "integration_gitlab", "integration_spotify", "integration_qqmusic", "integration_qqmail",
+  ]);
+
+  State.settings.activeIntegrations = ["integration_gitlab"];
+  State.loadIntegrationTasks();
+  State.upsertExternalAgent("agent_homemade", "Homemade", "#60A5FA");
+  assert.deepEqual(State.visibleOtherPills.map((t) => t.id), ["integration_gitlab", "agent_homemade"]);
+});

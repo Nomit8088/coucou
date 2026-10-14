@@ -1937,6 +1937,17 @@
    "ru": "Поделитесь своей неделей",
    "id": "Bagikan minggu Anda"
   },
+   "Only shows when Codex is your main tool or an active pill.": {
+    "zh-Hans": "仅当 Codex 是主要工具或已开启的标签时才会显示。",
+    "hi": "केवल तभी दिखता है जब Codex आपका मुख्य टूल या एक सक्रिय टैब हो।",
+    "es": "Solo aparece cuando Codex es tu herramienta principal o una pestaña activa.",
+    "ar": "يظهر فقط عندما يكون Codex أداتك الرئيسية أو تبويبًا نشطًا.",
+    "fr": "N'apparaît que si Codex est ton outil principal ou une pastille active.",
+    "bn": "শুধু তখনই দেখায় যখন Codex আপনার মূল টুল বা একটি সক্রিয় ট্যাব।",
+    "pt-BR": "Só aparece quando o Codex é sua ferramenta principal ou uma aba ativa.",
+    "ru": "Показывается, только если Codex — основной инструмент или активная вкладка.",
+    "id": "Hanya tampil saat Codex adalah alat utama atau pil aktif Anda."
+   },
   "Show Codex plan in the notch": {
    "zh-Hans": "在刘海中显示 Codex 套餐",
    "hi": "नॉच में Codex प्लान दिखाएं",

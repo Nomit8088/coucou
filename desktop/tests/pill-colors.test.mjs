@@ -98,6 +98,7 @@ test("a colour picked later reaches the pills already on the island, and back", 
 
 test("pills made for a session wear the colour too", () => {
   State.settings.pillColors = { agent_codex: "#F4505E" };
+  State.settings.activeIntegrations = ["agent_codex"];
   State.loadIntegrationTasks();
   State.upsertWorkspacePill("agent_codex", "my-project", "");
   assert.equal(colorOf("agent_codex"), "#F4505E");
