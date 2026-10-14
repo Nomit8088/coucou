@@ -26,9 +26,11 @@ export function claudePillVisible(): boolean {
   return State.view === "overview" && s.showPlanInNotch && s.planRelayInstalled;
 }
 
-/** The Codex pill is in the header: overview, turned on (nothing to install). */
+/** The Codex pill is in the header: overview, turned on, and Codex is a tool you use. */
 export function codexPillVisible(): boolean {
-  return State.view === "overview" && State.settings.showCodexPlanInNotch;
+  return State.view === "overview"
+    && State.settings.showCodexPlanInNotch
+    && State.isKept("agent_codex");
 }
 
 /** A plan card is open and its pill is still there. */

@@ -3,7 +3,7 @@
 import type { BotEmoteName, BotStateName, IslandMode, IslandViewName } from "./layout";
 import type { EyeShape } from "../mochi/engine";
 import {
-  DEFAULT_MAIN_PILL, HOST_OS, availablePills, orderPills, pillDefinition, sanitizeDeclared,
+  DEFAULT_MAIN_PILL, HOST_OS, MAX_DECLARED, availablePills, orderPills, pillDefinition, sanitizeDeclared,
   toggleDeclared, type HostOs, type PillDefinition,
 } from "./pills";
 import type { CodexPlanUsage, PlanUsage } from "./plan";
@@ -375,6 +375,20 @@ class AppState {
     return this.tasks.filter((t) => t.id !== this.focusId);
   }
 
+  /**
+   * The up-to-four pills next to the focused one. Declared tools keep their
+   * slots; a live session of something the user did not turn on (Codex with
+   * hooks installed, an unknown agent…) only fills a leftover slot.
+   */
+  get visibleOtherPills(): AgentTask[] {
+    const others = this.otherTasks;
+    const kept = others.filter((t) => this.isKept(t.id));
+    const extra = others.filter((t) => !this.isKept(t.id));
+    const declared = sanitizeDeclared(this.settings, this.os).activeIntegrations.length;
+    const extraSlots = Math.max(0, MAX_DECLARED - declared);
+    return [...kept, ...extra.slice(0, extraSlots)];
+  }
+
   setFocus(id: string) {
     const t = this.tasks.find((x) => x.id === id);
     if (!t) return;
@@ -562,8 +576,10 @@ class AppState {
 
   /**
    * Loads the catalog pills: the main pill always, the declared ones, and none
-   * of the others — a pill that is mid-session stays until its session ends.
-   * Safe to call any number of times. AppState.loadIntegrationTasks on macOS.
+   * of the others. A catalog tool the user turned off does not keep a slot
+   * because a session is mid-flight — that used to let undeclared Codex push
+   * QQ Mail off the island. Unknown (non-catalog) agents still stay until
+   * their session ends. Safe to call any number of times.
    */
   loadIntegrationTasks() {
     const d = sanitizeDeclared(this.settings, this.os);
@@ -577,8 +593,7 @@ class AppState {
       const shouldLoad = def.id === d.mainPill || d.activeIntegrations.includes(def.id);
       const idx = this.tasks.findIndex((t) => t.id === def.id);
       if (shouldLoad && idx < 0) this.tasks.push(taskFor(def, this.settings.pillColors));
-      const busy = idx >= 0 && (this.tasks[idx].state !== "idle" || this.tasks[idx].steps.length > 0);
-      if (!shouldLoad && idx >= 0 && !busy) this.tasks.splice(idx, 1);
+      if (!shouldLoad && idx >= 0) this.tasks.splice(idx, 1);
     }
     // A colour picked in Settings reaches the pills that are already up.
     for (const t of this.tasks) {
@@ -623,11 +638,13 @@ class AppState {
 
   /**
    * Creates the pill of a tagged agent on its first event; no-op if it exists.
-   * Inserted right after the main pill so it is in the visible slice(0,4). A
-   * catalog agent wears its catalog colour, as on macOS.
+   * Catalog tools the user turned off stay off (`evenIfOff` is for a permission
+   * card that still needs a face). Unknown agents are inserted after the main
+   * pill and only fill a leftover slot among the visible four.
    */
-  upsertExternalAgent(id: string, name: string, color: string) {
+  upsertExternalAgent(id: string, name: string, color: string, evenIfOff = false) {
     if (this.tasks.some((t) => t.id === id)) return;
+    if (!evenIfOff && pillDefinition(id) && !this.isKept(id)) return;
     const def = pillDefinition(id);
     this.insertAfterMain({
       id, name, color: def ? pillColor(def.id, def.color, this.settings.pillColors) : color,
@@ -638,14 +655,14 @@ class AppState {
 
   /**
    * The pill a Claude Code session belongs to (VS Code or Cursor). It is made
-   * for the session when it is neither the main pill nor declared, as
-   * upsertWorkspaceTask does on macOS.
+   * for the session when it is already the main pill or declared — a catalog
+   * tool the user turned off must not appear because a session started.
    */
   upsertWorkspacePill(id: string, name: string, cwd: string): AgentTask | null {
     let t = this.tasks.find((x) => x.id === id);
     if (!t) {
       const def = pillDefinition(id);
-      if (!def) return null;
+      if (!def || !this.isKept(id)) return null;
       t = taskFor(def, this.settings.pillColors, name);
       this.insertAfterMain(t);
     }

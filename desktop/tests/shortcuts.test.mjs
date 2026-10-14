@@ -381,7 +381,7 @@ test("go to alert: the permission first, then a question, else Mochi is annoyed"
 });
 
 test("go to alert brings up the unified card: any agent's pill, a question as a question", () => {
-  State.upsertExternalAgent("agent_codex", "Codex", "#fff");
+  State.upsertExternalAgent("agent_codex", "Codex", "#fff", true);
   State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_codex", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
   assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);

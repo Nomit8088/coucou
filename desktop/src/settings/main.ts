@@ -67,6 +67,7 @@ function toggle(on: boolean, onChange: (v: boolean) => void): HTMLElement {
 const PLAN_SETTINGS_TEXT = {
   get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
   get showCodex() { return t("Show Codex plan in the notch"); },
+  get onlyWhenDeclared() { return t("Only shows when Codex is your main tool or an active pill."); },
 };
 
 function planSection(_status: HookStatus): HTMLElement {
@@ -83,6 +84,7 @@ function planSection(_status: HookStatus): HTMLElement {
           void save();
         }),
       ),
+      h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.onlyWhenDeclared }),
     );
   }
 
