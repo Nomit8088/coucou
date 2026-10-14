@@ -33,8 +33,8 @@ npm run pack
 
 产物位于 `desktop/release/`：
 
-- Apple Silicon：`Coucou-macOS-0.2.0-aarch64.dmg`
-- Intel：`Coucou-macOS-0.2.0-x86_64.dmg`
+- Apple Silicon：`Coucou-macOS-0.2.1-aarch64.dmg`
+- Intel：`Coucou-macOS-0.2.1-x86_64.dmg`
 
 在对应 CPU 的 Mac 上分别构建。不直接使用 `--target universal-apple-darwin`：hook 资源也必须是对应架构，不能只把主程序合并为 universal 后忽略 relay。
 
