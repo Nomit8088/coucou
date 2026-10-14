@@ -481,6 +481,9 @@ async fn run_github_pulse(app: &AppHandle) -> bool {
     };
     emit_github(app);
     if !events.is_empty() {
+        if events.iter().any(|e| matches!(e, github::GitHubEvent::Comments { .. })) {
+            log::line("github: new comments");
+        }
         let _ = app.emit_to(WINDOW_LABEL, "github-alerts", &events);
     }
     pending
@@ -1137,6 +1140,41 @@ async fn gitlab_graphql(base: &reqwest::Url, token: &str, query: &str) -> Option
     Some(root)
 }
 
+fn encode_project(path: &str) -> String {
+    path.replace('/', "%2F")
+}
+
+/// Notes are not on the pipeline query: enterprise GitLab rejects `notes(filter:)`
+/// and that used to fail the whole pulse. A dedicated query, then REST for any
+/// MR it did not fill. `old` lets a failed fetch keep the last good note list.
+async fn gitlab_attach_notes(
+    base: &reqwest::Url,
+    token: &str,
+    pulse: &mut crate::gitlab::GitlabPulse,
+    old: Option<&crate::gitlab::GitlabPulse>,
+) {
+    if let Some(root) = gitlab_graphql(base, token, crate::gitlab::NOTES_QUERY).await {
+        pulse.apply_notes_payload(&root);
+    } else {
+        log::line("gitlab notes graphql unavailable — REST");
+    }
+    if pulse.review.iter().any(|mr| !mr.notes_fetched) {
+        if let Some(root) = gitlab_graphql(base, token, crate::gitlab::REVIEW_NOTES_QUERY).await {
+            pulse.apply_notes_payload(&root);
+        }
+    }
+    let pending = pulse.notes_pending();
+    for (project, iid, id) in pending.into_iter().take(12) {
+        let path = format!(
+            "/api/v4/projects/{}/merge_requests/{iid}/notes?per_page=20&sort=desc&order_by=created_at",
+            encode_project(&project),
+        );
+        let Some(body) = gitlab_get(base, token, &path).await else { continue };
+        pulse.set_notes(&id, crate::gitlab::rest_comments(&body));
+    }
+    pulse.seal_notes(old);
+}
+
 async fn gitlab_fill_pipelines(base: &reqwest::Url, token: &str, mrs: &mut [crate::gitlab::GitlabMr]) {
     for mr in mrs.iter_mut().take(20) {
         if mr.ci != crate::github::CiState::Unknown {
@@ -1240,7 +1278,7 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
     } else {
         None
     };
-    let pulse = if let Some(pulse) = pulse {
+    let mut pulse = if let Some(pulse) = pulse {
         pulse
     } else {
         log::line("gitlab graphql unavailable — REST pipelines");
@@ -1262,6 +1300,8 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
         gitlab_fill_pipelines(&base, &token, &mut pulse.review).await;
         pulse
     };
+    let old_pulse = GITLAB.lock().unwrap().pulse.clone();
+    gitlab_attach_notes(&base, &token, &mut pulse, old_pulse.as_ref()).await;
     let (pipelines, running) = pulse.card_pipelines();
     let events = {
         let mut cache = GITLAB.lock().unwrap();
@@ -1283,6 +1323,9 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
         event: None,
     });
     if !events.is_empty() {
+        if events.iter().any(|e| matches!(e, crate::gitlab::GitlabEvent::Comments { .. })) {
+            log::line("gitlab: new comments");
+        }
         let _ = app.emit_to(WINDOW_LABEL, "gitlab-alerts", &events);
     }
 }

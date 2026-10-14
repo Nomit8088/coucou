@@ -71,10 +71,32 @@ pub struct GitHubPr {
     /// GitHub login of the author; empty when the payload omitted it.
     #[serde(default)]
     pub author: String,
-    /// Conversation comments and non-empty reviews. Kept for event detection;
-    /// the island card does not show them.
+    /// Conversation comments, review summaries and inline review comments.
+    /// Kept for event detection; the island card does not show them.
     #[serde(skip_serializing, default)]
     pub comments: Vec<GitHubComment>,
+    /// The matching connection was present on this payload. A comment is only
+    /// compared once both polls saw that connection, so a field that starts
+    /// working mid-session cannot replay the whole history as "new".
+    #[serde(skip_serializing, default)]
+    pub issue_comments_ready: bool,
+    #[serde(skip_serializing, default)]
+    pub review_comments_ready: bool,
+    #[serde(skip_serializing, default)]
+    pub line_comments_ready: bool,
+}
+
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum GitHubCommentKind {
+    /// Conversation comment on the pull request.
+    Issue,
+    /// Submitted review whose summary body is non-empty.
+    Review,
+    /// Inline review comment, including a reply on a thread. These are the
+    /// comments people actually leave on a diff; the parent review body is
+    /// often empty, so they must be counted on their own.
+    Line,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
@@ -82,6 +104,7 @@ pub struct GitHubComment {
     pub id: String,
     pub author: String,
     pub at: String,
+    pub kind: GitHubCommentKind,
 }
 
 #[derive(Serialize, Clone, Debug, PartialEq)]
@@ -172,29 +195,106 @@ fn nodes<'a>(parent: Option<&'a Value>) -> &'a [Value] {
         .unwrap_or(&[])
 }
 
-fn comments_of(node: &Value) -> Vec<GitHubComment> {
-    let mut out = Vec::new();
-    for n in nodes(node.get("comments")) {
-        let Some(id) = str_at(n, "id") else { continue };
-        out.push(GitHubComment {
-            id: id.to_string(),
-            author: n.get("author").and_then(|a| str_at(a, "login")).unwrap_or("").to_string(),
-            at: str_at(n, "createdAt").unwrap_or("").to_string(),
-        });
+struct CommentRead {
+    comments: Vec<GitHubComment>,
+    issue_ready: bool,
+    review_ready: bool,
+    line_ready: bool,
+}
+
+fn author_login(node: &Value) -> String {
+    node.get("author").and_then(|a| str_at(a, "login")).unwrap_or("").to_string()
+}
+
+fn push_comment(
+    out: &mut Vec<GitHubComment>,
+    seen: &mut std::collections::HashSet<String>,
+    id: &str,
+    author: String,
+    at: &str,
+    kind: GitHubCommentKind,
+) {
+    if !seen.insert(id.to_string()) {
+        return;
+    }
+    out.push(GitHubComment { id: id.to_string(), author, at: at.to_string(), kind });
+}
+
+fn comments_of(node: &Value) -> CommentRead {
+    let mut comments = Vec::new();
+    let mut seen = std::collections::HashSet::new();
+    let issue_ready = node.get("comments").is_some();
+    let review_ready = node.get("reviews").is_some();
+    // Line comments ride on each review. A review node without that selection
+    // means the nested field failed; do not treat the history as empty.
+    let mut line_ready = review_ready;
+    if issue_ready {
+        for n in nodes(node.get("comments")) {
+            let Some(id) = str_at(n, "id") else { continue };
+            push_comment(
+                &mut comments,
+                &mut seen,
+                id,
+                author_login(n),
+                str_at(n, "createdAt").unwrap_or(""),
+                GitHubCommentKind::Issue,
+            );
+        }
     }
     for n in nodes(node.get("reviews")) {
         let body = str_at(n, "body").unwrap_or("");
-        if body.trim().is_empty() {
-            continue;
+        if !body.trim().is_empty() {
+            if let Some(id) = str_at(n, "id") {
+                push_comment(
+                    &mut comments,
+                    &mut seen,
+                    id,
+                    author_login(n),
+                    str_at(n, "submittedAt").unwrap_or(""),
+                    GitHubCommentKind::Review,
+                );
+            }
         }
-        let Some(id) = str_at(n, "id") else { continue };
-        out.push(GitHubComment {
-            id: id.to_string(),
-            author: n.get("author").and_then(|a| str_at(a, "login")).unwrap_or("").to_string(),
-            at: str_at(n, "submittedAt").unwrap_or("").to_string(),
-        });
+        match n.get("comments") {
+            Some(parent) => {
+                for c in nodes(Some(parent)) {
+                    let Some(id) = str_at(c, "id") else { continue };
+                    push_comment(
+                        &mut comments,
+                        &mut seen,
+                        id,
+                        author_login(c),
+                        str_at(c, "createdAt").unwrap_or(""),
+                        GitHubCommentKind::Line,
+                    );
+                }
+            }
+            None => line_ready = false,
+        }
     }
-    out
+    // Replies on an existing thread. Optional: a missing key must not silence
+    // conversation comments, but a present-and-broken selection is incomplete.
+    if let Some(threads) = node.get("reviewThreads") {
+        for thread in nodes(Some(threads)) {
+            match thread.get("comments") {
+                Some(parent) => {
+                    for c in nodes(Some(parent)) {
+                        let Some(id) = str_at(c, "id") else { continue };
+                        push_comment(
+                            &mut comments,
+                            &mut seen,
+                            id,
+                            author_login(c),
+                            str_at(c, "createdAt").unwrap_or(""),
+                            GitHubCommentKind::Line,
+                        );
+                    }
+                }
+                None => line_ready = false,
+            }
+        }
+    }
+    CommentRead { comments, issue_ready, review_ready, line_ready }
 }
 
 fn parse_pr(node: &Value) -> Option<GitHubPr> {
@@ -209,6 +309,7 @@ fn parse_pr(node: &Value) -> Option<GitHubPr> {
         .and_then(|c| c.get("statusCheckRollup"))
         .and_then(|r| str_at(r, "state"));
     let head_sha = commit.and_then(|c| str_at(c, "oid")).map(str::to_string);
+    let read = comments_of(node);
     Some(GitHubPr {
         id,
         title,
@@ -220,7 +321,10 @@ fn parse_pr(node: &Value) -> Option<GitHubPr> {
         review: ReviewState::from_github(str_at(node, "reviewDecision")),
         head_sha,
         author: node.get("author").and_then(|a| str_at(a, "login")).unwrap_or("").to_string(),
-        comments: comments_of(node),
+        comments: read.comments,
+        issue_comments_ready: read.issue_ready,
+        review_comments_ready: read.review_ready,
+        line_comments_ready: read.line_ready,
     })
 }
 
@@ -240,11 +344,19 @@ fn same_login(a: &str, b: &str) -> bool {
     !a.is_empty() && a.eq_ignore_ascii_case(b)
 }
 
+fn comment_ready(old: &GitHubPr, new: &GitHubPr, kind: GitHubCommentKind) -> bool {
+    match kind {
+        GitHubCommentKind::Issue => old.issue_comments_ready && new.issue_comments_ready,
+        GitHubCommentKind::Review => old.review_comments_ready && new.review_comments_ready,
+        GitHubCommentKind::Line => old.line_comments_ready && new.line_comments_ready,
+    }
+}
+
 fn new_foreign_comments(old: &GitHubPr, new: &GitHubPr, me: &str) -> usize {
     let seen: std::collections::HashSet<&str> = old.comments.iter().map(|c| c.id.as_str()).collect();
     new.comments
         .iter()
-        .filter(|c| !seen.contains(c.id.as_str()) && !same_login(&c.author, me))
+        .filter(|c| comment_ready(old, new, c.kind) && !seen.contains(c.id.as_str()) && !same_login(&c.author, me))
         .count()
 }
 
@@ -356,6 +468,7 @@ impl GitHubPulse {
     ///
     /// New PRs the user opened themselves never pop up. Comments from the user
     /// are ignored; several new comments on one PR become a single event.
+    /// Inline review comments count even when the review summary is empty.
     pub fn events(old: Option<&GitHubPulse>, new: &GitHubPulse, watch: GitWatch) -> Vec<GitHubEvent> {
         let Some(old) = old else { return Vec::new() };
         let mut out = Vec::new();
@@ -502,11 +615,23 @@ fragment PrFields on PullRequest {
   commits(last: 1) {
     nodes { commit { oid statusCheckRollup { state } } }
   }
-  comments(last: 15) {
+  comments(last: 12) {
     nodes { id author { login } createdAt }
   }
-  reviews(last: 15) {
-    nodes { id author { login } submittedAt body }
+  reviews(last: 8) {
+    nodes {
+      id author { login } submittedAt body
+      comments(last: 8) {
+        nodes { id author { login } createdAt }
+      }
+    }
+  }
+  reviewThreads(last: 8) {
+    nodes {
+      comments(last: 6) {
+        nodes { id author { login } createdAt }
+      }
+    }
   }
 }
 query {
@@ -638,7 +763,14 @@ mod tests {
             head_sha: sha.map(str::to_string),
             author: "testuser".into(),
             comments: Vec::new(),
+            issue_comments_ready: true,
+            review_comments_ready: true,
+            line_comments_ready: true,
         }
+    }
+
+    fn cmt(id: &str, author: &str, kind: GitHubCommentKind) -> GitHubComment {
+        GitHubComment { id: id.into(), author: author.into(), at: id.into(), kind }
     }
 
     fn repo(name: &str, ci: CiState, sha: Option<&str>) -> GitHubRepoCi {
@@ -884,11 +1016,11 @@ mod tests {
     #[test]
     fn several_new_comments_on_one_pr_are_one_event() {
         let mut old_pr = pr("r/p#3", CiState::Success, Some("s"));
-        old_pr.comments = vec![GitHubComment { id: "c1".into(), author: "bob".into(), at: "1".into() }];
+        old_pr.comments = vec![cmt("c1", "bob", GitHubCommentKind::Issue)];
         let mut new_pr = old_pr.clone();
-        new_pr.comments.push(GitHubComment { id: "c2".into(), author: "bob".into(), at: "2".into() });
-        new_pr.comments.push(GitHubComment { id: "c3".into(), author: "carol".into(), at: "3".into() });
-        new_pr.comments.push(GitHubComment { id: "c4".into(), author: "testuser".into(), at: "4".into() });
+        new_pr.comments.push(cmt("c2", "bob", GitHubCommentKind::Issue));
+        new_pr.comments.push(cmt("c3", "carol", GitHubCommentKind::Issue));
+        new_pr.comments.push(cmt("c4", "testuser", GitHubCommentKind::Issue));
         let mut old = empty_pulse();
         old.my_prs = vec![old_pr];
         let mut new = old.clone();
@@ -903,12 +1035,82 @@ mod tests {
     fn own_comments_are_silent() {
         let old_pr = pr("r/p#4", CiState::Success, Some("s"));
         let mut new_pr = old_pr.clone();
-        new_pr.comments.push(GitHubComment { id: "mine".into(), author: "testuser".into(), at: "1".into() });
+        new_pr.comments.push(cmt("mine", "testuser", GitHubCommentKind::Issue));
         let mut old = empty_pulse();
         old.my_prs = vec![old_pr];
         let mut new = old.clone();
         new.my_prs = vec![new_pr];
         assert!(GitHubPulse::events(Some(&old), &new, GitWatch::default()).is_empty());
+    }
+
+    #[test]
+    fn an_inline_comment_on_an_empty_review_is_one_event() {
+        let old_pr = pr("r/p#5", CiState::Success, Some("s"));
+        let mut new_pr = old_pr.clone();
+        new_pr.comments.push(cmt("line", "bob", GitHubCommentKind::Line));
+        let mut old = empty_pulse();
+        old.my_prs = vec![old_pr];
+        let mut new = old.clone();
+        new.my_prs = vec![new_pr];
+        assert_eq!(
+            GitHubPulse::events(Some(&old), &new, GitWatch::default()),
+            vec![GitHubEvent::Comments { pr_id: "r/p#5".into(), url: String::new(), title: "T".into(), count: 1 }]
+        );
+    }
+
+    #[test]
+    fn line_comments_are_not_replayed_when_the_field_just_appeared() {
+        let mut old_pr = pr("r/p#6", CiState::Success, Some("s"));
+        old_pr.line_comments_ready = false;
+        let mut new_pr = old_pr.clone();
+        new_pr.line_comments_ready = true;
+        new_pr.comments.push(cmt("old-line", "bob", GitHubCommentKind::Line));
+        let mut old = empty_pulse();
+        old.my_prs = vec![old_pr];
+        let mut new = old.clone();
+        new.my_prs = vec![new_pr];
+        assert!(GitHubPulse::events(Some(&old), &new, GitWatch::default()).is_empty());
+    }
+
+    #[test]
+    fn parses_inline_review_comments() {
+        let root = json!({
+          "data": {
+            "viewer": {
+              "login": "testuser",
+              "pullRequests": { "nodes": [{
+                "number": 8, "title": "Review me",
+                "url": "https://github.com/o/r/pull/8",
+                "isDraft": false,
+                "repository": {"nameWithOwner": "o/r"},
+                "author": {"login": "alice"},
+                "comments": { "nodes": [
+                  { "id": "ic1", "author": {"login": "bob"}, "createdAt": "1" }
+                ]},
+                "reviews": { "nodes": [{
+                  "id": "rv1", "author": {"login": "carol"}, "submittedAt": "2", "body": "",
+                  "comments": { "nodes": [
+                    { "id": "ln1", "author": {"login": "carol"}, "createdAt": "3" }
+                  ]}
+                }]},
+                "reviewThreads": { "nodes": [{
+                  "comments": { "nodes": [
+                    { "id": "ln1", "author": {"login": "carol"}, "createdAt": "3" },
+                    { "id": "ln2", "author": {"login": "dave"}, "createdAt": "4" }
+                  ]}
+                }]}
+              }]},
+              "repositories": { "nodes": [] }
+            }
+          }
+        });
+        let p = GitHubPulse::parse(&root, 1).unwrap();
+        let pr = &p.my_prs[0];
+        assert!(pr.issue_comments_ready && pr.review_comments_ready && pr.line_comments_ready);
+        let ids: Vec<&str> = pr.comments.iter().map(|c| c.id.as_str()).collect();
+        assert_eq!(ids, vec!["ic1", "ln1", "ln2"]);
+        assert!(PULSE_QUERY.contains("reviewThreads"));
+        assert!(PULSE_QUERY.contains("comments(last: 8)"));
     }
 
     #[test]

@@ -11,6 +11,7 @@ import { Sound } from "../core/sound";
 import { State, type AskedQuestion } from "../core/state";
 import { pillDefinition } from "../core/pills";
 import { APPROVAL_AGENTS, agentColor, agentName, validateAgent } from "./agents";
+import { presentDeferredNotice } from "./integrations";
 import type { Island } from "./island";
 import { parseClaudePlan, restorePlanUsage } from "../core/plan";
 import { setClaudePlanUsage, storedClaudePlanUsage } from "../views/usage";
@@ -27,7 +28,7 @@ function dropPendingCard(island: Island): void {
   if (next) {
     island.alert(next.questions ? "question" : "approval");
     armPendingTimeout(island);
-  } else if (State.view === "approval" || State.view === "question") {
+  } else if (!presentDeferredNotice(island) && (State.view === "approval" || State.view === "question")) {
     island.setView(State.defaultView());
   }
   State.notify();

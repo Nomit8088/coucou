@@ -338,7 +338,15 @@ export function gitNotice(events: GitHubEvent[], pillId: string, gitlab: boolean
     return { pillId, title: t("Pipeline passed"), detail, url, action: t("Open pipeline"), tone: "success" };
   }
   if (best.kind === "comments") {
-    return { pillId, title: t("New comments"), detail, url, action: t("Open comments"), tone: "info" };
+    const n = best.count ?? 1;
+    return {
+      pillId,
+      title: t("New comments"),
+      detail: n > 1 ? `${n} · ${detail}` : detail,
+      url,
+      action: t("Open comments"),
+      tone: "info",
+    };
   }
   return {
     pillId,
