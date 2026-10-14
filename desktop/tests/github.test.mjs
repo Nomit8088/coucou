@@ -10,7 +10,7 @@ import {
   formatCount, gitHubAlert, gitNotice, lastDays, lastWeeks, mainCISummary, myPRsValue, profileUrl, readActivity,
   readPulse, readStats, safeGitHubUrl, shortRepo, totalLabel, weekColumn, worstCI,
 } from "../src/core/github.ts";
-import { registerIntegrationHandlers } from "../src/island/integrations.ts";
+import { clearDeferredNotice, registerIntegrationHandlers } from "../src/island/integrations.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 
 const GITHUB = "integration_github";
@@ -180,21 +180,50 @@ test("the island notice prefers a failed pipeline, then comments, then a new PR"
   ], "integration_gitlab", true);
   assert.equal(mixed?.title, "New merge request");
   assert.equal(mixed?.action, "Open merge request");
+  const comments = gitNotice(
+    [{ kind: "comments", prId: "a/b#1", url: "https://github.com/a/b/pull/1", title: "Fix", count: 2 }],
+    "integration_github",
+    false,
+  );
+  assert.equal(comments?.title, "New comments");
+  assert.equal(comments?.action, "Open comments");
+  assert.equal(comments?.detail, "2 · Fix");
+  assert.equal(comments?.url, "https://github.com/a/b/pull/1");
 });
 
-const island = { reveal: () => {}, alert: () => {} };
+const alerts = [];
+const island = { reveal: () => {}, alert: (view) => { alerts.push(view); }, setView() {} };
 registerIntegrationHandlers(island);
 
 const github = () => State.tasks.find((t) => t.id === GITHUB);
 
 beforeEach(() => {
   calls.length = 0;
+  alerts.length = 0;
   State.tasks = [];
   State.focusId = null;
   State.mode = "hidden";
   State.paused = false;
+  State.pendingApproval = null;
+  State.notice = null;
+  clearDeferredNotice();
   State.settings = { ...DEFAULT_SETTINGS };
   State.loadIntegrationTasks();
+});
+
+test("a new-comment alert opens the notice card", () => {
+  emit("github-alerts", [{ kind: "comments", prId: "a/b#1", url: "https://github.com/a/b/pull/1", title: "Fix", count: 2 }]);
+  assert.equal(State.notice?.title, "New comments");
+  assert.equal(State.notice?.action, "Open comments");
+  assert.deepEqual(alerts, ["notice"]);
+  assert.equal(State.focusId, GITHUB);
+});
+
+test("a comment alert waits out a permission card instead of being dropped", () => {
+  State.pendingApproval = { pillId: "agent_dsh", requestId: "1" };
+  emit("github-alerts", [{ kind: "comments", prId: "a/b#1", url: "https://github.com/a/b/pull/1", title: "Fix", count: 1 }]);
+  assert.equal(alerts.length, 0, "must not cover the permission card");
+  assert.equal(State.notice?.title, "New comments");
 });
 
 test("an alert badges the GitHub pill when another pill is on screen", () => {

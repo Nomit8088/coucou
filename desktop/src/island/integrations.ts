@@ -12,6 +12,33 @@ import type { Island } from "./island";
 const GITHUB = "integration_github";
 
 const clearTimers = new Map<string, number>();
+/** A comment/pipeline notice arrived while a permission card was up. Show it when that card leaves. */
+let deferredNotice = false;
+
+/** Tests start from a clean notice, including one deferred by an earlier case. */
+export function clearDeferredNotice() {
+  deferredNotice = false;
+}
+
+/** The approval card is gone and a notice was waiting. Opens it, or returns false. */
+export function presentDeferredNotice(island: Island): boolean {
+  if (!deferredNotice || !State.notice || State.pendingApproval) return false;
+  deferredNotice = false;
+  State.setFocus(State.notice.pillId);
+  island.alert("notice");
+  return true;
+}
+
+function showNotice(island: Island, notice: GitNotice) {
+  State.notice = notice;
+  if (State.pendingApproval) {
+    deferredNotice = true;
+    return;
+  }
+  deferredNotice = false;
+  State.setFocus(notice.pillId);
+  island.alert("notice");
+}
 
 export function registerIntegrationHandlers(island: Island) {
   void onEvent<IntegrationUpdate>("integration", (update) => handle(island, update));
@@ -41,11 +68,7 @@ function handleGitAlerts(island: Island, events: GitHubEvent[], pillId: string, 
   if (State.focusId !== pillId) task.pillBadge = alert.badge;
   Sound.play(alert.sound);
   const notice = gitNotice(events, pillId, gitlab);
-  if (notice && !State.pendingApproval) {
-    State.notice = notice;
-    State.setFocus(pillId);
-    island.alert("notice");
-  }
+  if (notice) showNotice(island, notice);
   State.notify();
 }
 

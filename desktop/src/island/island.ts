@@ -26,7 +26,7 @@ import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
 import { armPendingTimeout, clearPendingTimeout } from "./hooks";
 import { tl } from "../i18n/i18n";
-import { refreshHookPills } from "./integrations";
+import { presentDeferredNotice, refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
@@ -155,7 +155,7 @@ export class Island {
       armPendingTimeout(this);
     } else {
       clearPendingTimeout();
-      this.setView(State.defaultView());
+      if (!presentDeferredNotice(this)) this.setView(State.defaultView());
     }
   }
 
