@@ -40,9 +40,7 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app: &AppHandle, event| match event.id.as_ref() {
             "quit" => app.exit(0),
             "settings" | "update" => crate::show_settings_window(app),
-            id => {
-                let _ = app.emit_to(WINDOW_LABEL, "tray", id.to_string());
-            }
+            id => dispatch(app, id),
         });
 
     if let Some(icon) = app.default_window_icon().cloned() {
@@ -51,6 +49,17 @@ pub fn build(app: &AppHandle) -> tauri::Result<()> {
 
     builder.build(app)?;
     Ok(())
+}
+
+/// Shared with the single-instance callback: reopening the app must also
+/// recover a window that is still alive but has fallen behind other apps.
+pub fn dispatch(app: &AppHandle, action: &str) {
+    if matches!(action, "open" | "recap" | "wardrobe") {
+        crate::island::restore_window(app);
+    }
+    if let Err(err) = app.emit_to(WINDOW_LABEL, "tray", action.to_string()) {
+        crate::log::line(format!("tray {action} failed: {err}"));
+    }
 }
 
 /// Relabels the menu in the current language.

@@ -26,8 +26,8 @@ use ::windows::Win32::UI::Input::KeyboardAndMouse::{
 use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow,
-    SetWindowLongPtrW, ShowWindow, GWL_EXSTYLE, GW_OWNER, SW_RESTORE, WS_EX_NOACTIVATE,
-    WS_EX_TOOLWINDOW,
+    SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GW_OWNER, HWND_TOPMOST,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_RESTORE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
 };
 
 use super::LocalTime;
@@ -328,6 +328,24 @@ pub fn make_non_activating(win: &WebviewWindow) {
         let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
         let want = ex | WS_EX_NOACTIVATE.0 as isize | WS_EX_TOOLWINDOW.0 as isize;
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, want);
+    }
+}
+
+/// Reassert the native z-order even if tao still caches ALWAYS_ON_TOP=true.
+/// A visible, non-activating island can end up behind ordinary windows; merely
+/// setting the same Tauri flag again need not issue another SetWindowPos.
+/// Keep the user's current keyboard focus while bringing the island back.
+pub fn raise_island(win: &WebviewWindow) {
+    let Some(hwnd) = hwnd_of(win) else { return };
+    if let Err(err) = unsafe {
+        SetWindowPos(
+            hwnd,
+            Some(HWND_TOPMOST),
+            0, 0, 0, 0,
+            SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE,
+        )
+    } {
+        crate::log::line(format!("could not raise island: {err}"));
     }
 }
 

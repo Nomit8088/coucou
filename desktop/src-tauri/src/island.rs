@@ -123,6 +123,29 @@ pub fn window(app: &AppHandle) -> Option<WebviewWindow> {
     app.get_webview_window(WINDOW_LABEL)
 }
 
+/// An explicit Open must restore the native window as well as its web content.
+/// Preserve the collapsed state: the frontend expands it when handling the
+/// action, so its own collapsed flag and the cursor poll stay in step.
+pub fn restore_window(app: &AppHandle) {
+    let Some(win) = window(app) else { return };
+    if let Some(shared) = app.try_state::<crate::Shared>() {
+        let pref = shared.settings.lock().unwrap().screen.clone();
+        let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
+        apply_geometry(app, &pref, collapsed);
+        refresh_click_through(app, &shared.gate);
+    }
+    if win.is_minimized().unwrap_or(false) {
+        let _ = win.unminimize();
+    }
+    // Avoid SW_SHOW on an already-visible island: opening it should not take
+    // keyboard focus from the user's editor.
+    if !win.is_visible().unwrap_or(false) {
+        let _ = win.show();
+    }
+    #[cfg(windows)]
+    platform::raise_island(&win);
+}
+
 fn monitor_contains(m: &Monitor, x: f64, y: f64) -> bool {
     let p = m.position();
     let s = m.size();
