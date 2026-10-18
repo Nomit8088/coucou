@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.2 — October 18, 2026
 
 - **Claude Code 接入**：设置里新增「Claude Code」区，安装/卸载 hooks 前先展示 `~/.claude/settings.json` 的完整差异并写日期备份，只增删 Coucou 自己的条目。安装后会话、工具调用、权限请求、AskUserQuestion 提问、最终消息与实时 diff 都显示在岛上，可直接 Allow / Deny 或在岛上选题。Cursor 终端里的 Claude Code 使用独立的 Cursor 标签。标签默认关闭，需要在「活动标签」里勾选；未开启时权限请求会立刻退回终端，不会让 Claude Code 空等。
 - **错误卡片显示真实原因**（逻辑移植上游 `69e2231c` / `c7c36c50`，即 PR #718 / #781）：StopFailure 时优先显示 Claude Code 发来的 `error_message` / `error.message`，否则把 `rate_limit`、`overloaded`、未登录、账单、服务器错误、输出截断、模型不存在等错误类型翻成一句人话（10 种语言）。只有 `unknown` 或裸状态码时退回最后一条消息，最后才退回最后一步；错误卡片的按钮改为「打开终端 / 确定」，n8n 卡片仍打开 n8n。

@@ -112,7 +112,7 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 | Mail | Apple Mail | QQ IMAP / Web 邮件卡片 | 不直接同步 |
 | Crypto | Coinbase / OKX | 未实现 | 暂不做 |
 | Mochi 动画 | Swift display-rate 调整 | Tauri RAF + `dt` | 不 cherry-pick |
-| 发布流程 | 上游 `windows-v0.5.0` | Fork 自有版本/CI（v0.2.1） | 只选择性吸收 CI 修复 |
+| 发布流程 | 上游 `windows-v0.5.0` | Fork 自有版本/CI（v0.2.2） | 只选择性吸收 CI 修复 |
 
 ## 本轮验证
 
