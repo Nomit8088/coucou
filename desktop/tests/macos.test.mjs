@@ -53,7 +53,9 @@ test("all Mac music pills are hidden, without changing catalog IDs or Windows/Li
   assert.deepEqual(availablePills().filter((p) => p.mediaApp), []);
   assert.deepEqual(availablePills("windows").filter((p) => p.mediaApp).map((p) => p.id), musicIds);
   assert.deepEqual(availablePills("linux").filter((p) => p.mediaApp).map((p) => p.id), ["integration_spotify"]);
-  assert.deepEqual(mainPillChoices().map((p) => p.id), ["agent_dsh", "agent_codex"]);
+  assert.deepEqual(mainPillChoices().map((p) => p.id), [
+    "integration_claude", "agent_cursor", "agent_dsh", "agent_codex",
+  ]);
   const persisted = { mainPill: "agent_codex", activeIntegrations: [...musicIds, "integration_github", "integration_github", "agent_dsh"] };
   assert.deepEqual(sanitizeDeclared(persisted), { mainPill: "agent_codex", activeIntegrations: ["integration_github", "agent_dsh"] });
   assert.deepEqual(persisted.activeIntegrations.slice(0, 3), musicIds, "sanitize does not mutate its input");

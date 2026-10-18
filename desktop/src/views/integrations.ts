@@ -84,7 +84,17 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   const status = idleStatus(task.id, info);
 
   const actions = h("div", { class: "int-actions" });
-  if (OPEN_URLS[task.id]) {
+  if (task.id === "integration_claude") {
+    // The Mac's IntegrationCardView: Claude Code runs in VS Code here.
+    actions.append(
+      h("button", {
+        class: "link-btn",
+        style: `color:${task.color}b3`,
+        text: t("Open Visual Studio Code"),
+        onclick: () => void Bridge.openInVSCode(task.sessionCwd ?? null),
+      }),
+    );
+  } else if (OPEN_URLS[task.id]) {
     actions.append(
       h("button", {
         class: "link-btn",
@@ -116,7 +126,11 @@ function idleCard(task: AgentTask, openSettings: () => void): HTMLElement {
   return h(
     "div",
     { class: "int-card" },
-    header(task.color, task.name, t(def?.subtitle ?? N_("Integration"))),
+    header(
+      task.color,
+      task.id === "integration_claude" && def ? def.name : task.name,
+      t(def?.subtitle ?? N_("Integration")),
+    ),
     h("div", { class: "int-status" }, dot(status.color, 5), h("span", { text: status.label })),
     actions,
   );

@@ -1,17 +1,22 @@
 // Hook events → island state (src/island/hooks.ts), driven through the real
 // bridge.
 //
-// This fork has no Claude Code pill: an event without a valid `coucou_agent` is
-// discarded. Only Codex and DSH reach the island, and only they get cards.
+// An event without a valid `coucou_agent` is Claude Code's: it goes to the
+// Claude Code pill (or Cursor's, when the relay says it runs there), which the
+// user declares in Settings exactly like any other tool. Tagged agents (DSH,
+// Codex, unknown tools) get their own `agent_<name>` pill — and only the ones
+// the island can answer for get a card.
 
 import { afterEach, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
-import { registerHookHandlers } from "../src/island/hooks.ts";
+import { registerHookHandlers, stopFailureDetail } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
 
 const DSH = "agent_dsh";
 const CODEX = "agent_codex";
+const CLAUDE = "integration_claude";
+const CURSOR = "agent_cursor";
 
 /** What the handler asked the island to do, in order. */
 let asked;
@@ -27,6 +32,11 @@ const hook = (payload) => emit("hook", payload);
 const dsh = (payload) => hook({ coucou_agent: "dsh", ...payload });
 const task = (id = DSH) => State.tasks.find((t) => t.id === id);
 const seconds = (n) => mock.timers.tick(n * 1000);
+/** Declares pills the way Settings does, then loads their idle cards. */
+const declare = (...ids) => {
+  State.settings.activeIntegrations = ids;
+  State.loadIntegrationTasks();
+};
 
 beforeEach(() => {
   mock.timers.enable({ apis: ["setTimeout"] });
@@ -52,21 +62,49 @@ afterEach(() => {
 
 // ── Routing ───────────────────────────────────────────────────────────────────
 
-test("an event with no agent tag is discarded", () => {
-  hook({ hook_event_name: "SessionStart", cwd: "C:\\Users\\me\\proj" });
-  hook({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "ls" } });
-  assert.deepEqual(asked, []);
-  assert.deepEqual(calls, []);
-  // Only the pills the settings declare: nothing was made for the session.
-  assert.equal(State.tasks.some((t) => t.id.startsWith("agent_") && t.id !== DSH), false);
+test("an event with no tag goes to Claude Code's pill once it is declared", () => {
+  declare(CLAUDE);
+  hook({ hook_event_name: "SessionStart", session_id: "s1", cwd: "C:\\Users\\me\\proj" });
+  assert.equal(task(CLAUDE).sessionId, "s1");
+  assert.equal(task(CLAUDE).sessionCwd, "C:\\Users\\me\\proj");
+  assert.deepEqual(asked, ["reveal"]);
+  hook({ hook_event_name: "PreToolUse", session_id: "s1", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(task(CLAUDE).state, "working");
+  assert.deepEqual(task(CLAUDE).steps, ["Runs · ls"]);
 });
 
-test("an invalid or reserved agent tag is discarded too", () => {
-  for (const tag of ["claude", "Gemini", "has space", "a".repeat(25), ""]) {
+test("without a declared Claude Code pill its events create nothing", () => {
+  for (const event of ["SessionStart", "PreToolUse", "StopFailure"]) {
+    hook({ hook_event_name: event, cwd: "/p/proj" });
+  }
+  assert.equal(task(CLAUDE), undefined);
+  assert.equal(State.tasks.some((t) => t.id === CLAUDE), false);
+  // Nothing is revealed and nothing is asked of the island for a pill it does
+  // not show.
+  assert.deepEqual(asked, []);
+  assert.deepEqual(calls, []);
+});
+
+test("Claude Code in Cursor's terminal gets the Cursor pill", () => {
+  declare(CLAUDE, CURSOR);
+  hook({ hook_event_name: "SessionStart", session_id: "s1", cwd: "/p/proj", term_editor: "cursor" });
+  assert.equal(task(CURSOR).sessionId, "s1");
+  assert.equal(task(CLAUDE).sessionId ?? null, null);
+});
+
+test("the reserved 'claude' tag is Claude Code itself, not an external agent", () => {
+  declare(CLAUDE);
+  hook({ hook_event_name: "PreToolUse", cwd: "/p", coucou_agent: "claude", tool_name: "Bash", tool_input: { command: "ls" } });
+  assert.equal(task(CLAUDE).state, "working");
+  assert.equal(task("agent_claude"), undefined);
+});
+
+test("an invalid tag is never an external agent", () => {
+  for (const tag of ["Gemini", "has space", "a".repeat(25)]) {
     hook({ hook_event_name: "SessionStart", cwd: "/p/proj", coucou_agent: tag });
   }
-  assert.deepEqual(asked, []);
   assert.equal(State.tasks.some((t) => t.id.startsWith("agent_") && t.id !== DSH), false);
+  assert.deepEqual(asked, []);
 });
 
 test("the main pill exists from the start, idle", () => {
@@ -248,6 +286,49 @@ test("a failed turn shows the error view, or the error badge behind another pill
   assert.equal(task().pillBadge, "error");
 });
 
+// ── StopFailure: the card says what actually failed ───────────────────────────
+
+test("a StopFailure keeps the API's own message for the error card", () => {
+  declare(CLAUDE);
+  hook({ hook_event_name: "PreToolUse", tool_name: "Bash", tool_input: { command: "npm test" } });
+  hook({ hook_event_name: "StopFailure", error: { message: "API Error: 529 Overloaded. Try again." } });
+  assert.equal(task(CLAUDE).state, "error");
+  assert.equal(task(CLAUDE).finalLine, "API Error: 529 Overloaded. Try again.");
+});
+
+test("an error kind becomes a sentence in the interface language", () => {
+  assert.equal(stopFailureDetail({ error_type: "rate_limit" }),
+    "Claude's rate limit is reached. Try again in a moment.");
+  assert.equal(stopFailureDetail({ error: "overloaded" }),
+    "Claude is overloaded. Try again in a moment.");
+  assert.equal(stopFailureDetail({ error_type: "authentication_failed" }),
+    "Claude Code is not signed in, or its key is no longer valid.");
+  assert.equal(stopFailureDetail({ error_type: "max_output_tokens" }),
+    "The answer was too long and was cut.");
+  // "unknown" and bare status codes say nothing: the card falls back to the last step.
+  assert.equal(stopFailureDetail({ error: "unknown" }), null);
+  assert.equal(stopFailureDetail({ error_type: "unknown" }), null);
+  assert.equal(stopFailureDetail({ error: "500" }), null);
+  assert.equal(stopFailureDetail({}), null);
+});
+
+test("Claude Code's 'unknown' error uses the last message when it carries the API's words", () => {
+  assert.equal(
+    stopFailureDetail({ error: "unknown", last_assistant_message: "API Error: 500 Internal Server Error" }),
+    "API Error: 500 Internal Server Error",
+  );
+  // A last message without an error in it is the answer, not the failure.
+  assert.equal(stopFailureDetail({ error: "unknown", last_assistant_message: "All done." }), null);
+  // A readable error kind is shown as it is.
+  assert.equal(stopFailureDetail({ error: "database is locked" }), "database is locked");
+});
+
+test("the error message is read from the first field that carries one", () => {
+  assert.equal(stopFailureDetail({ error_message: "first", error_details: "second", message: "third" }), "first");
+  assert.equal(stopFailureDetail({ error_details: "second", message: "third" }), "second");
+  assert.equal(stopFailureDetail({ message: "third" }), "third");
+});
+
 test("a session end clears the session id so the pill can no longer be steered", () => {
   dsh({ hook_event_name: "SessionStart", session_id: "s1" });
   assert.equal(task().sessionId, "s1");
@@ -303,6 +384,42 @@ test("Codex's permission request gets the same card", () => {
   assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
 });
 
+test("Claude Code's permission request gets a card and is never declined", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1",
+    cwd: "C:\\Users\\me\\proj", tool_name: "Bash", tool_input: { command: "npm publish" },
+  });
+  assert.deepEqual(State.pendingApproval, {
+    requestId: "r1",
+    sessionId: "s1",
+    pillId: CLAUDE,
+    tool: "Bash",
+    command: "Bash · npm publish",
+  });
+  assert.deepEqual(sent("approval_ack"), [{ requestId: "r1" }]);
+  assert.deepEqual(sent("approval_decline"), []);
+  assert.equal(task(CLAUDE).state, "approval");
+});
+
+test("Claude Code's permission request is declined when its pill is off", () => {
+  hook({ hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1", tool_name: "Bash" });
+  assert.deepEqual(sent("approval_decline"), [{ requestId: "r1" }]);
+  assert.deepEqual(sent("approval_ack"), []);
+  assert.equal(State.pendingApproval, null);
+});
+
+test("Claude Code's AskUserQuestion becomes a question card", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1",
+    tool_name: "AskUserQuestion",
+    tool_input: { questions: [{ id: "q1", question: "Which?", options: [{ label: "A" }, { label: "B" }] }] },
+  });
+  assert.equal(State.pendingApproval.questions?.length, 1);
+  assert.equal(State.defaultView(), "question");
+});
+
 test("every other agent's request is declined, never shown as a card", () => {
   for (const agent of ["my-tool", "gemini", "cursor"]) {
     calls.length = 0;
@@ -314,7 +431,7 @@ test("every other agent's request is declined, never shown as a card", () => {
   }
 });
 
-test("only DSH's questions become a question card", () => {
+test("DSH's questions become a question card; Codex's do not", () => {
   dsh({
     hook_event_name: "PermissionRequest", request_id: "r1", session_id: "s1",
     tool_name: "user-questions",

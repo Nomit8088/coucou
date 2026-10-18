@@ -21,7 +21,7 @@
 由 [@Nomit8088](https://github.com/Nomit8088) 基于 [Louis Raillé 的 Coucou](https://github.com/Louis-CFM/coucou) 增强，重点服务 DeepSeek Harness（DSH）开发场景。
 
 - **DSH 双向交互**：灵动岛与 Web GUI 同时显示权限请求/问题，明确点击后作出决策；继续输入、取消、权限预设、上下文占用、后台任务、定时提醒与会话状态。
-- **AI 会话与聊天**：DSH / Codex hook 与 plugin 集成；DeepSeek 内置及自定义 OpenAI-compatible provider，支持本地模型服务。
+- **AI 会话与聊天**：Claude Code（hooks 安装、权限审批与提问、套餐用量）、DSH / Codex hook 与 plugin 集成；DeepSeek 内置及自定义 OpenAI-compatible provider，支持本地模型服务。
 - **开发服务**：GitHub / GitLab 流水线与请求通知、QQ 邮箱等可选集成。凭据进入系统安全存储，不写入普通设置。
 - **Mochi**：保留现有角色、灵动岛、换装、声音、文件拖入、差异展示和周报，不重做已发布界面。
 - **Windows 音乐增强**：网易云音乐、QQ 音乐、Spotify 系统媒体会话、播放控制与舞蹈动效；独立安装包 / 绿色便携版。

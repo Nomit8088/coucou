@@ -48,8 +48,21 @@ pub struct HookStatus {
     /// Coucou's status line relay (plan usage) is the one in settings.json.
     pub plan_relay_installed: bool,
     pub settings_path: String,
+    /// settings.json is there already (it does not exist before the first install).
+    pub settings_exists: bool,
+    /// It is there but could not be read: unreadable, or not a JSON object.
+    pub settings_error: Option<String>,
     pub hook_path: String,
     pub hook_ready: bool,
+    /// Every event that routes to Coucou's relay right now, in install order.
+    pub events: Vec<String>,
+    /// The events Coucou installs (hooks.rs HOOK_EVENTS).
+    pub expected_events: Vec<String>,
+    /// Expected events with no Coucou entry: the install is partial or stale.
+    pub missing_events: Vec<String>,
+    /// One of Coucou's entries points at a relay other than this build's — an
+    /// install from another user or machine, or an older build's path.
+    pub stale_path: bool,
 }
 
 #[derive(Serialize)]
@@ -65,16 +78,6 @@ pub struct HookPreview {
 
 pub fn settings_path() -> PathBuf {
     platform::home_dir().join(".claude").join("settings.json")
-}
-
-/// The settings as they are, or an empty object when we cannot tell. Only for
-/// read-only paths like `status()`, which must never fail loudly; anything that
-/// writes goes through `config_file`, which surfaces the error instead.
-fn read_settings_lossy() -> Value {
-    config_file::read(&settings_path())
-        .ok()
-        .and_then(|bytes| config_file::parse_json(bytes.as_deref(), "settings.json").ok())
-        .unwrap_or_else(|| json!({}))
 }
 
 /// On Windows Claude Code runs hook commands through Git Bash; on Linux through
@@ -96,6 +99,67 @@ fn entry_is_ours(entry: &Value) -> bool {
             })
         })
         .unwrap_or(false)
+}
+
+/// The commands Coucou's own entries for `event` run (empty when it has none).
+/// `settings` is parsed already, so a malformed `hooks` never reaches here.
+fn our_commands(settings: &Value, event: &str) -> Vec<String> {
+    settings
+        .get("hooks")
+        .and_then(|hooks| hooks.get(event))
+        .and_then(Value::as_array)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter(|entry| entry_is_ours(entry))
+                .flat_map(|entry| entry.get("hooks").and_then(Value::as_array).into_iter().flatten())
+                .filter_map(|hook| hook.get("command").and_then(Value::as_str))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+/// The relay path as it is written in a hook command: one quoted shell word
+/// with forward slashes (see `hook_command`).
+fn relay_word(hook_path: &Path) -> String {
+    hook_path.to_string_lossy().replace('\\', "/")
+}
+
+/// Whether a hook command runs the relay at `relay` (this build's path). An
+/// entry copied from another user, machine or build runs that relay instead and
+/// cannot reach this one: that is what `stale_path` reports.
+fn command_runs_relay(command: &str, relay: &str) -> bool {
+    let command = command.replace('\\', "/");
+    if cfg!(windows) {
+        command.to_lowercase().contains(&relay.to_lowercase())
+    } else {
+        command.contains(relay)
+    }
+}
+
+/// Which expected events Coucou currently has an entry for, and whether any of
+/// those entries points at a relay other than this build's.
+struct Scan {
+    events: Vec<String>,
+    stale: bool,
+}
+
+fn scan(settings: &Value, hook_path: &Path) -> Scan {
+    let relay = relay_word(hook_path);
+    let mut events = Vec::new();
+    let mut stale = false;
+    for (event, _) in HOOK_EVENTS {
+        let commands = our_commands(settings, event);
+        if commands.is_empty() {
+            continue;
+        }
+        events.push((*event).to_string());
+        if commands.iter().any(|command| !command_runs_relay(command, &relay)) {
+            stale = true;
+        }
+    }
+    Scan { events, stale }
 }
 
 /// The status line in settings.json is Coucou's relay (old installs wrote
@@ -183,25 +247,40 @@ fn edits(install: bool) -> Vec<FileEdit<'static>> {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 pub fn status() -> HookStatus {
-    let current = read_settings_lossy();
-    let installed = current
-        .get("hooks")
-        .and_then(Value::as_object)
-        .map(|hooks| {
-            hooks
-                .values()
-                .filter_map(Value::as_array)
-                .flatten()
-                .any(entry_is_ours)
-        })
-        .unwrap_or(false);
+    // Reading is best-effort here: Settings shows what is wrong instead of
+    // failing, and anything that writes goes through `config_file`, which
+    // refuses an unreadable file rather than treating it as empty.
+    let path = settings_path();
+    let read = config_file::read(&path);
+    let settings_exists = matches!(&read, Ok(Some(_))) || read.is_err();
+    let (current, settings_error) = match read {
+        Ok(bytes) => match config_file::parse_json(bytes.as_deref(), "settings.json") {
+            Ok(value) => (value, None),
+            Err(err) => (Value::Null, Some(err)),
+        },
+        Err(err) => (Value::Null, Some(err)),
+    };
     let hook_path = settings::hook_exe_path();
+    let scan = scan(&current, &hook_path);
+    let expected_events: Vec<String> =
+        HOOK_EVENTS.iter().map(|(event, _)| (*event).to_string()).collect();
+    let missing_events = expected_events
+        .iter()
+        .filter(|event| !scan.events.contains(event))
+        .cloned()
+        .collect();
     HookStatus {
-        installed,
+        installed: !scan.events.is_empty(),
         plan_relay_installed: plan_relay_installed(&current),
-        settings_path: settings_path().to_string_lossy().to_string(),
-        hook_ready: hook_path.exists(),
+        settings_path: path.to_string_lossy().to_string(),
+        settings_exists,
+        settings_error,
         hook_path: hook_path.to_string_lossy().to_string(),
+        hook_ready: hook_path.exists(),
+        events: scan.events,
+        expected_events,
+        missing_events,
+        stale_path: scan.stale,
     }
 }
 
@@ -576,5 +655,56 @@ mod tests {
         assert_eq!(std::fs::read(&path).unwrap(), b"{ broken");
 
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    #[test]
+    fn a_scan_reports_hooked_events_and_another_builds_relay() {
+        let relay = Path::new("/opt/coucou/bin/coucou-hook");
+        let entry = |event: &str| {
+            let command = format!("\"{}\" {event}", relay.display());
+            serde_json::json!({ "hooks": [
+                { "type": "command", "command": command }
+            ] })
+        };
+
+        // Two events hooked; status() turns the rest of HOOK_EVENTS into "missing".
+        let partial = serde_json::json!({
+            "hooks": {
+                "SessionStart": [entry("SessionStart")],
+                "PreToolUse": [entry("PreToolUse")],
+            }
+        });
+        let found = scan(&partial, relay);
+        assert_eq!(found.events, vec!["SessionStart".to_string(), "PreToolUse".to_string()]);
+        assert!(!found.stale);
+
+        // Somebody else's hook for an event Coucou installs does not count.
+        let theirs = serde_json::json!({ "hooks": { "Stop": [{ "hooks": [
+            { "type": "command", "command": "/usr/local/bin/other-tool" }
+        ] }] } });
+        assert!(scan(&theirs, relay).events.is_empty());
+
+        // An entry copied from another install runs a relay path that is not
+        // this one: it is there, but it cannot reach this build.
+        let other = serde_json::json!({ "hooks": { "SessionStart": [{ "hooks": [
+            { "type": "command", "command": "\"C:/Users/old/Coucou/bin/coucou-hook.exe\" SessionStart" }
+        ] }] } });
+        let found = scan(&other, relay);
+        assert_eq!(found.events, vec!["SessionStart".to_string()]);
+        assert!(found.stale, "another install's relay path must read as stale");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_relay_paths_are_compared_without_case() {
+        let relay = relay_word(Path::new(r"C:\Users\me\AppData\Local\Coucou\bin\coucou-hook.exe"));
+        assert!(command_runs_relay(
+            r#""C:/users/ME/appdata/local/coucou/bin/coucou-hook.exe" SessionStart"#,
+            &relay
+        ));
+        assert!(!command_runs_relay(
+            r#""C:/Users/me/AppData/Local/Other/bin/coucou-hook.exe" SessionStart"#,
+            &relay
+        ));
     }
 }

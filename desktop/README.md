@@ -138,15 +138,14 @@ answer on one line, still, until the next prompt.
 
 ## Your pills
 
-**Settings… → Active pills** lists the tools you use, from the same catalog as
-the Mac app. Pick your **main tool** — VS Code, Cursor, Codex or Antigravity —
-which is always there and doesn't take a slot, then declare up to four more:
-agents (Gemini CLI, Copilot CLI, Muse Code, OpenCode, Amp, Hermes, Claude
-Desktop), the chat providers (Anthropic, Google AI, OpenAI, Ollama, LM Studio),
-and the services under **Integrations**. A pill fed by hooks says whether its
-hooks are installed, never asks for a key; a local model server's pill says
-whether the chat is connected to it. A session on a pill you didn't
-declare still shows up, for as long as it runs.
+**Settings… → Active pills** lists the tools this fork offers. Pick your **main
+tool** — Claude Code, Cursor, DeepSeek Harness or Codex — which is always there
+and doesn't take a slot, then declare up to four more workspace tools (the
+remaining ones). A pill fed by hooks says whether its hooks are installed, never
+asks for a key; services under **Integrations** are declared next to their keys.
+Claude Code and Cursor are fed by Claude Code's own hooks, installed above. A
+session on a pill you didn't declare is not shown — and its permission request
+is handed back to the terminal instead of waiting on an island with no card.
 
 ## Claude Code
 

@@ -63,5 +63,10 @@ jobs:
       - name: Build the relay
         run: cargo build --release -p coucou-hook
 
+      # The same command a release runs, so a broken bundle fails here and not
+      # on the tag. It rebuilds the relay at worst; the step above warmed it.
+      - name: Build the app bundle
+        run: npm run build
+
       - name: Rust tests
         run: cargo test --workspace --locked

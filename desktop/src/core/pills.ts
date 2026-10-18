@@ -1,8 +1,11 @@
 // Pill catalog for this personal Windows fork. IDs are contract values
 // (settings, hook routing, credentials). New IDs written here do not change:
-// agent_dsh, integration_gitlab, integration_qqmusic. Official Mac catalog pills
-// that this fork does not use are absent on purpose — do not add them back for
-// parity.
+// integration_claude, agent_cursor, agent_dsh, integration_gitlab,
+// integration_qqmusic. Other Mac catalog pills this fork does not use are
+// absent on purpose — do not add them back for parity. Claude Code and Cursor
+// are here because the Settings window installs Claude Code's own hooks
+// (hooks.rs): their sessions, questions, permissions and final answers show in
+// the island, exactly as on the Mac.
 
 import type { AgentSource } from "./state";
 import { N_ } from "../i18n/i18n";
@@ -46,6 +49,13 @@ const key = (k: string): PillConnect => ({ kind: "key", key: k });
 const none: PillConnect = { kind: "none" };
 
 export const PILL_CATALOG: readonly PillDefinition[] = [
+  // Claude Code, through its own hooks (Settings → Claude Code).
+  { id: "integration_claude", name: "Claude Code", color: "#F5F6F8", category: "workspace",
+    subtitle: N_("Integration"), source: "claudeCode", support: "yes", connect: hooks },
+  // Claude Code in Cursor's terminal: the same hooks, told apart by the relay's
+  // `term_editor` (Mac #120).
+  { id: "agent_cursor", name: "Cursor", color: "#C0C4CC", category: "workspace",
+    subtitle: N_("Integration"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_dsh", name: "DeepSeek Harness", color: "#4D6BFE", category: "workspace",
     subtitle: N_("Agent"), source: "agent", support: "yes", connect: hooks },
   { id: "agent_codex", name: "Codex", color: "#2DD4BF", category: "workspace",
@@ -105,6 +115,8 @@ export function mainPillChoices(os: HostOs = HOST_OS): PillDefinition[] {
 
 export function sessionSubtitle(id: string): string {
   switch (id) {
+    case "integration_claude": return "Claude Code";
+    case "agent_cursor": return "Cursor";
     case "agent_dsh": return "DeepSeek Harness";
     case "agent_codex": return "Codex";
     default: return N_("Agent");

@@ -991,7 +991,8 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0 6px;
+  /* The mini Mochi sits at 7px + 24px: the label starts after it (Mac #522). */
+  padding: 0 8px 0 34px;
   pointer-events: none;
 }
 
@@ -1061,6 +1062,12 @@ body {
 .who-row .n {
   font: 600 12px var(--font);
   color: var(--ink);
+}
+
+/* The queued-request count, inside the who row next to the label. */
+.who-row .sub {
+  font: 400 12px var(--font);
+  color: var(--dim-2);
 }
 
 .code {

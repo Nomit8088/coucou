@@ -7,6 +7,7 @@ mod claude;
 mod codex_plan;
 mod config_file;
 mod desktop;
+mod diagnostics;
 mod dsh;
 mod files;
 mod github;
@@ -336,6 +337,13 @@ fn hooks_status() -> HookStatus {
 #[tauri::command]
 fn agent_hooks_status() -> std::collections::HashMap<String, bool> {
     agent_hooks::status()
+}
+
+/// Settings → Diagnostics: versions, paths, hook status and the log tail. It
+/// carries no secret; the settings window turns it into pasteable text.
+#[tauri::command]
+fn desktop_diagnostics(app: AppHandle) -> diagnostics::DiagnosticsInfo {
+    diagnostics::info(&app)
 }
 
 /// Returns the diff the user has to look at before anything is written.
@@ -789,6 +797,7 @@ pub fn run() {
             quit_app,
             hooks_status,
             agent_hooks_status,
+            desktop_diagnostics,
             hooks_preview,
             hooks_apply,
             agent_hooks_list,

@@ -20,6 +20,10 @@ import { N_, t } from "../i18n/i18n";
 /** Clears the approval card if no decision was made before the hook gave up. */
 let pendingTimeout: number | null = null;
 
+/** Claude Code's own pill, and the one Claude Code uses when it runs in Cursor. */
+const CLAUDE_ID = "integration_claude";
+const CURSOR_ID = "agent_cursor";
+
 /** Takes the approval or question card down and gives the island back. */
 function dropPendingCard(island: Island): void {
   if (!State.pendingApproval) return;
@@ -87,6 +91,15 @@ interface HookPayload {
   last_assistant_message?: string;
   tool_name?: string;
   tool_input?: Record<string, unknown>;
+  /**
+   * StopFailure: what stopped Claude Code's turn. Its hook sends the API's own
+   * message in one of these, or only an error kind (`rate_limit`, `overloaded`,
+   * `unknown`…) — see stopFailureDetail().
+   */
+  error?: unknown;
+  error_type?: string;
+  error_message?: string;
+  error_details?: string;
   /** Set by the relay when an edit was too big to forward whole (> 256 KB). */
   coucou_diff_truncated?: boolean;
   /** Optional agent tag: lowercase, digits and hyphens, ≤ 24 chars. */
@@ -241,6 +254,48 @@ function upsert(id: string, projectName: string, cwd: string, sessionId: string)
   if (t && sessionId) t.sessionId = sessionId;
 }
 
+/**
+ * What stopped a Claude Code turn, from its StopFailure hook: the API's own
+ * message when it sends one, else a sentence for the kind of error. null when
+ * nothing says anything useful (a bare status code, or the word "unknown").
+ *
+ * Port of HookServer.stopFailureDetail (macOS, ports #718 and #781).
+ */
+export function stopFailureDetail(payload: HookPayload): string | null {
+  for (const key of ["error_message", "error_details", "message"] as const) {
+    const text = payload[key];
+    if (typeof text === "string" && text.trim()) return toOneLine(text);
+  }
+  const error = payload.error;
+  if (error && typeof error === "object") {
+    const text = (error as { message?: unknown }).message;
+    if (typeof text === "string" && text) return toOneLine(text);
+  }
+  const kind = payload.error_type
+    ?? (typeof error === "string" ? error : "");
+  switch (kind) {
+    case "rate_limit": return t("Claude's rate limit is reached. Try again in a moment.");
+    case "overloaded": return t("Claude is overloaded. Try again in a moment.");
+    case "authentication_failed":
+    case "oauth_org_not_allowed":
+      return t("Claude Code is not signed in, or its key is no longer valid.");
+    case "billing_error": return t("Billing problem on the Claude account.");
+    case "server_error": return t("Claude's servers had a problem. Try again.");
+    case "max_output_tokens": return t("The answer was too long and was cut.");
+    case "model_not_found": return t("This model is not available.");
+    default: break;
+  }
+  // Claude Code often sends only `error: "unknown"`: its last message then
+  // usually carries the API's own words ("API Error: 529 Overloaded…").
+  if (typeof payload.last_assistant_message === "string"
+    && /error/i.test(payload.last_assistant_message)) {
+    return toOneLine(payload.last_assistant_message);
+  }
+  // A readable error is shown as it is; "unknown" or a bare status code says nothing.
+  if (kind.length > 3 && !/^\d+$/.test(kind) && kind !== "unknown") return kind;
+  return null;
+}
+
 /** The session is over: the pill goes back as it was, or away if it was only there for it. */
 function clearSession(id: string) {
   const t = State.tasks.find((x) => x.id === id);
@@ -312,15 +367,24 @@ function handleHook(island: Island, payload: HookPayload) {
   const raw = lastPathComponent(cwd);
   const projectName = aliasProjectName(raw || "Session");
 
-  // No coucou_agent: discard. This fork does not keep a Claude Code pill.
+  // Route to the right pill. A valid `coucou_agent` gets a dynamic
+  // "agent_<name>" pill; without one the event is Claude Code's: Cursor's pill
+  // when it runs in Cursor's terminal (Mac #120), Claude Code's own otherwise.
+  // "claude" is reserved by validateAgent and never reaches this branch.
   const validAgent = validateAgent(payload.coucou_agent);
-  if (!validAgent) {
+  const workspaceId = payload.term_editor === "cursor" ? CURSOR_ID : CLAUDE_ID;
+  const agentId = validAgent ? `agent_${validAgent}` : workspaceId;
+  const isExternalAgent = validAgent !== null;
+  const sessionId = payload.session_id ?? "";
+
+  // A catalog tool the user turned off must not appear because a session
+  // started (the Mac's rule). Claude Code and Cursor are shown once declared in
+  // Settings; their permission requests are handed straight back so the
+  // terminal asks instead of waiting on an island with no card to show.
+  if (!isExternalAgent && !State.tasks.some((t) => t.id === agentId)) {
     if (payload.request_id) void Bridge.approvalDecline(payload.request_id);
     return;
   }
-  const agentId = `agent_${validAgent}`;
-  const isExternalAgent = true;
-  const sessionId = payload.session_id ?? "";
 
   /** Alerts force the island open; work events only reveal the compact island. */
   const surface = (view: Parameters<Island["alert"]>[0], isAlert: boolean) => {
@@ -578,13 +642,18 @@ function handleHook(island: Island, payload: HookPayload) {
       // The Web GUI answered first. TURN_OVER already took the card down.
       break;
 
-    case "StopFailure":
+    case "StopFailure": {
       supersedeStop();
       State.sessionState(agentId, sessionId, "error");
+      // The error view shows what went wrong (finalLine), not the last thing
+      // said before it — the Mac's behaviour since #718/#781.
+      const failed = State.tasks.find((x) => x.id === agentId);
+      if (failed) failed.finalLine = stopFailureDetail(payload);
       Sound.play("error");
       if (focused && !State.pendingApproval) surface("error", true);
       else State.setPillBadge(agentId, "error");
       break;
+    }
 
     case "SessionEnd":
       // Nothing left for the timer to do, and it must not outlive the session: a

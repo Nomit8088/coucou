@@ -1,9 +1,13 @@
 // Settings window — the place where anything that writes to disk is confirmed.
-// Stage 2 covers the Claude Code hooks and the general preferences; API keys and
-// integrations land here too in a later stage.
+// The Claude Code hooks and the general preferences live here, with the agents,
+// the API keys and the integrations.
+//
+// Nothing is written blind: a change to ~/.claude/settings.json first shows the
+// exact diff, then writes only after an explicit click, and only if the file
+// still matches the diff that was shown.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookStatus, type ShortcutsReport } from "../core/bridge";
+import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
 import { ensureProviders, newProviderId, urlAllowed } from "../core/providers";
 import {
   availableShortcuts, islandShortcuts, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
@@ -18,9 +22,10 @@ import {
 import { h, clear } from "../views/dom";
 import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
-import { statusDot } from "./parts";
+import { statusDot, renderDiff } from "./parts";
 import { HOST_OS, platformCapabilities } from "../core/platform";
 import { updateAction } from "../core/updater";
+import { formatDiagnostics } from "../core/diagnostics";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
 } from "../i18n/i18n";
@@ -57,25 +62,334 @@ function toggle(on: boolean, onChange: (v: boolean) => void): HTMLElement {
   return el;
 }
 
+/** Puts text on the clipboard, with the old hidden-field fallback. */
+async function copyText(text: string): Promise<void> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return;
+  } catch {
+    // No clipboard API (or no permission): the pre-Clipboard-API way.
+  }
+  const area = document.createElement("textarea");
+  area.value = text;
+  area.style.position = "fixed";
+  area.style.opacity = "0";
+  document.body.append(area);
+  area.select();
+  document.execCommand("copy");
+  area.remove();
+}
+
+// ── Changes to Claude Code's settings.json ────────────────────────────────────
+
+/** One kind of change to ~/.claude/settings.json, with the words that go with it. */
+interface Change {
+  preview: (install: boolean) => Promise<HookPreview>;
+  apply: (install: boolean, fingerprint: string) => Promise<string>;
+  installText: string;
+  removeText: string;
+  installButton: string;
+  removeButton: string;
+  /** The note once written; `backup` is "" when there was no file to back up. */
+  done: (backup: string) => string;
+}
+
+const HOOKS_CHANGE: Change = {
+  preview: Bridge.hooksPreview,
+  apply: Bridge.hooksApply,
+  get installText() { return t("This is exactly what will change in your settings.json. Your own hooks are left untouched."); },
+  get removeText() { return t("This removes Coucou's entries only. Your own hooks are left untouched."); },
+  get installButton() { return t("Back up and write"); },
+  get removeButton() { return t("Back up and remove"); },
+  done: (backup) => backup
+    ? t("Done. Previous settings saved as {backup}. Open a new Claude Code session to pick the hooks up.", { backup })
+    : t("Done. Open a new Claude Code session to pick the hooks up."),
+};
+
+const STATUS_LINE_CHANGE: Change = {
+  preview: Bridge.statusLinePreview,
+  apply: Bridge.statusLineApply,
+  get installText() { return t("This is exactly what will change: only the status line. If you already have one it keeps working, Coucou's relay runs it for you."); },
+  get removeText() { return t("This puts your previous status line back, or removes the entry if there was none."); },
+  get installButton() { return t("Back up and write"); },
+  get removeButton() { return t("Back up and remove"); },
+  done: (backup) => backup
+    ? t("Done. Previous settings saved as {backup}. The numbers appear after the next reply of a Claude Code session.", { backup })
+    : t("Done. The numbers appear after the next reply of a Claude Code session."),
+};
+
+/** The error as the notice shows it, without the JS wrapper. */
+function errorText(err: unknown): string {
+  return String(err).replace(/^Error:\s*/, "");
+}
+
+/**
+ * Shows the diff of a change in `body` and writes it only after an explicit
+ * click, and only if settings.json still matches the diff that was shown.
+ * `back` redraws the section; `applied` runs a moment after a successful write.
+ */
+async function reviewChange(
+  body: HTMLElement,
+  change: Change,
+  install: boolean,
+  back: () => void,
+  applied: () => void,
+) {
+  let preview: HookPreview;
+  try {
+    preview = await change.preview(install);
+  } catch (err) {
+    // An unreadable or invalid settings.json stops here rather than being
+    // treated as empty and written over.
+    clear(body);
+    body.append(
+      h("div", { class: "notice err", text: errorText(err) }),
+      h("div", { class: "row" }, h("button", { text: t("Back"), onclick: back })),
+    );
+    return;
+  }
+  clear(body);
+  body.append(
+    h("div", { class: "hint", text: install ? change.installText : change.removeText }),
+    renderDiff(preview.diff),
+    h("div", { class: "row" },
+      h("span", {
+        class: "path",
+        text: preview.backup
+          ? t("Backup → {path}", { path: preview.backup })
+          : t("No settings.json yet — nothing to back up."),
+      }),
+    ),
+  );
+  const confirm = h("button", {
+    class: install ? "primary" : "danger",
+    text: install ? change.installButton : change.removeButton,
+  });
+  confirm.addEventListener("click", async () => {
+    confirm.disabled = true;
+    try {
+      const backup = await change.apply(install, preview.fingerprint);
+      clear(body);
+      body.append(h("div", { class: "notice ok", text: change.done(backup ?? "") }));
+      window.setTimeout(applied, 2600);
+    } catch (err) {
+      confirm.disabled = false;
+      body.append(h("div", { class: "notice err", text: t("Could not write: {error}", { error: errorText(err) }) }));
+    }
+  });
+  body.append(h("div", { class: "row" }, confirm, h("button", { text: t("Cancel"), onclick: back })));
+}
+
+// ── Claude Code section ───────────────────────────────────────────────────────
+
+function claudeSection(status: HookStatus): HTMLElement {
+  const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
+  const section = h(
+    "section",
+    {},
+    h("h2", {}, statusDot(status.installed), h("span", { text: "Claude Code" })),
+    body,
+  );
+
+  const redraw = () => {
+    clear(body);
+    draw();
+  };
+  async function rebuild() {
+    const fresh = await Bridge.hooksStatus();
+    if (fresh) Object.assign(status, fresh);
+    redraw();
+    const head = section.querySelector("h2")!;
+    clear(head);
+    head.append(statusDot(status.installed), h("span", { text: "Claude Code" }));
+  }
+
+  function draw() {
+    body.append(
+      h("div", {
+        class: "hint",
+        text: status.installed
+          ? t("Coucou is hooked into your Claude Code sessions. Tool calls, questions and permission requests show up in the island, and you can answer them there.")
+          : t("Install the hooks to see your Claude Code sessions in the island and approve permissions without leaving what you are doing."),
+      }),
+      h("div", { class: "row" },
+        h("label", { text: "settings.json" }),
+        h("span", { class: "path", text: status.settingsPath }),
+      ),
+      h("div", { class: "row" },
+        h("label", { text: t("Hooks") }),
+        h("span", {
+          text: status.installed
+            ? t("{found} of {expected} events hooked", {
+                found: status.events.length,
+                expected: status.expectedEvents.length,
+              })
+            : t("Not installed"),
+        }),
+        statusDot(status.installed && status.missingEvents.length === 0 && !status.stalePath),
+      ),
+      h("div", { class: "row" },
+        h("label", { text: t("Relay") }),
+        h("span", { class: "path", text: status.hookPath }),
+        statusDot(status.hookReady),
+      ),
+    );
+
+    // Read-only self-check: the ways an install silently stops working.
+    if (status.settingsError) {
+      body.append(h("div", {
+        class: "notice err",
+        text: t("settings.json could not be read: {error}", { error: status.settingsError }),
+      }));
+    }
+    if (status.stalePath) {
+      body.append(h("div", {
+        class: "notice warn",
+        text: t("The hooks point at another Coucou build and will not reach this one. Reinstall them from here."),
+      }));
+    }
+    if (status.installed && status.missingEvents.length > 0) {
+      body.append(h("div", {
+        class: "notice warn",
+        text: t("Some events are not hooked: {events}", { events: status.missingEvents.join(", ") }),
+      }));
+    }
+
+    if (!status.hookReady) {
+      body.append(h("div", {
+        class: "notice warn",
+        text: t("coucou-hook.exe is not in place yet. Restart Coucou; if it still fails, build it with `cargo build -p coucou-hook`."),
+      }));
+    }
+
+    const actions = h("div", { class: "row" });
+    const install = h("button", {
+      class: "primary",
+      text: status.installed ? t("Reinstall hooks…") : t("Install hooks…"),
+      onclick: () => void reviewChange(body, HOOKS_CHANGE, true, redraw, () => void rebuild()),
+    });
+    // Writing hook commands that point at a relay which isn't there would give
+    // every Claude Code session a broken hook and nothing to show for it.
+    if (!status.hookReady) {
+      install.disabled = true;
+      install.title = t("The relay isn't installed yet.");
+    }
+    actions.append(install);
+    if (status.installed) {
+      actions.append(h("button", {
+        class: "danger",
+        text: t("Uninstall hooks…"),
+        onclick: () => void reviewChange(body, HOOKS_CHANGE, false, redraw, () => void rebuild()),
+      }));
+    }
+    body.append(actions);
+  }
+
+  draw();
+  return section;
+}
+
+// ── Diagnostics section ──────────────────────────────────────────────────────
+
+function diagnosticsSection(): HTMLElement {
+  const button = h("button", { text: t("Copy diagnostics") });
+  const statusEl = h("span", { class: "hint", style: "margin-left: 10px" });
+  button.addEventListener("click", async () => {
+    statusEl.textContent = "";
+    try {
+      const info = await Bridge.diagnostics();
+      await copyText(formatDiagnostics(info, navigator.userAgent));
+      button.textContent = t("Copied");
+      window.setTimeout(() => { button.textContent = t("Copy diagnostics"); }, 2400);
+    } catch (err) {
+      statusEl.textContent = t("Could not build the diagnostics: {error}", { error: errorText(err) });
+    }
+  });
+  return h(
+    "section",
+    {},
+    h("h2", {}, h("span", { text: t("Diagnostics") })),
+    h("div", {
+      class: "hint",
+      text: t("A summary of this install to paste into a bug report. No API keys, no message contents."),
+    }),
+    h("div", { class: "row" }, button, statusEl),
+  );
+}
+
 // ── Plan usage section ────────────────────────────────────────────────────────
 
 /**
- * Codex's weekly limit in the island's header. Nothing is installed for it:
- * Coucou asks the Codex CLI when the pill shows. Claude Code's status line is
- * not part of this fork.
+ * The 5-hour and weekly limits in the island's header. They come from Claude
+ * Code's status line, so the relay has to be the status line first: turning the
+ * switch on without it starts the install, and the switch only stays on once
+ * that has been confirmed. A status line the user had keeps working.
  */
 const PLAN_SETTINGS_TEXT = {
+  get claude() { return t("Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Coucou adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only."); },
+  get claudeCli() { return t("The numbers come from the Claude Code command-line tool. The Claude desktop app does not report them, so the gauge stays empty if you only use the desktop app."); },
+  get showClaude() { return t("Show in notch"); },
   get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
   get showCodex() { return t("Show Codex plan in the notch"); },
   get onlyWhenDeclared() { return t("Only shows when Codex is your main tool or an active pill."); },
 };
 
-function planSection(_status: HookStatus): HTMLElement {
+function planSection(status: HookStatus): HTMLElement {
   const body = h("div", { style: "display:flex;flex-direction:column;gap:12px" });
   const section = h("section", {}, h("h2", {}, h("span", { text: t("Plan usage") })), body);
 
+  const redraw = () => {
+    clear(body);
+    draw();
+  };
+  async function rebuild() {
+    const fresh = await Bridge.hooksStatus();
+    if (fresh) Object.assign(status, fresh);
+    settings.planRelayInstalled = status.planRelayInstalled;
+    // Cancelled or failed: a switch that was waiting for the install falls back.
+    if (!status.planRelayInstalled) settings.showPlanInNotch = false;
+    redraw();
+  }
+
   function draw() {
+    // The switch shows "on" while the install it asked for is being reviewed.
+    const sw = toggle(settings.showPlanInNotch, (on) => {
+      if (!on) {
+        settings.showPlanInNotch = false;
+        void save();
+      } else if (status.planRelayInstalled) {
+        settings.showPlanInNotch = true;
+        void save();
+      } else {
+        // Turned on before the relay is in: install it first; it stays on once confirmed.
+        void reviewChange(body, STATUS_LINE_CHANGE, true, () => void rebuild(), () => {
+          settings.planRelayInstalled = true;
+          settings.showPlanInNotch = true;
+          void save().then(rebuild);
+        });
+      }
+    });
     body.append(
+      h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.claude }),
+      h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.claudeCli }),
+      h("div", { class: "row" }, h("label", { text: PLAN_SETTINGS_TEXT.showClaude }), sw),
+      h("div", { class: "row" },
+        h("label", { text: t("Relay") }),
+        statusDot(status.planRelayInstalled),
+        h("span", { class: "hint", text: status.planRelayInstalled ? t("installed") : t("not installed") }),
+        status.planRelayInstalled
+          ? h("button", {
+              class: "danger",
+              text: t("Uninstall relay…"),
+              onclick: () => void reviewChange(body, STATUS_LINE_CHANGE, false, redraw, () => void rebuild()),
+            })
+          : h("button", {
+              class: "primary",
+              text: t("Install relay…"),
+              onclick: () => void reviewChange(body, STATUS_LINE_CHANGE, true, redraw, () => void rebuild()),
+            }),
+      ),
+      // Codex: nothing to install, Coucou asks the Codex CLI when the pill shows.
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.codex }),
       h("div", { class: "row" },
         h("label", { text: PLAN_SETTINGS_TEXT.showCodex }),
@@ -898,7 +1212,9 @@ async function main() {
 /** Reads what the sections show and draws them all. */
 async function render() {
   const status = (await Bridge.hooksStatus()) ?? {
-    installed: false, planRelayInstalled: false, settingsPath: "", hookPath: "", hookReady: false,
+    installed: false, planRelayInstalled: false, settingsPath: "", settingsExists: false,
+    settingsError: null, hookPath: "", hookReady: false, events: [], expectedEvents: [],
+    missingEvents: [], stalePath: false,
   };
   const agents = await Bridge.agentHooksList();
 
@@ -936,6 +1252,8 @@ async function render() {
   root.append(
     h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
     updaterSection(),
+    diagnosticsSection(),
+    claudeSection(status),
     agentsSection(agents),
     planSection(status),
     personalChatSection(chatKeys, keyChanged),

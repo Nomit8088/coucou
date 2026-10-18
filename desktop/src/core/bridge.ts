@@ -116,6 +116,8 @@ export const Bridge = {
    */
   hooksApply: (install: boolean, fingerprint: string) =>
     callOrThrow<string>("hooks_apply", { install, fingerprint }),
+  /** The Settings → Diagnostics data; core/diagnostics.ts turns it into text. */
+  diagnostics: () => callOrThrow<DiagnosticsInfo>("desktop_diagnostics"),
 
   // ── Other agents (Gemini CLI, Codex, Cursor…) ─────────────────────────────
   agentHooksList: () => call<AgentHookStatus[]>("agent_hooks_list"),
@@ -334,8 +336,50 @@ export interface HookStatus {
   /** Coucou's status line relay (plan usage) is the status line in settings.json. */
   planRelayInstalled: boolean;
   settingsPath: string;
+  /** settings.json is there already; it does not exist before the first install. */
+  settingsExists: boolean;
+  /** It is there but could not be read (unreadable, or not a JSON object). */
+  settingsError: string | null;
   hookPath: string;
   hookReady: boolean;
+  /** Events that route to Coucou's relay right now. */
+  events: string[];
+  /** The events Coucou installs. */
+  expectedEvents: string[];
+  /** Expected events with no Coucou entry: a partial or stale install. */
+  missingEvents: string[];
+  /** An entry points at another Coucou build's relay, which cannot reach this one. */
+  stalePath: boolean;
+}
+
+/** What Settings → Diagnostics collects (src-tauri/src/diagnostics.rs). */
+export interface DiagnosticsInfo {
+  appVersion: string;
+  identifier: string;
+  os: string;
+  arch: string;
+  settingsPath: string;
+  localDir: string;
+  logPath: string;
+  /** The end of coucou.log; "" when there is no log yet. */
+  logTail: string;
+  hook: HookStatus;
+  settings: {
+    language: string;
+    mainPill: string;
+    activeIntegrations: string[];
+    screen: string;
+    soundEnabled: boolean;
+    soundVolume: number;
+    autostart: boolean;
+    hooksInstalled: boolean;
+    planRelayInstalled: boolean;
+    showPlanInNotch: boolean;
+    showCodexPlanInNotch: boolean;
+    chatProvider: string;
+    model: string;
+    dshProfile: string;
+  };
 }
 
 /** One agent other than Claude Code, as agents.rs reports it. */

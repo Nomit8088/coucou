@@ -99,6 +99,16 @@ function agentWho(task: AgentTask | null, label: string): HTMLElement {
   return row;
 }
 
+/**
+ * The requests waiting behind the card on screen (state.ts approvalQueue).
+ * Without it the island answers one request and the next appears out of
+ * nowhere, which reads like the first answer did not work.
+ */
+function queueChip(): HTMLElement | null {
+  const queued = State.approvalQueue.length;
+  return queued > 0 ? h("span", { class: "sub", text: t("{count} queued", { count: queued }) }) : null;
+}
+
 function stack(padLeft: number, padRight: number, ...children: Node[]): HTMLElement {
   const el = h("div", { class: "stack" }, ...children);
   el.style.padding = `4px ${padRight}px 4px ${padLeft}px`;
@@ -572,7 +582,9 @@ export function hasSessionTicker(task: AgentTask): boolean {
 }
 
 function buildPill(task: AgentTask, actions: ViewActions): HTMLElement {
-  const label = task.name;
+  // Claude Code's pill reads its own name; every other live session names the
+  // folder it runs in, as on the Mac.
+  const label = task.id === "integration_claude" ? pillDefinition(task.id)!.name : task.name;
   const canvas = createMiniBot(task, 24);
   const pill = h(
     "div",
@@ -674,7 +686,10 @@ function buildApproval(actions: ViewActions): ViewHost {
         shownAt = performance.now();
       }
       clear(who);
-      who.append(agentWho(State.focusTask, t("needs permission")));
+      const whoRow = agentWho(State.focusTask, t("needs permission"));
+      const queued = queueChip();
+      if (queued) whoRow.append(queued);
+      who.append(whoRow);
       // The whole point of approving here rather than in the terminal: this line
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
@@ -730,7 +745,10 @@ function buildQuestion(actions: ViewActions): ViewHost {
 
       // A question that arrived as a notification has nothing to pick from.
       if (!questions) {
-        who.append(agentWho(State.focusTask, t("is asking a question")));
+        const whoRow = agentWho(State.focusTask, t("is asking a question"));
+        const queued = queueChip();
+        if (queued) whoRow.append(queued);
+        who.append(whoRow);
         const task = State.focusTask;
         title.textContent = (task && lastTextStep(task.steps)) ?? t("Claude needs an answer.");
         if (rowKey !== "terminal") {
@@ -751,7 +769,10 @@ function buildQuestion(actions: ViewActions): ViewHost {
       const asking = questions.length > 1
         ? t("is asking ({index} of {total})", { index: index + 1, total: questions.length })
         : t("is asking");
-      who.append(agentWho(State.focusTask, asking));
+      const whoRow = agentWho(State.focusTask, asking);
+      const queued = queueChip();
+      if (queued) whoRow.append(queued);
+      who.append(whoRow);
       title.textContent = q.question;
       title.title = q.question;
 
@@ -798,21 +819,31 @@ function buildError(actions: ViewActions): ViewHost {
   const who = h("div");
   const title = h("div", { class: "title" });
   const detail = h("div", { class: "detail" });
-  const row = h("div", { class: "actions" },
+  // An n8n workflow has a page to open; a coding session has a terminal, as in
+  // the Mac's ErrorView.
+  const n8nRow = h("div", { class: "actions" },
     btn(tl("Retry"), "primary", () => actions.setView(State.defaultView())),
-    btn(tl("Open in n8n"), "secondary", () => actions.openUrl("")),
+    btn(tl("Open in n8n"), "secondary", () => void Bridge.openN8n()),
   );
-  const el = h("div", { class: "view" }, card("red", stack(116, 16, who, title, detail, row)));
+  const sessionRow = h("div", { class: "actions" },
+    btn(tl("Open terminal"), "primary", () => actions.openTerminal()),
+    btn(tl("OK"), "secondary", () => actions.collapse()),
+  );
+  const el = h("div", { class: "view" }, card("red", stack(116, 16, who, title, detail, n8nRow, sessionRow)));
   return {
     el,
     sync() {
       const task = State.focusTask;
+      const n8n = task?.source === "n8n";
       clear(who);
       // agentWho already shows an agent's name: its label is just the kind.
-      const whoLabel = task?.source === "n8n" ? "n8n" : task?.source === "agent" ? t("Agent") : "Claude Code";
+      const whoLabel = n8n ? "n8n" : task?.source === "agent" ? t("Agent") : "Claude Code";
       who.append(agentWho(task, whoLabel));
-      title.textContent = task?.source === "n8n" ? t("Workflow stopped.") : t("Session stopped on an error.");
-      detail.textContent = (task && lastTextStep(task.steps)) ?? t("No detail available.");
+      title.textContent = n8n ? t("Workflow stopped.") : t("Session stopped on an error.");
+      // The real error when the hook sent one (StopFailure), else the last step.
+      detail.textContent = task?.finalLine || (task && lastTextStep(task.steps)) || t("No detail available.");
+      n8nRow.style.display = n8n ? "" : "none";
+      sessionRow.style.display = n8n ? "none" : "";
     },
   };
 }

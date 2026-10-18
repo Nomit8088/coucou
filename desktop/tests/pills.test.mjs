@@ -14,6 +14,8 @@ test("the catalog is the personal fork set, with stable new ids", () => {
   assert.deepEqual(
     PILL_CATALOG.map((p) => [p.id, p.name, p.color]),
     [
+      ["integration_claude", "Claude Code", "#F5F6F8"],
+      ["agent_cursor", "Cursor", "#C0C4CC"],
       ["agent_dsh", "DeepSeek Harness", "#4D6BFE"],
       ["agent_codex", "Codex", "#2DD4BF"],
       ["integration_github", "GitHub", "#F4505E"],
@@ -26,6 +28,10 @@ test("the catalog is the personal fork set, with stable new ids", () => {
     ],
   );
   assert.equal(DEFAULT_MAIN_PILL, "agent_dsh");
+  // Claude Code and Cursor are fed by Claude Code's own hooks.
+  assert.equal(pillDefinition("integration_claude").source, "claudeCode");
+  assert.equal(pillDefinition("integration_claude").connect.kind, "hooks");
+  assert.equal(pillDefinition("agent_cursor").connect.kind, "hooks");
   assert.equal(pillDefinition("integration_gitlab").connect.key, "gitlab-token");
   // Spotify is read over MPRIS on Linux and over a media session on Windows.
   assert.equal(pillDefinition("integration_spotify").support, "yes");
@@ -36,7 +42,7 @@ test("the catalog is the personal fork set, with stable new ids", () => {
   assert.equal(pillDefinition("integration_cloudmusic").mediaApp, "cloudmusic.exe");
   assert.equal(pillDefinition("integration_spotify").mediaApp, "Spotify.exe");
   assert.equal(pillDefinition("integration_qqmail").connect.key, "qqmail-auth-code");
-  for (const gone of ["integration_claude", "agent_cursor", "ai_anthropic", "integration_stripe", "integration_music"]) {
+  for (const gone of ["ai_anthropic", "integration_stripe", "integration_music", "agent_gemini"]) {
     assert.equal(pillDefinition(gone), undefined, gone);
   }
 });
@@ -55,25 +61,33 @@ test("IDs are unique", () => {
   assert.equal(new Set(ids).size, ids.length);
 });
 
-test("the main pill is DeepSeek or Codex", () => {
-  assert.deepEqual(mainPillChoices("windows").map((p) => p.id), ["agent_dsh", "agent_codex"]);
-  assert.deepEqual(mainPillChoices("linux").map((p) => p.id), ["agent_dsh", "agent_codex"]);
+test("the main tool is one of the workspace pills", () => {
+  assert.deepEqual(mainPillChoices("windows").map((p) => p.id), [
+    "integration_claude", "agent_cursor", "agent_dsh", "agent_codex",
+  ]);
+  assert.deepEqual(mainPillChoices("linux").map((p) => p.id), [
+    "integration_claude", "agent_cursor", "agent_dsh", "agent_codex",
+  ]);
 });
 
-test("hook pills are DSH and Codex", () => {
+test("hook pills are Claude Code, Cursor, DSH and Codex", () => {
+  assert.equal(isHookPill("integration_claude"), true);
+  assert.equal(isHookPill("agent_cursor"), true);
   assert.equal(isHookPill("agent_dsh"), true);
   assert.equal(isHookPill("agent_codex"), true);
   assert.equal(isHookPill("integration_github"), false);
 });
 
 test("a live session names its tool", () => {
+  assert.equal(sessionSubtitle("integration_claude"), "Claude Code");
+  assert.equal(sessionSubtitle("agent_cursor"), "Cursor");
   assert.equal(sessionSubtitle("agent_dsh"), "DeepSeek Harness");
   assert.equal(sessionSubtitle("agent_codex"), "Codex");
 });
 
 test("an old settings file falls back to DeepSeek and drops removed pills", () => {
   const d = sanitizeDeclared({
-    mainPill: "integration_claude",
+    mainPill: "integration_stripe",
     activeIntegrations: ["integration_n8n", "integration_github", "integration_stripe", "integration_github"],
   });
   assert.equal(d.mainPill, "agent_dsh");
