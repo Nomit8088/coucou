@@ -32,6 +32,8 @@ export class CompactMusicWidget {
   private progressEl: HTMLElement;
   private fillEl: HTMLElement;
 
+  private isDragging = false;
+  private dragRatio: number | null = null;
   private hovered = false;
   private lastTitle = "";
   private lastArtist = "";
@@ -97,6 +99,7 @@ export class CompactMusicWidget {
       Spotify.state = withPlaying(Spotify.state, nextPlaying, Date.now());
       this.updatePlayIcon(nextPlaying);
       void Bridge.spotifyControl("playPause");
+      State.notify();
     });
 
     this.nextBtn = document.createElement("button");
@@ -140,11 +143,53 @@ export class CompactMusicWidget {
     this.progressEl.className = "compact-music-progress";
     this.progressEl.append(this.fillEl);
 
-    // Seeking on the progress bar
-    this.progressEl.addEventListener("mousedown", (e) => {
+    // Seeking on the progress bar with dragging and clicking
+    const onMove = (e: MouseEvent | PointerEvent) => {
+      if (!this.isDragging) return;
+      const ratio = this.ratioFromEvent(e);
+      this.dragRatio = ratio;
+      this.fillEl.style.width = `${ratio * 100}%`;
+    };
+
+    const onEnd = (e: MouseEvent | PointerEvent) => {
+      if (!this.isDragging) return;
+      this.isDragging = false;
+      this.progressEl.classList.remove("dragging");
+      this.fillEl.style.transition = "";
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onEnd);
+
+      const ratio = this.ratioFromEvent(e);
+      this.commitSeek(ratio);
+      this.dragRatio = null;
+    };
+
+    const onStart = (e: MouseEvent | PointerEvent) => {
+      if (e.button !== 0 || this.isDragging) return;
+      const track = Spotify.state.track;
+      if (!track || track.duration <= 0 || isAd(track)) return;
       e.stopPropagation();
-      this.handleSeek(e);
-    });
+      e.preventDefault();
+      this.isDragging = true;
+      this.progressEl.classList.add("dragging");
+      this.fillEl.style.transition = "none";
+
+      const ratio = this.ratioFromEvent(e);
+      this.dragRatio = ratio;
+      this.fillEl.style.width = `${ratio * 100}%`;
+
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onEnd);
+    };
+
+    this.progressEl.addEventListener("pointerdown", onStart);
+    this.progressEl.addEventListener("mousedown", onStart);
 
     this.el = document.createElement("div");
     this.el.id = "compact-music";
@@ -166,16 +211,20 @@ export class CompactMusicWidget {
     return this.hovered;
   }
 
-  private handleSeek(e: MouseEvent) {
+  private ratioFromEvent(e: MouseEvent | PointerEvent): number {
     const rect = this.progressEl.getBoundingClientRect();
-    if (rect.width <= 0) return;
-    const ratio = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const duration = Spotify.state.track?.duration ?? 0;
-    if (duration > 0) {
-      const target = ratio * duration;
-      Spotify.state.position = target;
-      Spotify.state.positionAt = Date.now();
+    const w = rect.width > 0 ? rect.width : 100;
+    return Math.max(0, Math.min(1, (e.clientX - rect.left) / w));
+  }
+
+  private commitSeek(ratio: number) {
+    const track = Spotify.state.track;
+    const duration = track?.duration ?? 0;
+    if (duration > 0 && !isAd(track)) {
+      const target = Math.min(Math.max(0, ratio * duration), Math.max(0, duration - 1));
+      Spotify.state = { ...Spotify.state, position: target, positionAt: Date.now() };
       this.fillEl.style.width = `${ratio * 100}%`;
+      State.notify();
       void Bridge.spotifyControl("seek", target);
     }
   }
@@ -197,6 +246,10 @@ export class CompactMusicWidget {
 
   /** Called per frame to update progress bar smoothly. */
   tick(nowMs: number) {
+    if (this.isDragging && this.dragRatio != null) {
+      this.fillEl.style.width = `${this.dragRatio * 100}%`;
+      return;
+    }
     const track = Spotify.state.track;
     if (!track || track.duration <= 0) {
       this.fillEl.style.width = "0%";

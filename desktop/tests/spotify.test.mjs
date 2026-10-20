@@ -456,3 +456,89 @@ test("custom musicLikeHotkeys in settings can be stored and configured", () => {
   assert.equal(State.settings.musicLikeHotkeys.integration_cloudmusic, "Ctrl+Shift+L");
 });
 
+test("compact music widget supports dragging and clicking the progress bar to seek", () => {
+  const widget = new CompactMusicWidget({
+    onHoverChange: () => {},
+    onExpand: () => {},
+  });
+
+  Spotify.state = playing({ track: track({ duration: 200 }) });
+  widget.sync(true);
+
+  const progressEl = widget.el.querySelector(".compact-music-progress");
+  const fillEl = widget.el.querySelector(".compact-music-fill");
+  assert.ok(progressEl);
+  assert.ok(fillEl);
+
+  // 1. Pointer down at 50%
+  progressEl.fire("pointerdown", { button: 0, clientX: 50 });
+  assert.equal(fillEl.style.width, "50%");
+  assert.ok(progressEl.classList.contains("dragging"));
+
+  // 2. tick() during drag should NOT overwrite the dragged fill width
+  widget.tick(Date.now());
+  assert.equal(fillEl.style.width, "50%");
+
+  // 3. Pointer move on window to 75%
+  window.dispatchEvent({ type: "pointermove", clientX: 75 });
+  assert.equal(fillEl.style.width, "75%");
+
+  // 4. Release at 80%
+  const before = sent("spotify_control").length;
+  window.dispatchEvent({ type: "pointerup", clientX: 80 });
+
+  const seekCalls = sent("spotify_control").filter((c) => c.action === "seek");
+  assert.ok(seekCalls.length > 0);
+  assert.equal(seekCalls[seekCalls.length - 1].value, 160);
+  assert.equal(Spotify.state.position, 160);
+  assert.ok(!progressEl.classList.contains("dragging"));
+});
+
+test("expanded spotify card progress bar supports dragging to seek", () => {
+  const card = buildSpotifyCard();
+  Spotify.state = playing({ track: track({ duration: 100 }) });
+  card.sync();
+
+  const barEl = card.el.querySelector(".np-bar");
+  assert.ok(barEl);
+
+  const before = sent("spotify_control").length;
+  // Start dragging at 40%
+  barEl.fire("pointerdown", { button: 0, clientX: 40 });
+
+  // Move and release at 60%
+  window.dispatchEvent({ type: "pointermove", clientX: 60 });
+  window.dispatchEvent({ type: "pointerup", clientX: 60 });
+
+  const seekCalls = sent("spotify_control").filter((c) => c.action === "seek");
+  assert.ok(seekCalls.length > 0);
+  assert.equal(seekCalls[seekCalls.length - 1].value, 60);
+});
+
+test("clock visibility logic: clock hides when music is playing or compact music is hovered", () => {
+  const clockActive = (mode, showClock, isCompactMusicActive, spotifyPlaying, playingState) => {
+    const musicPlaying = isCompactMusicActive || spotifyPlaying || playingState;
+    return mode === "compact" && showClock && !musicPlaying;
+  };
+
+  // 1. In compact mode, showClock true, music idle -> clock visible
+  assert.equal(clockActive("compact", true, false, false, false), true);
+
+  // 2. Music starts playing -> clock hidden
+  assert.equal(clockActive("compact", true, true, true, true), false);
+  assert.equal(clockActive("compact", true, false, false, true), false);
+
+  // 3. Music paused, but compact widget hovered -> clock hidden
+  assert.equal(clockActive("compact", true, true, false, false), false);
+
+  // 4. Music paused, hover leaves -> clock visible again
+  assert.equal(clockActive("compact", true, false, false, false), true);
+
+  // 5. In expanded mode -> clock hidden
+  assert.equal(clockActive("expanded", true, false, false, false), false);
+
+  // 6. showClock disabled -> clock hidden
+  assert.equal(clockActive("compact", false, false, false, false), false);
+});
+
+

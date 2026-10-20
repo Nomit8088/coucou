@@ -283,6 +283,7 @@ export class Island {
     this.compactMusic = new CompactMusicWidget({
       onHoverChange: () => {
         if (State.mode === "compact") {
+          this.updateClock();
           const target = this.targetSize();
           if (this.width.target !== target.w) {
             this.animateGeometry(this.width.target > target.w);
@@ -1388,7 +1389,8 @@ export class Island {
 
   /** The clock sits in the middle of the compact island, where the notch is on a Mac. */
   private updateClock() {
-    const on = State.mode === "compact" && State.settings.showClock;
+    const musicPlaying = this.isCompactMusicActive || State.spotifyPlaying || Spotify.state.playing;
+    const on = State.mode === "compact" && State.settings.showClock && !musicPlaying;
     this.clockEl.style.opacity = on ? "1" : "0";
     if (!on) return;
     const now = new Date();

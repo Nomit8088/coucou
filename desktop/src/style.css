@@ -384,13 +384,23 @@ body {
   margin-top: 2px;
   background: rgba(255, 255, 255, 0.12);
   border-radius: 1px;
-  overflow: hidden;
   cursor: pointer;
   transition: height 0.15s ease-in-out;
 }
 
-.compact-music-progress:hover {
-  height: 3.5px;
+.compact-music-progress::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  left: 0;
+  right: 0;
+  cursor: pointer;
+}
+
+.compact-music-progress:hover,
+.compact-music-progress.dragging {
+  height: 4px;
 }
 
 .compact-music-fill {
@@ -2831,7 +2841,17 @@ input[type="range"]::-webkit-slider-thumb {
   flex: 1 1 auto;
   height: 10px;
   touch-action: none;
-  cursor: default;
+  cursor: pointer;
+}
+
+.np-bar::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  cursor: pointer;
 }
 
 .np-track,

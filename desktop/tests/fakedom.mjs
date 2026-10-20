@@ -77,12 +77,13 @@ class FakeElement {
     return { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0 };
   }
   setPointerCapture() {}
+  releasePointerCapture() {}
   addEventListener(type, fn) {
     this.listeners.set(type, [...(this.listeners.get(type) ?? []), fn]);
   }
   /** Calls the listeners of `type` with a minimal event. */
-  fire(type) {
-    const event = { type, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
+  fire(type, detail = {}) {
+    const event = { type, defaultPrevented: false, preventDefault() { this.defaultPrevented = true; }, stopPropagation() {}, ...detail };
     for (const fn of this.listeners.get(type) ?? []) fn(event);
     return event;
   }
@@ -130,6 +131,18 @@ class FakeElement {
 
 export function installFakeDom() {
   globalThis.requestAnimationFrame = (fn) => fn();
+  const windowListeners = new Map();
+  globalThis.window.addEventListener = (type, fn) => {
+    windowListeners.set(type, [...(windowListeners.get(type) ?? []), fn]);
+  };
+  globalThis.window.removeEventListener = (type, fn) => {
+    const list = windowListeners.get(type) ?? [];
+    windowListeners.set(type, list.filter((f) => f !== fn));
+  };
+  globalThis.window.dispatchEvent = (event) => {
+    for (const fn of windowListeners.get(event.type) ?? []) fn(event);
+    return true;
+  };
   globalThis.document = {
     createElement: (tag) => new FakeElement(tag),
     createElementNS: (ns, tag) => new FakeElement(tag, ns),

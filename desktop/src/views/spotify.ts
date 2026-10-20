@@ -194,29 +194,54 @@ class NowPlayingBar {
       this.hovering = false;
       this.paint();
     });
-    this.el.addEventListener("pointerdown", (e) => {
-      if (!this.enabled || e.button !== 0) return;
-      e.stopPropagation();
-      this.dragging = true;
-      try {
-        this.el.setPointerCapture(e.pointerId);
-      } catch {
-        /* capture is a nicety */
-      }
+
+    const onMove = (e: PointerEvent | MouseEvent) => {
+      if (!this.dragging) return;
       this.onChange(this.at(e.clientX));
-      this.paint();
-    });
-    this.el.addEventListener("pointermove", (e) => {
-      if (this.dragging) this.onChange(this.at(e.clientX));
-    });
-    const end = (e: PointerEvent) => {
+    };
+
+    const onEnd = (e: PointerEvent | MouseEvent) => {
       if (!this.dragging) return;
       this.dragging = false;
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onEnd);
+      window.removeEventListener("pointercancel", onEnd);
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onEnd);
+      if ("pointerId" in e) {
+        try {
+          this.el.releasePointerCapture(e.pointerId);
+        } catch {
+          /* ignore */
+        }
+      }
       this.onCommit(this.at(e.clientX));
       this.paint();
     };
-    this.el.addEventListener("pointerup", end);
-    this.el.addEventListener("pointercancel", end);
+
+    const onStart = (e: PointerEvent | MouseEvent) => {
+      if (!this.enabled || e.button !== 0 || this.dragging) return;
+      e.stopPropagation();
+      e.preventDefault();
+      this.dragging = true;
+      if ("pointerId" in e) {
+        try {
+          this.el.setPointerCapture(e.pointerId);
+        } catch {
+          /* capture is a nicety */
+        }
+      }
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+      window.addEventListener("mousemove", onMove);
+      window.addEventListener("mouseup", onEnd);
+      this.onChange(this.at(e.clientX));
+      this.paint();
+    };
+
+    this.el.addEventListener("pointerdown", onStart);
+    this.el.addEventListener("mousedown", onStart);
   }
 
   get active(): boolean {
@@ -225,7 +250,8 @@ class NowPlayingBar {
 
   private at(clientX: number): number {
     const r = this.el.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width)));
+    const w = r.width > 0 ? r.width : 100;
+    return Math.min(1, Math.max(0, (clientX - r.left) / w));
   }
 
   set(fraction: number) {
