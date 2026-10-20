@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="768" height="768" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Coucou · DeepSeek 鲸鱼娘完整头像设计稿</title>
+  <desc id="desc">根据裁切参考图重绘的 DeepSeek 鲸鱼娘完整正脸。透明背景，连续的蓝色刘海与鬓发、两侧下垂的鲸鱼耳鳍及浅色内缘、白色褶边发饰、右侧蝴蝶结、深蓝豆豆眼及粉色腮红。各部件按图层分组。</desc>
+  <defs>
+    <linearGradient id="hair" x1=".2" y1="0" x2=".8" y2="1"><stop stop-color="#465aa3"/><stop offset=".55" stop-color="#4869b0"/><stop offset="1" stop-color="#729dd1"/></linearGradient>
+    <linearGradient id="bangs" x1=".45" y1="0" x2=".55" y2="1"><stop stop-color="#43579d"/><stop offset=".65" stop-color="#5075bb"/><stop offset="1" stop-color="#779ed0"/></linearGradient>
+    <linearGradient id="back" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#33417e"/><stop offset="1" stop-color="#303d78"/></linearGradient>
+    <radialGradient id="skin" cx=".52" cy=".5" r=".7"><stop stop-color="#fffaf5"/><stop offset="1" stop-color="#fae8df"/></radialGradient>
+    <linearGradient id="lace" x1="0" y1="0" x2=".3" y2="1"><stop stop-color="#fffafd"/><stop offset="1" stop-color="#ede8f2"/></linearGradient>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#7eafe1"/><stop offset="1" stop-color="#5486c5"/></linearGradient>
+    <linearGradient id="fin" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#263469"/><stop offset=".6" stop-color="#354985"/><stop offset="1" stop-color="#435c9e"/></linearGradient>
+    <linearGradient id="fin-belly" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#d7d8e9"/><stop offset="1" stop-color="#f3eef7"/></linearGradient>
+    <path id="ruffle" d="M-27 18 Q-35-4-30-27 Q-28-43 0-45 Q28-43 30-27 Q35-4 27 18Z"/>
+  </defs>
+  <g id="back-hair" fill="url(#back)">
+    <path d="M135 303C97 378 121 484 75 548C103 571 131 571 156 553L143 591Q174 595 196 575L196 607Q233 596 252 535L387 535Q409 598 445 608L444 575Q470 598 497 588L486 553Q522 579 568 550C515 489 541 385 502 306Z"/>
+    <path fill="#e6e0ee" d="M87 533Q112 555 148 543Q156 565 177 568Q164 583 148 576Q122 586 108 567Q91 566 80 550Z M485 543Q520 555 554 533L568 550Q546 570 524 564Q504 583 486 571L472 559Z"/>
+    <path fill="#435996" d="M163 447Q159 528 143 554Q176 544 195 511L191 585Q223 557 233 515Z M448 446L413 515Q421 560 448 589L441 518Q462 546 486 555Q467 503 472 451Z"/>
+  </g>
+  <g id="headband">
+    <path fill="#d5d1e5" d="M103 284C83 174 172 91 308 89C445 84 540 169 537 281L503 317L131 318Z"/>
+    <g fill="url(#lace)">
+      <use href="#ruffle" transform="translate(125 236) rotate(-70)"/>
+      <use href="#ruffle" transform="translate(151 188) rotate(-52)"/>
+      <use href="#ruffle" transform="translate(192 149) rotate(-34)"/>
+      <use href="#ruffle" transform="translate(245 125) rotate(-17)"/>
+      <use href="#ruffle" transform="translate(305 117)"/>
+      <use href="#ruffle" transform="translate(366 124) rotate(17)"/>
+      <use href="#ruffle" transform="translate(422 147) rotate(34)"/>
+      <use href="#ruffle" transform="translate(468 184) rotate(52)"/>
+      <use href="#ruffle" transform="translate(501 231) rotate(70)"/>
+      <use href="#ruffle" transform="translate(517 282) rotate(87)"/>
+    </g>
+  </g>
+  <g id="whale-ears">
+    <g id="whale-ear-right">
+      <path fill="url(#fin)" d="M501 326C541 332 541 376 562 412C581 446 604 470 624 480C614 498 591 504 569 496C537 489 514 466 501 438C487 406 480 361 501 326Z"/>
+      <path fill="#526cad" opacity=".55" d="M507 343C529 366 531 406 552 439Q579 474 611 479C575 485 547 467 529 444C509 415 504 379 507 343Z"/>
+      <path fill="url(#fin-belly)" d="M510 438C535 471 578 491 624 480C618 492 608 499 595 500Q581 511 567 501Q550 505 539 492Q521 489 519 476Q507 465 510 438Z"/>
+      <path fill="#c9c9df" opacity=".55" d="M510 438Q525 463 543 473Q546 485 552 493Q531 484 519 476Q507 465 510 438Z"/>
+    </g>
+    <use id="whale-ear-left" href="#whale-ear-right" transform="translate(640 0) scale(-1 1)"/>
+  </g>
+  <g id="hair-crown">
+    <path fill="url(#hair)" d="M117 403C93 352 98 286 128 234C167 169 234 130 308 126C390 118 463 156 503 219C542 277 549 358 520 423C507 472 480 507 450 525L184 525Q137 503 117 403Z"/>
+    <path fill="#3e5295" opacity=".22" d="M119 299C132 229 189 170 255 149Q361 121 434 165C352 133 272 156 221 195Q160 238 119 299Z"/>
+  </g>
+  <g id="face">
+    <path fill="url(#skin)" d="M132 293C142 204 225 170 319 175C416 172 500 218 509 308C525 368 519 432 492 474C460 528 397 555 321 557C244 558 177 534 141 486C112 449 113 409 119 365C121 340 125 313 132 293Z"/>
+  </g>
+  <g id="fringe" fill="url(#bangs)">
+    <path id="fringe-bridge" d="M365 155C404 158 436 195 436 250L423 310L391 330L380 230Z"/>
+    <path d="M330 144C260 133 195 167 155 219C129 255 117 303 119 347C174 329 230 296 267 258C251 287 243 310 243 330C280 304 313 259 326 212C337 180 338 153 330 144Z"/>
+    <path id="upper-left-lock" d="M291 148C235 139 177 170 148 211C125 244 118 273 118 298Q134 289 149 275Q133 303 130 317C176 298 214 258 240 213C256 185 274 161 291 148Z"/>
+    <path d="M325 146C283 161 259 203 262 258C263 304 277 337 303 349Q290 316 300 290C308 340 345 378 384 384Q372 366 376 343C413 311 429 254 410 202C393 166 362 148 325 146Z"/>
+    <path d="M370 156C417 177 438 224 417 279C418 324 454 353 469 401Q477 372 472 346C493 378 489 413 478 438C519 408 532 355 518 293C506 236 463 190 370 156Z"/>
+    <path id="upper-right-lock" d="M382 159C437 164 480 196 501 234Q522 263 524 295Q510 284 496 278Q508 302 508 320C479 298 456 269 447 242C433 202 410 175 382 159Z"/>
+  </g>
+  <g id="hair-flow-details" fill="none" stroke-linecap="round">
+    <path stroke="#344d91" stroke-width="3" opacity=".22" d="M278 157C224 166 181 212 157 256"/>
+    <path stroke="#344d91" stroke-width="3" opacity=".22" d="M398 168C449 190 474 229 485 263"/>
+    <path fill="#98bdea" opacity=".22" stroke="none" d="M163 232C190 192 233 168 272 167C228 185 199 211 178 240Q168 248 155 252Z"/>
+    <path fill="#98bdea" opacity=".19" stroke="none" d="M402 175C444 188 480 217 496 252Q487 245 479 242C461 216 433 192 402 175Z"/>
+    <path fill="#a2c0ec" opacity=".13" stroke="none" d="M300 181C278 212 276 251 287 281C283 240 292 208 311 184Z"/>
+  </g>
+  <g id="side-locks" fill="url(#hair)">
+    <path d="M150 248C106 284 95 349 108 414C112 457 132 491 163 514C144 479 140 440 150 405Q155 463 182 493C165 448 161 398 178 350C188 315 176 277 150 248Z"/>
+    <path d="M499 275C531 313 544 383 529 445C521 489 505 527 470 548Q482 527 485 500Q462 529 428 520C471 483 474 437 468 394L462 346Z"/>
+    <path fill="#3c5295" opacity=".55" d="M129 328Q114 419 142 467Q133 415 149 373Z M514 352Q536 445 493 510Q519 429 504 392Z"/>
+  </g>
+  <g id="ahoge">
+    <path fill="#455aa5" d="M330 142C365 111 374 73 344 51C305 22 252 32 220 58C260 9 324 8 366 34C412 62 401 116 354 142Z"/>
+    <path fill="#536bb4" opacity=".5" d="M222 56Q285 5 353 35Q386 51 388 82Q393 52 366 34C324 8 260 9 222 56Z"/>
+  </g>
+  <g id="bow" transform="translate(526 355) rotate(9)">
+    <path fill="#354a8b" d="M-2 9L-10 71L14 57L28 72L13 10Z"/>
+    <path fill="url(#ribbon)" d="M-4-4C-25-36-48-48-49-24C-50-5-45 19-33 30C-26 36-13 25-2 11C11 32 31 38 37 24C43 11 44-19 36-30C29-40 9-21-4-4Z"/>
+    <path fill="#4678b6" opacity=".55" d="M-6 5L-34-4Q-44 3-30 8Z M5 5L27-6Q36 1 24 8Z"/>
+    <rect x="-10" y="-6" width="17" height="22" rx="7" fill="#5e91cd"/>
+  </g>
+  <g id="expression">
+    <g id="eyes" fill="#21263f">
+      <rect id="eye-left" x="211" y="361" width="42" height="89" rx="21" transform="rotate(5 232 405)"/>
+      <rect id="eye-right" x="380" y="361" width="42" height="89" rx="21" transform="rotate(5 401 405)"/>
+    </g>
+    <g id="blush" fill="#facbd0" opacity=".75">
+      <ellipse cx="179" cy="463" rx="33" ry="21" transform="rotate(8 179 463)"/>
+      <ellipse cx="452" cy="463" rx="33" ry="21" transform="rotate(8 452 463)"/>
+    </g>
+  </g>
+</svg>

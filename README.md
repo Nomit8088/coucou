@@ -79,6 +79,7 @@ Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS
 
 | Version | Date | Highlights |
 |---|---|---|
+| [v0.2.4](https://github.com/Nomit8088/coucou/releases/tag/v0.2.4) | Oct 20, 2026 | 全新 DeepSeek 鲸鱼娘桌宠形象；分层矢量 Canvas 实时重绘与眼神跟随；优化思考（Thinking）歪头杀神态与视线黄金区间保护；全套应用及托盘图标升级 |
 | [v0.2.3](https://github.com/Nomit8088/coucou/releases/tag/v0.2.3) | Oct 20, 2026 | Claude Code 计划审批卡片（ExitPlanMode 自动模式/手动/修改计划）；智能体 ask_question 提问通知与响铃；多会话展示名动态跟随当前工作会话；紧凑灵动岛居中时钟；DSH 子智能体隔离优化 |
 | [v0.2.2](https://github.com/Nomit8088/coucou/releases/tag/v0.2.2) | Oct 18, 2026 | 恢复 Claude Code 接入（hooks 安装、权限/提问卡片、Cursor 标签、套餐用量）；同步上游错误卡片真实原因；新增 hooks 自检、诊断信息复制与审批队列提示 |
 | [v0.2.1](https://github.com/Nomit8088/coucou/releases/tag/v0.2.1) | Oct 14, 2026 | 修复 GitHub / GitLab 新评论不弹灵动岛；未开启的 Codex 不再占用岛上的格子 |
@@ -86,7 +87,7 @@ Tauri 自动采用对应操作系统配置。Mac 的 DMG 输出为 `Coucou-macOS
 | [v0.1.1](https://github.com/Nomit8088/coucou/releases/tag/v0.1.1) | Oct 10, 2026 | Windows 托盘与设置内更新检测、一键拉起安装包 |
 | [v0.1.0](https://github.com/Nomit8088/coucou/releases/tag/v0.1.0) | Oct 10, 2026 | DSH 深度适配、Windows 原生媒体控制、独立安装包 |
 
-当前源码版本为 0.2.3。历史上游版本见 [CHANGELOG](<CHANGELOG.md>)。
+当前源码版本为 0.2.4。历史上游版本见 [CHANGELOG](<CHANGELOG.md>)。
 
 ## 代码位置与验证
 

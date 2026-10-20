@@ -9,6 +9,12 @@ import { Sound } from "../core/sound";
 import type { BotEmoteName, BotStateName } from "../core/layout";
 import { PUMPKIN_BODY, drawOutfitBehind, drawOutfitFront, makeHead } from "./outfits";
 import type { Outfit } from "./wardrobe";
+import {
+  type WhaleContext,
+  drawWhaleBehind,
+  drawWhaleFront,
+  getWhaleFacePath,
+} from "./whale-avatar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -196,6 +202,8 @@ export function danceTransform(seconds: number, level: number, R: number) {
 
 export class BotEngine {
   isMini = false;
+  /** Active character skin: "whale" (DeepSeek 鲸鱼娘) or "mochi" (classic). Defaults to "whale". */
+  character: "whale" | "mochi" = "whale";
   /** Solid body colour for mini bots / integration pills (null = Mochi gradient). */
   bodyColor: RGB | null = null;
 
@@ -618,9 +626,23 @@ export class BotEngine {
       tp = this.miniLookTarget.y * 0.5;
     }
 
+    if (this.character === "whale" && !this.isMini) {
+      if (this.state === "thinking") {
+        // Natural thinking posture for anime chibi: gentle glance + cute head tilt
+        ty = this.lookX * 0.1 + 0.15;
+        tp = this.lookY * 0.08 + 0.09;
+        this.tgTilt = 0.12;
+      } else {
+        // Comfort clamp to keep eyes clear of low fringe bangs
+        tp = Math.min(0.12, Math.max(-0.25, tp));
+        this.tgTilt = this.cfg.tilt;
+      }
+    } else {
+      this.tgTilt = this.cfg.tilt;
+    }
+
     this.tgYaw = ty;
     this.tgPitch = tp;
-    this.tgTilt = this.cfg.tilt;
 
     if (n > this.waveStart && n < this.waveUntil) {
       const wt = n - this.waveStart;
@@ -796,29 +818,67 @@ export class BotEngine {
     const dressed = !this.isMini && this.outfit !== "none";
     const head = dressed ? makeHead(R, this.yaw, this.pitch, this.physDx, this.physDy) : null;
     const outfitState = { presence: this.outfitPresence, morph: this.morph };
-    if (head) drawOutfitBehind(x, this.outfit, head, outfitState);
 
-    const body = this.bodyPath(rx, ry, R);
-    this.drawBody(x, body, R, rx, ry);
+    if (this.character === "whale" && !this.isMini) {
+      const whaleCtx: WhaleContext = {
+        R,
+        yaw: this.yaw,
+        pitch: this.pitch,
+        roll: this.roll,
+        tilt: this.tilt,
+        open: this.open,
+        blush: this.blush,
+        tint: this.tint,
+        physDx: this.physDx,
+        physDy: this.physDy,
+        eyeShape: this.eyeOverride ?? this.cfg.eye,
+      };
 
-    const blushVal = Math.max(this.blush, this.tint * 0.5) * (1 - this.morph);
-    if (blushVal > 0.01) {
-      x.save();
-      x.clip(body);
-      const yOffset = Math.sin(this.yaw) * rx * 0.8;
-      x.fillStyle = `rgba(255,120,150,${0.5 * blushVal})`;
-      for (const sd of [-1, 1]) {
-        x.beginPath();
-        x.ellipse(sd * rx * 0.55 + yOffset, ry * 0.2, R * 0.17, R * 0.1, 0, 0, Math.PI * 2);
-        x.fill();
+      // 1. Behind layers: back hair, ears, headband, hair crown, face base, blush
+      drawWhaleBehind(x, whaleCtx);
+
+      // 2. Eyes (clipped to face base with DeepSeek navy ink #21263f)
+      const whaleFaceClip = new Path2D();
+      const s = R / 205;
+      if (typeof DOMMatrix !== "undefined") {
+        const sm = new DOMMatrix().scale(s, s).translate(-320, -390);
+        whaleFaceClip.addPath(getWhaleFacePath(), sm);
       }
-      x.restore();
+      this.drawEyes(x, whaleFaceClip, R, rx, ry, "#21263f", 0.21, 0.44);
+
+      // 3. Mouth hole when slot is open/morphing
+      if (this.morph > 0.05) this.drawMouth(x, whaleFaceClip, R);
+
+      // 4. Front layers: fringe bangs, sidelocks, hair highlights, bow, ahoge
+      drawWhaleFront(x, whaleCtx);
+
+      // 5. Wardrobe outfits (if selected)
+      if (head) drawOutfitFront(x, this.outfit, head, outfitState);
+    } else {
+      if (head) drawOutfitBehind(x, this.outfit, head, outfitState);
+
+      const body = this.bodyPath(rx, ry, R);
+      this.drawBody(x, body, R, rx, ry);
+
+      const blushVal = Math.max(this.blush, this.tint * 0.5) * (1 - this.morph);
+      if (blushVal > 0.01) {
+        x.save();
+        x.clip(body);
+        const yOffset = Math.sin(this.yaw) * rx * 0.8;
+        x.fillStyle = `rgba(255,120,150,${0.5 * blushVal})`;
+        for (const sd of [-1, 1]) {
+          x.beginPath();
+          x.ellipse(sd * rx * 0.55 + yOffset, ry * 0.2, R * 0.17, R * 0.1, 0, 0, Math.PI * 2);
+          x.fill();
+        }
+        x.restore();
+      }
+
+      this.drawEyes(x, body, R, rx, ry);
+      if (this.morph > 0.05) this.drawMouth(x, body, R);
+
+      if (head) drawOutfitFront(x, this.outfit, head, outfitState);
     }
-
-    this.drawEyes(x, body, R, rx, ry);
-    if (this.morph > 0.05) this.drawMouth(x, body, R);
-
-    if (head) drawOutfitFront(x, this.outfit, head, outfitState);
 
     x.restore();
     x.restore();
@@ -913,7 +973,16 @@ export class BotEngine {
     x.restore();
   }
 
-  private drawEyes(x: CanvasRenderingContext2D, body: Path2D, R: number, rx: number, ry: number) {
+  private drawEyes(
+    x: CanvasRenderingContext2D,
+    body: Path2D,
+    R: number,
+    rx: number,
+    ry: number,
+    customInk?: string,
+    customEyeW?: number,
+    customEyeH?: number,
+  ) {
     let shape: EyeShape = this.eyeOverride ?? this.cfg.eye;
     // Dancing: happy eyes in the calm states.
     if (this.isDancing && this.dancingLevel > 0.15 && !this.isMini && (this.state === "idle" || this.state === "finished")) {
@@ -926,14 +995,14 @@ export class BotEngine {
 
     x.save();
     x.clip(body);
-    const ink = this.isMini ? MINI_INK : INK;
+    const ink = customInk ?? (this.isMini ? MINI_INK : INK);
     x.fillStyle = ink;
     x.strokeStyle = ink;
 
     for (const sd of [-1, 1]) {
       const eyeYaw = sd * EYE_SP + this.yaw;
       // Rolling with an outfit on, the whole body turns: the eyes must not roll again.
-      let eyePitch = EYE_P + this.pitch + (this.rigidRoll ? 0 : this.roll);
+      let eyePitch = (customEyeH ? -0.04 : EYE_P) + this.pitch + (this.rigidRoll ? 0 : this.roll);
       eyePitch = (((eyePitch + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2) - Math.PI;
       const cp = Math.cos(eyePitch);
       if (Math.cos(eyeYaw) * cp <= 0.04) continue;
@@ -943,8 +1012,8 @@ export class BotEngine {
       const fx = lerp(Math.max(0.18, Math.cos(eyeYaw)), 1, this.morph * 0.7);
       const fy = lerp(Math.max(0.18, cp), 1, this.morph * 0.7);
       const eyeMult = this.isMini ? 1.9 : 1.0;
-      const ew = R * EYE_W * this.es * eyeMult;
-      const eh = R * EYE_H * this.es * eyeMult;
+      const ew = R * (customEyeW ?? EYE_W) * this.es * eyeMult;
+      const eh = R * (customEyeH ?? EYE_H) * this.es * eyeMult;
 
       x.save();
       x.translate(ex, ey);
