@@ -61,6 +61,7 @@ export class Island {
   private botGlow!: HTMLElement;
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
+  private clockEl!: HTMLElement;
   private countdown!: HTMLElement;
   private dismissBtn!: HTMLElement;
   private wakeStrip!: HTMLElement;
@@ -216,8 +217,12 @@ export class Island {
         const req = State.pendingApproval;
         void Bridge.log(`decide ${d} req=${req?.requestId ?? "none"}`);
         if (!req) return;
-        Sound.play(d === "deny" ? "blip" : "approve");
+        Sound.play(d === "deny" || d === "plan_change" ? "blip" : "approve");
         void Bridge.approvalDecision(req.requestId, d);
+        if (d === "plan_change") {
+          const task = State.focusTask;
+          if (task) void Bridge.openSession(task.sessionId ?? null, task.sessionCwd ?? null);
+        }
         this.closeApproval();
       },
       answer: (answers) => {
@@ -273,6 +278,7 @@ export class Island {
     this.botCanvas = h("canvas", { id: "bot-canvas" });
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
+    this.clockEl = h("div", { id: "island-clock" });
     this.countdown = h("div", { id: "countdown" });
     this.compactMusic = new CompactMusicWidget({
       onHoverChange: () => {
@@ -359,6 +365,7 @@ export class Island {
       this.botCanvas,
       this.compactMusic.el,
       this.miniGrid,
+      this.clockEl,
       this.dismissBtn,
       this.countdown,
     );
@@ -371,6 +378,12 @@ export class Island {
 
     this.root.append(this.wakeStrip, this.islandEl);
     this.applyGeometry();
+
+    window.setInterval(() => {
+      if (State.mode === "compact" && State.settings.showClock) {
+        this.updateClock();
+      }
+    }, 10000);
   }
 
   // ── FSM ─────────────────────────────────────────────────────────────────────
@@ -822,6 +835,7 @@ export class Island {
     // the state-driven DOM sync.
     this.miniGrid.style.left = `${w - 40 - 14.5}px`;
     this.miniGrid.style.top = `${hh / 2 - 14.5}px`;
+    this.clockEl.style.height = `${hh}px`;
     // The − takes the 25 pt left at the island's right end, past the mini grid,
     // which keeps the place it had before there was a button here.
     this.dismissBtn.style.left = `${w - 20}px`;
@@ -1360,6 +1374,8 @@ export class Island {
       }
     }
 
+    this.updateClock();
+
     syncMiniBotStates(State.tasks);
     this.engine.setState(State.effectiveState);
 
@@ -1368,6 +1384,18 @@ export class Island {
       this.animateGeometry(this.width.target > target.w);
     }
     this.compactMusic.sync(this.isCompactMusicActive);
+  }
+
+  /** The clock sits in the middle of the compact island, where the notch is on a Mac. */
+  private updateClock() {
+    const on = State.mode === "compact" && State.settings.showClock;
+    this.clockEl.style.opacity = on ? "1" : "0";
+    if (!on) return;
+    const now = new Date();
+    const date = now.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+    const time = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    const text = `${date}  ${time}`;
+    if (this.clockEl.textContent !== text) this.clockEl.textContent = text;
   }
 
   /** Applies settings coming from Rust at boot. */

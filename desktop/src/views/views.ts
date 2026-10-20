@@ -40,7 +40,7 @@ export interface ViewActions {
   /** The ↗ button: opens whatever the focused pill points at. */
   openTarget(): void;
   openUrl(url: string): void;
-  decide(d: "allow" | "deny"): void;
+  decide(d: "allow" | "deny" | "plan_auto" | "plan_default" | "plan_change"): void;
   /** Answers the question Claude Code asked: question text → chosen label. */
   answer(answers: Record<string, string | string[]>): void;
   /** Hands the pending request back to the terminal. */
@@ -673,7 +673,7 @@ function buildApproval(actions: ViewActions): ViewHost {
   // moments after a new request appears are ignored.
   let shownFor: string | null = null;
   let shownAt = 0;
-  const guarded = (d: "allow" | "deny") => () => {
+  const guarded = (d: "allow" | "deny" | "plan_auto" | "plan_default" | "plan_change") => () => {
     if (performance.now() - shownAt < CLICK_GUARD_MS) return;
     actions.decide(d);
   };
@@ -686,7 +686,8 @@ function buildApproval(actions: ViewActions): ViewHost {
         shownAt = performance.now();
       }
       clear(who);
-      const whoRow = agentWho(State.focusTask, t("needs permission"));
+      const isPlan = State.pendingApproval?.isPlan === true;
+      const whoRow = agentWho(State.focusTask, isPlan ? t("has a plan ready") : t("needs permission"));
       const queued = queueChip();
       if (queued) whoRow.append(queued);
       who.append(whoRow);
@@ -694,16 +695,22 @@ function buildApproval(actions: ViewActions): ViewHost {
       // is the command, the file path or the URL being authorised, not just the
       // name of the tool asking.
       code.textContent = State.pendingApproval?.command || State.pendingApproval?.tool || "…";
-      // Two buttons, built once. Rebuilding them between a mouse-down and a
-      // mouse-up would swallow the click, and there is nothing left to vary:
-      // "Always" is gone until the remembered-rules list exists to back it.
-      if (rowKey === "built") return;
-      rowKey = "built";
+      const planKey = isPlan ? "plan" : "normal";
+      if (rowKey === planKey) return;
+      rowKey = planKey;
       clear(row);
-      row.append(
-        btn(tl("Deny"), "secondary", guarded("deny"), "N"),
-        btn(tl("Allow"), "primary", guarded("allow"), "Y"),
-      );
+      if (isPlan) {
+        row.append(
+          btn(tl("Change plan"), "secondary", guarded("plan_change"), "C"),
+          btn(tl("Auto mode"), "primary", guarded("plan_auto"), "A"),
+          btn(tl("Manual"), "secondary", guarded("plan_default"), "M"),
+        );
+      } else {
+        row.append(
+          btn(tl("Deny"), "secondary", guarded("deny"), "N"),
+          btn(tl("Allow"), "primary", guarded("allow"), "Y"),
+        );
+      }
     },
   };
 }

@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.2.3 — October 20, 2026
+
+- **Claude Code 计划审批卡片（ExitPlanMode）**（逻辑移植上游 #703）：当 Claude Code 处于 Plan 模式准备好计划时，卡片顶部提示切换为「计划已就绪（has a plan ready）」，并提取计划第一行作为标题展示。底部按钮提供与终端对齐的 3 个专属选项：
+  - **自动模式（Auto mode）**：批准并自动应用修改（返回 `setMode: auto`）；
+  - **手动（Manual）**：批准并保持每次手动确认修改（返回 `setMode: default`）；
+  - **修改计划（Change plan）**：中断当前计划并自动唤起终端，方便用户直接在终端内敲入计划调整要求。
+- **智能体提问通知与响铃**（移植上游 #709）：支持识别 Antigravity 等智能体的提问工具（`ask_question` / `default_api:ask_question`），在 Ticker 中展示提取的问题内容（`需要输入 · <问题>`），并将任务状态置为 `question` 播放提示音，回答后平滑切回工作态。
+- **多会话名称与当前工作会话动态绑定**（逻辑移植上游 #761）：胶囊展示名优先采用会话的 `/rename` 标题或初次启动根目录，避免在子目录下 `cd` 时篡改名字；并发多会话时，胶囊展示名与控制终端自动跟随当前正在工作的活跃会话，工作结束时平滑交接。
+- **紧凑灵动岛居中时钟**（移植上游 #788）：设置 → 通用新增「在灵动岛中显示时钟（Show clock in the island）」开关（默认关闭）。在 PC 端收起紧凑状态下居中呈现系统日期与时间，每 10 秒刷新一次，展开时淡出，收起时淡入。
+- **DSH Subagent 隔离优化**：DSH 子智能体（subagent）产生的会话、中间步骤与工具调用只作为 Ticker 步骤呈现，不再作为主会话强行弹岛或打断正在展示的卡片。
+
 ## 0.2.2 — October 18, 2026
 
 - **Claude Code 接入**：设置里新增「Claude Code」区，安装/卸载 hooks 前先展示 `~/.claude/settings.json` 的完整差异并写日期备份，只增删 Coucou 自己的条目。安装后会话、工具调用、权限请求、AskUserQuestion 提问、最终消息与实时 diff 都显示在岛上，可直接 Allow / Deny 或在岛上选题。Cursor 终端里的 Claude Code 使用独立的 Cursor 标签。标签默认关闭，需要在「活动标签」里勾选；未开启时权限请求会立刻退回终端，不会让 Claude Code 空等。

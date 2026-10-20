@@ -362,6 +362,9 @@ pub fn decline(app: &AppHandle, request_id: &str) {
 pub fn answer(app: &AppHandle, request_id: &str, decision: &str) {
     let word = match decision {
         "allow" | "always" => "allow",
+        "plan_auto" => "plan_auto",
+        "plan_default" => "plan_default",
+        "plan_change" => "plan_change",
         _ => "deny",
     };
     log::line(format!("decision id={request_id} {word}"));

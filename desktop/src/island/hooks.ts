@@ -125,6 +125,10 @@ interface HookPayload {
   /** PresetChanged (the DSH plugin): current permission preset and catalog. */
   preset?: string;
   presets?: string[];
+  /** /rename title from the transcript (#761). */
+  session_title?: string;
+  /** The folder the session started in (#761). */
+  session_root?: string;
 }
 
 const PROJECT_ALIASES: Record<string, string> = {
@@ -141,6 +145,18 @@ function lastPathComponent(p: string): string {
   const cleaned = p.replace(/[\\/]+$/, "");
   const idx = Math.max(cleaned.lastIndexOf("\\"), cleaned.lastIndexOf("/"));
   return idx >= 0 ? cleaned.slice(idx + 1) : cleaned;
+}
+
+/**
+ * The pill's name: the session's /rename title, else the folder it started in
+ * (session_root, from the first cwd), falling back to the event's cwd (#761).
+ */
+function sessionName(payload: HookPayload, cwd: string): string {
+  const title = typeof payload.session_title === "string" ? payload.session_title.trim() : "";
+  if (title) return title;
+  const root = typeof payload.session_root === "string" ? payload.session_root.trim() : "";
+  const raw = lastPathComponent(root || cwd);
+  return aliasProjectName(raw || "Session");
 }
 
 /**
@@ -178,10 +194,12 @@ const TOOL_LABELS: Record<string, string> = {
   replace_file_content: N_("Edits"),
   read_url_content: N_("Fetches"),
   search_web: N_("Searches the web"),
+  ask_question: N_("Needs input"),
 };
 
 function stepLabel(tool: string, input: Record<string, unknown>): string {
-  const label = TOOL_LABELS[tool] ? t(TOOL_LABELS[tool]) : tool;
+  const labelTool = tool === "ask_question" || tool.endsWith(":ask_question") ? "ask_question" : tool;
+  const label = TOOL_LABELS[labelTool] ? t(TOOL_LABELS[labelTool]) : tool;
   const str = (k: string) => (typeof input[k] === "string" ? (input[k] as string) : null);
   const cmd = str("command");
   if (cmd) return `${label} · ${cmd.slice(0, 40)}`;
@@ -191,6 +209,17 @@ function stepLabel(tool: string, input: Record<string, unknown>): string {
   if (file) return `${label} · ${lastPathComponent(file)}`;
   const query = str("query");
   if (query) return `${label} · ${query.slice(0, 40)}`;
+  if (
+    (tool === "ask_question" || tool.endsWith(":ask_question")) &&
+    Array.isArray(input.questions) &&
+    input.questions.length > 0
+  ) {
+    const firstQ = input.questions[0];
+    if (typeof firstQ === "object" && firstQ !== null && typeof (firstQ as Record<string, unknown>).question === "string") {
+      const q = ((firstQ as Record<string, unknown>).question as string).trim();
+      if (q) return `${label} · ${q.slice(0, 40)}`;
+    }
+  }
   return label;
 }
 
@@ -212,7 +241,17 @@ const APPROVAL_FIELDS = [
   "prompt", // Task
 ] as const;
 
+/** The plan's first non-empty line without Markdown heading marks, for the card. */
+function planTitle(plan?: unknown): string {
+  if (typeof plan !== "string") return "Plan";
+  const firstLine = plan.split("\n").map((l) => l.trim()).find((l) => l.length > 0);
+  if (!firstLine) return "Plan";
+  const title = firstLine.replace(/^#+\s*/, "").trim();
+  return title || "Plan";
+}
+
 function approvalTarget(tool: string, input: Record<string, unknown>): string {
+  if (tool === "ExitPlanMode") return planTitle(input.plan);
   for (const field of APPROVAL_FIELDS) {
     const value = input[field];
     if (typeof value === "string" && value.trim()) {
@@ -250,8 +289,8 @@ function askedQuestions(tool: string, input: Record<string, unknown>): AskedQues
 
 /** The Claude Code session's pill, named after its project for the session. */
 function upsert(id: string, projectName: string, cwd: string, sessionId: string) {
-  const t = State.upsertWorkspacePill(id, projectName, cwd);
-  if (t && sessionId) t.sessionId = sessionId;
+  State.upsertWorkspacePill(id, projectName, cwd);
+  if (sessionId) State.registerSession(id, sessionId, projectName, cwd);
 }
 
 /**
@@ -364,8 +403,7 @@ function handleHook(island: Island, payload: HookPayload) {
 
   const name = payload.hook_event_name ?? "";
   const cwd = payload.cwd ?? "";
-  const raw = lastPathComponent(cwd);
-  const projectName = aliasProjectName(raw || "Session");
+  const projectName = sessionName(payload, cwd);
 
   // Route to the right pill. A valid `coucou_agent` gets a dynamic
   // "agent_<name>" pill; without one the event is Claude Code's: Cursor's pill
@@ -403,9 +441,8 @@ function handleHook(island: Island, payload: HookPayload) {
       State.upsertExternalAgent(agentId, agentName(validAgent!), agentColor(validAgent!), evenIfOff);
       const t = State.tasks.find((x) => x.id === agentId);
       if (t && cwd) t.sessionCwd = cwd;
-      if (t && sessionId) {
-        t.sessionId ??= sessionId;
-        State.registerSession(agentId, sessionId);
+      if (sessionId) {
+        State.registerSession(agentId, sessionId, projectName, cwd);
       }
     } else {
       upsert(agentId, projectName, cwd, sessionId);
@@ -471,10 +508,18 @@ function handleHook(island: Island, payload: HookPayload) {
       ensurePill();
       supersedeStop();
       clearFinalLine(agentId);
-      State.sessionState(agentId, sessionId, "working");
       const tool = payload.tool_name ?? "Tool";
-      State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
-      surface("overview", false);
+      const isQuestion = tool === "ask_question" || tool.endsWith(":ask_question");
+      if (isQuestion) {
+        State.sessionState(agentId, sessionId, "question");
+        State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
+        Sound.play("question");
+        surface("overview", true);
+      } else {
+        State.sessionState(agentId, sessionId, "working");
+        State.appendStep(agentId, stepLabel(tool, payload.tool_input ?? {}));
+        surface("overview", false);
+      }
       break;
     }
 
@@ -701,6 +746,7 @@ function handleHook(island: Island, payload: HookPayload) {
       // shows the options and sends back the one that was picked. Only Claude
       // Code asks questions this way.
       const questions = validAgent === "dsh" || !isExternalAgent ? askedQuestions(tool, input) : null;
+      const isPlan = tool === "ExitPlanMode";
       const view = questions ? "question" : "approval";
       // The card always comes up, even over another pill or an island that is
       // already open: its pill comes to the front, and the one you were on
@@ -712,6 +758,7 @@ function handleHook(island: Island, payload: HookPayload) {
         tool,
         command: approvalTarget(tool, input),
         ...(questions ? { questions } : {}),
+        ...(isPlan ? { isPlan: true } : {}),
       };
       const visible = State.enqueueApproval(info);
       if (requestId) void Bridge.approvalAck(requestId);

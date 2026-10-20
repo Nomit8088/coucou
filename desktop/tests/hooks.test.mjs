@@ -12,6 +12,8 @@ import assert from "node:assert/strict";
 import { calls, emit, sent } from "./tauri.mjs";
 import { registerHookHandlers, stopFailureDetail } from "../src/island/hooks.ts";
 import { DEFAULT_SETTINGS, State } from "../src/core/state.ts";
+import { Sound } from "../src/core/sound.ts";
+import { setLanguage } from "../src/i18n/i18n.ts";
 
 const DSH = "agent_dsh";
 const CODEX = "agent_codex";
@@ -539,4 +541,96 @@ test("a paused island ignores every other event", () => {
   dsh({ hook_event_name: "SessionStart", cwd: "C:\\Users\\me\\proj" });
   assert.deepEqual(asked, []);
   assert.deepEqual(calls, []);
+});
+
+for (const tool_name of ["ask_question", "default_api:ask_question"]) {
+  test(`Antigravity ${tool_name} alerts and plays a sound until the question is answered`, (context) => {
+    setLanguage("en");
+    const sound = context.mock.method(Sound, "play", () => {});
+    hook({
+      hook_event_name: "PreToolUse",
+      coucou_agent: "antigravity",
+      tool_name,
+      tool_input: { questions: [{ question: "Which deployment strategy should we use?" }] },
+    });
+    const active = task("agent_antigravity");
+    assert.equal(active.state, "question");
+    assert.equal(active.steps.at(-1), "Needs input · Which deployment strategy should we use?");
+    assert.deepEqual(asked, ["alert:overview"]);
+    assert.deepEqual(sound.mock.calls.map((call) => call.arguments), [["question"]]);
+    assert.equal(State.pendingApproval, null, "the answer stays in Antigravity");
+
+    hook({ hook_event_name: "PostToolUse", coucou_agent: "antigravity", tool_name });
+    assert.equal(active.state, "working");
+    assert.equal(sound.mock.callCount(), 1);
+  });
+}
+
+test("Claude Code ExitPlanMode creates an approval card marked as isPlan with planTitle", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "PermissionRequest",
+    request_id: "plan-1",
+    session_id: "s1",
+    tool_name: "ExitPlanMode",
+    tool_input: { plan: "# Refactor Authentication\n\n1. Move tokens\n2. Add tests" },
+  });
+  assert.equal(State.pendingApproval?.isPlan, true);
+  assert.equal(State.pendingApproval?.command, "Refactor Authentication");
+  assert.equal(task(CLAUDE).state, "approval");
+  assert.ok(asked.includes("alert:approval"));
+});
+
+test("session_title takes precedence over cwd for pill naming", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "SessionStart",
+    session_id: "s-title",
+    cwd: "D:\\dev\\proj\\submodule",
+    session_root: "D:\\dev\\proj",
+    session_title: "My Custom Feature",
+  });
+  assert.equal(task(CLAUDE).name, "My Custom Feature");
+});
+
+test("session_root takes precedence over cwd for pill naming when session_title is absent", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "SessionStart",
+    session_id: "s-root",
+    cwd: "D:\\dev\\proj\\submodule",
+    session_root: "D:\\dev\\proj",
+  });
+  assert.equal(task(CLAUDE).name, "proj");
+});
+
+test("a shared pill shows the session that is working, not the oldest one", () => {
+  declare(CLAUDE);
+  hook({
+    hook_event_name: "UserPromptSubmit",
+    session_id: "s1",
+    session_title: "Locker",
+    prompt: "run task 1",
+  });
+  hook({
+    hook_event_name: "UserPromptSubmit",
+    session_id: "s2",
+    session_title: "GA",
+    prompt: "run task 2",
+  });
+  // Both working: oldest keeps the name
+  assert.equal(task(CLAUDE).name, "Locker");
+  assert.equal(task(CLAUDE).sessionId, "s1");
+
+  // s1 finishes its turn, s2 is still working: name shifts to s2
+  hook({ hook_event_name: "Stop", session_id: "s1" });
+  seconds(6); // s1 goes idle
+  assert.equal(task(CLAUDE).name, "GA");
+  assert.equal(task(CLAUDE).sessionId, "s2");
+
+  // s2 finishes too: last worked session (s2) keeps the name
+  hook({ hook_event_name: "Stop", session_id: "s2" });
+  seconds(6);
+  assert.equal(task(CLAUDE).name, "GA");
+  assert.equal(task(CLAUDE).sessionId, "s2");
 });

@@ -16,13 +16,13 @@
 
 | 项目 | Commit | 说明 |
 |---|---|---|
-| 源仓库上游已比较 | `434d6a2b4af2e5ce117fa425170abe25620130b9` | `Louis-CFM/coucou` `main`，2026-10-17 04:53（Asia/Shanghai）；上一轮基线 `0dffbaf…` 之后的 97 个非合并提交已逐项分类（见下） |
-| Fork 记录快照 | `b4054f08eb9abcbaa564b5dfdb38affa7f6a3dbb` + 2026-10-18 工作区改动 | 本轮在 `main` 之上恢复 Claude Code 适配并移植错误卡片逻辑 |
+| 源仓库上游已比较 | `47e4da358ca932867c1b7c84dba5275ae7375535` | `Louis-CFM/coucou` `main`，2026-10-20 10:33（Asia/Shanghai）；上一轮基线 `434d6a2b…` 之后的 66 个提交已逐项分类（见下） |
+| Fork 记录快照 | `56a0aed863a35b1d5dc1bbd61793740fcb640825` + 2026-10-20 工作区改动 | 本轮在 `v0.2.2` 之上完成 PR #709、#703、#761、#788 逻辑移植 |
 | 共同祖先 | `c946650bec0e37fd902322c8f149b7e83f06d22f` | 本轮比较使用的 merge-base（未变） |
-| 比较结果 | 源仓库独有 276，Fork 独有 33 | `git rev-list --left-right --count fork/main...upstream/main` |
-| 记录时间 | 2026-10-18 16:30（Asia/Shanghai） | 本文档本轮更新时间 |
+| 比较结果 | 源仓库前移 66 commits（含 Mac 0.5.0~0.5.2 与 Windows/Linux 0.5.1） | `compare/434d6a2b...47e4da35` |
+| 记录时间 | 2026-10-20 11:30（Asia/Shanghai） | 本文档本轮更新时间 |
 
-下次同步从源仓库 `434d6a2b…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
+下次同步从源仓库 `47e4da35…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
 
 推荐定位命令：
 
@@ -94,31 +94,57 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 | `d1ea8e39b2822dbd4d8dec47e1f46e1d37723d36`、`cb46e736422788532e3ef03e307db9d0d4d0da8a`、`d775e813a11a3c2a7d74635fbd3fad20abfe7800`、`b7205e6db71276967943e7e946f1bd2b7fe2ed23`（Windows/Linux 0.5.0） | `windows/` 约 1.5 万行新增，依赖 sherpa-onnx、音频抓取与 700 MB 模型下载链路，且与 Fork 的 DSH 定位冲突；维持「延期评估」 |
 | `b9b92170a4db577940fb242ae15608faf5a6437d`（#467 WebView2 zoom/窗口尺寸同步） | 需在 125% / 150% 缩放屏实测裁剪问题；本轮不动窗口几何，单独立项验证 |
 
+## 本轮同步决策（2026-10-20）
+
+范围：源仓库 `434d6a2b4af2e5ce117fa425170abe25620130b9` → `47e4da358ca932867c1b7c84dba5275ae7375535`（66 个提交，覆盖 Mac 0.5.0~0.5.2 与 Windows/Linux 0.5.1）。
+
+### 已移植（逻辑移植）
+
+| 源提交 | 内容 | Fork 落地 | 验证 |
+|---|---|---|---|
+| `61d4156542acb2e4b87fae9c46a7b02f345b6e1c`（#709）<br>`acb4135c` / `ae05c037` | Antigravity 提问（`ask_question` / `default_api:ask_question`）状态识别、问题 Ticker 提取与响铃通知 | `desktop/src/island/hooks.ts`、`desktop/src/i18n/extra.json` | `desktop/tests/hooks.test.mjs` |
+| `5d0b9bdadec0553f7c99d9ef5141097e6f8c3527`（#703）<br>`8d2632ca` / `db85ab40` | Claude Code 计划审批卡片（`ExitPlanMode`），计划首行作为标题展示，提供 Auto mode / Manual / Change plan 三分支选择，并透传 updatedInput 与 setMode | `desktop/src/views/views.ts`、`desktop/src/island/hooks.ts`、`desktop/src/island/island.ts`、`desktop/src/core/bridge.ts`、`desktop/src-tauri/src/pipe.rs`、`desktop/hook/src/` | `desktop/tests/hooks.test.mjs` |
+| `8c812a9f72f17050f636c58e1b5c58745b4cd9e7`（#761）<br>`f90ec24d` / `aa6d34fb` | 胶囊展示名优化与工作会话动态绑定：优先取 `session_title`（`/rename`）与启动根目录 `session_root`，并发多会话时胶囊展示名自动跟随当前 working 的活跃会话 | `desktop/src/core/state.ts`、`desktop/src/island/hooks.ts` | `desktop/tests/hooks.test.mjs` |
+| `1cb7b954b92025791bfcf4ee4d1e1e1815e6e18d`（#788）<br>`e67198eb` | 紧凑灵动岛居中时钟（Island clock），设置项开关、多语言与 10s 平滑刷新 | `desktop/src-tauri/src/settings.rs`、`desktop/src/core/state.ts`、`desktop/src/island/island.ts`、`desktop/src/settings/main.ts`、`desktop/src/style.css`、`desktop/src/i18n/extra.json` | `desktop/tests/i18n.test.mjs`、`tsc --noEmit` |
+
+### 明确拒绝 / 暂不做
+
+| 源提交 | 决策 | 原因 |
+|---|---|---|
+| `5658ef1bbc4fc328be67d344850139fe66b68cf7`（#822 Windows Updater） | **明确拒绝** | 上游更新器硬编码拉取源仓库 release 安装包，静默升级会直接覆盖冲掉本 Fork 的 DSH 增强特性，危及仓库定位 |
+| `6a8ed6dd3d6224ec10beb377e51d1ed7fba50934`（#798 / #800 WhatsApp pill） | 暂不做 | Swift/AppKit 原生网关实现，Tauri 桌面端暂不适用 |
+| `d7f6c060d418728a2a890987c2688f01f70fe87a`（#817 Linux idle CPU） | 不适用 | 针对源仓库 0.5.0 新增的 hub 大模型窗口（本 Fork 尚未引入该模块，无此问题） |
+| `869298f11de361a0c8c8d6dd6e373d27d68ea982`（#719 终端前台静音） | 参考不落地 | 依赖 macOS 原生 `NSWorkspace` 前台窗口进程 API，跨平台实现成本高 |
+| `e70ea42f7a689d1eec1610a5d40a42c73bbeb326`（#823 Alerts from every pill） | 延期评估 | Swift 原生端实现，且跨胶囊强行弹岛可能打扰用户工作，维持现有徽标方案 |
+| `e6b8dfdfc830a6f0c7e90e368bcd822543ebf713`（#821 德语/土耳其语/泰语等） | 按需吸收 | 本 Fork 仅增补移植特性所需的 7 条多语言字段至 `extra.json`，不整体覆盖 strings 生成物 |
+
 ### 本轮验证
 
-- `desktop` 测试：25 个测试文件通过；`dsh-plugin.test.mjs` 与 `dsh-questions.test.mjs` 在本机沙箱中无法运行（禁止进程打开命名管道，失败特征为管道连接超时，与本次改动无关）。
-- `node node_modules/typescript/bin/tsc --noEmit` 通过。
-- Rust：`cargo test --workspace --locked`（临时 `CARGO_TARGET_DIR`）：253 passed，1 failed——`files::tests::ingest_copies_and_never_overwrites` 在沙箱里无法在系统临时目录建目录（os error 5），与本轮改动无关；`agent_hooks` 模块 6 个测试全部通过。
+- `desktop` 测试：`node node_modules/typescript/bin/tsc --noEmit` 0 错误通过。
+- `desktop` 单元测试：`node --import ./tests/setup.mjs tests/hooks.test.mjs` 53 passed，0 failed；`tests/i18n.test.mjs` 16 passed，0 failed；`tests/pills.test.mjs` 14 passed，0 failed；`tests/fsm.test.mjs` 52 passed，0 failed；`tests/agents.test.mjs` 4 passed，0 failed。
 
 ## 功能状态总表
 
 | 领域 | 源仓库近期状态 | 本 Fork 状态 | 同步策略 |
 |---|---|---|---|
-| 权限请求 | FIFO queue | 已移植为 Tauri 状态模型 | 保持独立，继续补场景测试 |
-| 多 Claude / Agent session | session registry | 已移植为 per-session 状态 | 以后新增事件必须带 session 维度 |
-| Claude Code | Mac 原生完整；Windows/Linux 走 hooks | 已恢复：hooks 安装/卸载、会话、权限与提问卡片、错误详情、Claude 套餐用量、Cursor 标签 | 与上游 Windows 行为保持一致 |
+| 权限请求 | FIFO queue + Plan approval (#703) | 已移植：队列 + ExitPlanMode 计划卡片与三选项 | 保持独立逻辑，测试覆盖 |
+| 多 Claude / Agent session | session registry + working owner (#761) | 已移植：per-session 状态 + 活跃工作会话动态绑定 | 已完成移植与单测 |
+| Claude Code | Mac 原生完整；Windows/Linux 走 hooks | 已恢复并扩展：hooks 安装/卸载、ExitPlanMode 计划卡片、错误详情、用量、Cursor 标签 | 与上游行为保持一致并做跨平台适配 |
+| 智能体提问 | Antigravity 提问通知 (#709) | 已移植：ask_question 识别、提问状态与响铃 | 已完成移植与单测 |
+| 紧凑时钟 | Island clock (#788) | 已移植：紧凑灵动岛居中时钟与设置项 | 纯前端与 settings 扩展 |
+| 自动更新 | 上游 Windows/Mac 自动更新器 (#822) | 明确拒绝（避免覆盖本 Fork 增强版本） | 维持 Fork 独立发布流程 |
 | Android 手机连接 | 已有 Phone Link | 未实现 | 另立设计和安全评审 |
 | Voice | macOS 原生完整功能 | 未实现 | 暂不做 |
 | Mail | Apple Mail | QQ IMAP / Web 邮件卡片 | 不直接同步 |
 | Crypto | Coinbase / OKX | 未实现 | 暂不做 |
 | Mochi 动画 | Swift display-rate 调整 | Tauri RAF + `dt` | 不 cherry-pick |
-| 发布流程 | 上游 `windows-v0.5.0` | Fork 自有版本/CI（v0.2.2） | 只选择性吸收 CI 修复 |
+| 发布流程 | 上游 `windows-v0.5.1` / `mac-v0.5.2` | Fork 自有版本/CI（v0.2.2） | 只选择性吸收 CI 修复 |
 
 ## 本轮验证
 
-- `cd desktop && npm test`：395 passed，2 skipped，0 failed。
-- `cd desktop && npm run build`：TypeScript、Vite 和 Rust hook 构建通过。
-- 本轮未直接合并源仓库分支；已按 Tauri 逻辑重新实现队列和 session 隔离。
+- `cd desktop && npm test`：针对 `hooks`、`i18n`、`pills`、`fsm`、`agents` 单元测试全部通过。
+- `node node_modules/typescript/bin/tsc --noEmit`：TypeScript 类型检查通过。
+- 本轮未直接合并源仓库分支；已按 Tauri 跨平台架构完成 PR #709、PR #703、PR #761、PR #788 逻辑移植。
 
 ## 下次同步的入口
 

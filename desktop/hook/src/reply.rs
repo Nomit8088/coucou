@@ -8,11 +8,11 @@
 
 use serde_json::{json, Map, Value};
 
-/// The agents whose permission requests the island can answer: Codex and DSH.
-/// Claude Code (no `--agent`) and every other agent are ignored here too,
-/// whatever the app sent. Nothing is ever allowed without a click.
+/// The agents whose permission requests the island can answer: Claude Code, Codex and DSH.
+/// Every other agent is ignored here too, whatever the app sent. Nothing is ever allowed
+/// without a click.
 pub fn takes_decisions(agent: &str) -> bool {
-    matches!(agent, "codex" | "dsh")
+    matches!(agent, "" | "codex" | "dsh")
 }
 
 /// Agents that read a JSON object on stdout after every hook and get `{}` —
@@ -22,8 +22,8 @@ fn wants_json(agent: &str) -> bool {
 }
 
 /// The line to print for `event` from `agent`, given the island's `decision`
-/// (`None`: nobody clicked) and, for Claude Code's AskUserQuestion, the
-/// question as it was asked.
+/// (`None`: nobody clicked) and, for Claude Code's AskUserQuestion or ExitPlanMode,
+/// the question or plan tool input as it was asked.
 pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option<&Value>) -> Option<String> {
     if event != "PermissionRequest" {
         // Antigravity reads "{}" on PreToolUse as a denial. "ask" keeps its own prompt
@@ -49,8 +49,7 @@ pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option
                 None => None,
             }
         }
-        // Claude Code and Codex share the documented hookSpecificOutput. Only
-        // Claude Code asks questions.
+        // Claude Code and Codex share the documented hookSpecificOutput.
         "" => decision.and_then(|d| decision_json(d, question)),
         _ => decision.and_then(|d| decision_json(d, None)),
     }
@@ -60,13 +59,13 @@ pub fn stdout(agent: &str, event: &str, decision: Option<&str>, question: Option
 /// nothing at all rather than guessing — silence is the safe answer.
 /// See https://code.claude.com/docs/en/hooks
 ///
-/// `question` is the AskUserQuestion input, when that is what is being asked:
-/// the island may then answer it, which Claude Code takes as the same input
-/// with an `answers` map added. Nothing else of the input can be changed from
-/// the island, and no other tool's input can be changed at all.
+/// `question` is the AskUserQuestion or ExitPlanMode input, when that is what is
+/// being asked: the island may then answer or update mode, which Claude Code
+/// takes as updatedInput and updatedPermissions.
 pub fn decision_json(decision: &str, question: Option<&Value>) -> Option<String> {
-    if decision.trim_start().starts_with('{') {
-        let reply = serde_json::from_str::<Value>(decision).ok()?;
+    let trimmed = decision.trim();
+    if trimmed.starts_with('{') {
+        let reply = serde_json::from_str::<Value>(trimmed).ok()?;
         let answers = reply.get("answers")?.as_object()?;
         let question = question?;
         if !answers_fit(question, answers) {
@@ -84,16 +83,63 @@ pub fn decision_json(decision: &str, question: Option<&Value>) -> Option<String>
             .to_string(),
         );
     }
-    let behavior = match decision.trim() {
-        // "always" still answers a plain allow; remembering it is the island's
-        // business, not the agent's.
-        "allow" | "always" => r#"{"behavior":"allow"}"#.to_string(),
-        "deny" => r#"{"behavior":"deny","message":"Denied from Coucou"}"#.to_string(),
-        _ => return None,
-    };
-    Some(format!(
-        r#"{{"hookSpecificOutput":{{"hookEventName":"PermissionRequest","decision":{behavior}}}}}"#
-    ))
+    if trimmed == "plan_auto" || trimmed == "plan_default" {
+        let mode = if trimmed == "plan_auto" { "auto" } else { "default" };
+        let updated_input = question.cloned().unwrap_or_else(|| json!({}));
+        return Some(
+            json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": {
+                        "behavior": "allow",
+                        "updatedInput": updated_input,
+                        "updatedPermissions": [{ "type": "setMode", "mode": mode, "destination": "session" }]
+                    }
+                }
+            })
+            .to_string(),
+        );
+    }
+    if trimmed == "plan_change" {
+        return Some(
+            json!({
+                "hookSpecificOutput": {
+                    "hookEventName": "PermissionRequest",
+                    "decision": {
+                        "behavior": "deny",
+                        "interrupt": true,
+                        "message": "The user wants to change the plan and will type the changes in the terminal."
+                    }
+                }
+            })
+            .to_string(),
+        );
+    }
+    match trimmed {
+        "allow" | "always" => {
+            if let Some(q) = question {
+                if q.get("plan").is_some() {
+                    return Some(
+                        json!({
+                            "hookSpecificOutput": {
+                                "hookEventName": "PermissionRequest",
+                                "decision": {
+                                    "behavior": "allow",
+                                    "updatedInput": q
+                                }
+                            }
+                        })
+                        .to_string(),
+                    );
+                }
+            }
+            Some(r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#.to_string())
+        }
+        "deny" => {
+            Some(r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from Coucou"}}}"#.to_string())
+        }
+        _ => None,
+    }
 }
 
 /// True when `answers` answers exactly the questions Claude Code asked: one entry
@@ -186,8 +232,7 @@ mod tests {
     fn each_agent_gets_its_own_reply_shape() {
         let allow = r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}"#;
         let deny = r#"{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from Coucou"}}}"#;
-        assert!(stdout("", "PermissionRequest", Some("allow"), None).is_none());
-        for agent in ["codex", "dsh"] {
+        for agent in ["", "codex", "dsh"] {
             assert_eq!(stdout(agent, "PermissionRequest", Some("allow"), None).unwrap(), allow);
             assert_eq!(stdout(agent, "PermissionRequest", Some("always"), None).unwrap(), allow);
             assert_eq!(stdout(agent, "PermissionRequest", Some("deny"), None).unwrap(), deny);
@@ -273,5 +318,31 @@ mod tests {
         assert!(!ok(r#"{"answers":{"Which one?":"A","Extras?":"Tests"}}"#));
         assert!(!ok(r#"{"answers":{"Which one?":"A","Extras?":[]}}"#));
         assert!(!ok(r#"{"answers":{"Which one?":"A","Extras?":["Tests","Tests"]}}"#));
+    }
+
+    #[test]
+    fn plan_decisions_format_properly() {
+        let plan_input = json!({
+            "plan": "# Build feature\n1. Step one\n2. Step two"
+        });
+        // Auto mode
+        let auto = decision_json("plan_auto", Some(&plan_input)).unwrap();
+        assert!(auto.contains(r#""behavior":"allow""#));
+        assert!(auto.contains(r#""mode":"auto""#));
+        assert!(auto.contains(r#""updatedInput":{"plan":"# Build feature\n1. Step one\n2. Step two"}"#));
+
+        // Manual mode
+        let manual = decision_json("plan_default", Some(&plan_input)).unwrap();
+        assert!(manual.contains(r#""behavior":"allow""#));
+        assert!(manual.contains(r#""mode":"default""#));
+
+        // Change plan
+        let change = decision_json("plan_change", Some(&plan_input)).unwrap();
+        assert!(change.contains(r#""behavior":"deny""#));
+        assert!(change.contains(r#""interrupt":true"#));
+
+        // Plain allow on a plan tool preserves input
+        let plain = decision_json("allow", Some(&plan_input)).unwrap();
+        assert!(plain.contains(r#""updatedInput":{"plan":"# Build feature\n1. Step one\n2. Step two"}"#));
     }
 }

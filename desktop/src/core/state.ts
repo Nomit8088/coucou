@@ -47,6 +47,14 @@ export interface AgentTask {
   liveLine?: string | null;
 }
 
+export interface SessionRecord {
+  id: string;
+  state: BotStateName;
+  projectName?: string;
+  cwd?: string;
+  lastWorked: number;
+}
+
 export interface ApprovalInfo {
   requestId: string;
   sessionId: string;
@@ -56,6 +64,8 @@ export interface ApprovalInfo {
   command: string;
   /** Set when Claude Code is asking a question rather than for a permission. */
   questions?: AskedQuestion[];
+  /** Set when Claude Code has finished a plan (ExitPlanMode) and asks how to proceed. */
+  isPlan?: boolean;
 }
 
 /** One question of an AskUserQuestion call. */
@@ -112,6 +122,8 @@ export interface Settings {
   autoCloseInterval: number;
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
+  /** Date and time in the middle of the compact island. */
+  showClock: boolean;
   absenceInterval: number;
   /** Declared pills next to the main one (at most 4), in the order they were added. */
   activeIntegrations: string[];
@@ -192,6 +204,7 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.12,
   autoCloseInterval: 15,
   openOnHover: false,
+  showClock: false,
   absenceInterval: 180,
   activeIntegrations: ["integration_github", "integration_resend"],
   mainPill: DEFAULT_MAIN_PILL,
@@ -267,8 +280,8 @@ class AppState {
   /** The pill that was in front when the card came up; it comes back after. */
   focusBeforeApproval: string | null = null;
 
-  /** Session ids currently contributing state to each agent pill. */
-  private liveSessions = new Map<string, Map<string, BotStateName>>();
+  /** Session records currently contributing state and display identity to each agent pill. */
+  private liveSessions = new Map<string, Map<string, SessionRecord>>();
 
   integrations: Record<string, IntegrationInfo> = {};
 
@@ -441,13 +454,24 @@ class AppState {
     return removed;
   }
 
-  registerSession(id: string, sessionId: string) {
+  registerSession(id: string, sessionId: string, projectName?: string, cwd?: string) {
     if (!sessionId) return;
-    const sessions = this.liveSessions.get(id) ?? new Map<string, BotStateName>();
-    if (!sessions.has(sessionId)) sessions.set(sessionId, "idle");
+    const sessions = this.liveSessions.get(id) ?? new Map<string, SessionRecord>();
+    const existing = sessions.get(sessionId);
+    if (!existing) {
+      sessions.set(sessionId, {
+        id: sessionId,
+        state: "idle",
+        projectName,
+        cwd,
+        lastWorked: 0,
+      });
+    } else {
+      if (projectName && !existing.projectName) existing.projectName = projectName;
+      if (cwd && !existing.cwd) existing.cwd = cwd;
+    }
     this.liveSessions.set(id, sessions);
-    const task = this.tasks.find((x) => x.id === id);
-    if (task && !task.sessionId) task.sessionId = sessionId;
+    this.applyDisplayOwner(id);
   }
 
   hasSession(id: string, sessionId: string): boolean {
@@ -464,24 +488,86 @@ class AppState {
     this.liveSessions.clear();
   }
 
+  /**
+   * The session whose project name and cwd the pill shows, so the name matches
+   * the activity under it: the oldest session that is mid-turn, else the session
+   * that worked last. Port of HookServer.applyDisplayOwner (#761).
+   */
+  applyDisplayOwner(id: string) {
+    const task = this.tasks.find((x) => x.id === id);
+    if (!task) return;
+    const sessions = this.liveSessions.get(id);
+    if (!sessions || sessions.size === 0) return;
+
+    const isWorking = (s: BotStateName) =>
+      s === "working" || s === "thinking" || s === "question" || s === "ratelimit" || s === "approval";
+
+    // 1. Pick the oldest session that is mid-turn
+    let owner: SessionRecord | null = null;
+    for (const s of sessions.values()) {
+      if (isWorking(s.state)) {
+        owner = s;
+        break;
+      }
+    }
+
+    // 2. If no session is working, pick the session that worked last
+    if (!owner) {
+      let newest = -1;
+      for (const s of sessions.values()) {
+        if (s.lastWorked > newest) {
+          newest = s.lastWorked;
+          owner = s;
+        }
+      }
+    }
+
+    // 3. Fallback to the first live session
+    if (!owner) {
+      owner = sessions.values().next().value ?? null;
+    }
+
+    if (owner) {
+      task.sessionId = owner.id;
+      if (owner.projectName) task.name = owner.projectName;
+      if (owner.cwd) task.sessionCwd = owner.cwd;
+    }
+  }
+
   sessionState(id: string, sessionId: string, state: BotStateName) {
     if (!sessionId) return this.updateTask(id, state);
     this.registerSession(id, sessionId);
-    this.liveSessions.get(id)!.set(sessionId, state);
+    const s = this.liveSessions.get(id)!.get(sessionId)!;
+    s.state = state;
+    const isWorking =
+      state === "working" || state === "thinking" || state === "question" || state === "ratelimit" || state === "approval";
+    if (isWorking) s.lastWorked = performance.now();
+
     const aggregate = [...this.liveSessions.get(id)!.values()]
-      .reduce<BotStateName>((worst, s) => (STATE_PRIORITY[s] < STATE_PRIORITY[worst] ? s : worst), "idle");
+      .map((r) => r.state)
+      .reduce<BotStateName>((worst, cur) => (STATE_PRIORITY[cur] < STATE_PRIORITY[worst] ? cur : worst), "idle");
     this.updateTask(id, aggregate);
+    this.applyDisplayOwner(id);
   }
 
   removeSession(id: string, sessionId: string): boolean {
     const sessions = this.liveSessions.get(id);
     if (!sessions || !sessionId) return true;
     sessions.delete(sessionId);
-    const task = this.tasks.find((x) => x.id === id);
-    if (task?.sessionId === sessionId) task.sessionId = sessions.keys().next().value ?? null;
-    if (!sessions.size) this.liveSessions.delete(id);
-    else this.sessionState(id, [...sessions.keys()][0], [...sessions.values()][0]);
-    return sessions.size === 0;
+    if (!sessions.size) {
+      this.liveSessions.delete(id);
+      const task = this.tasks.find((x) => x.id === id);
+      if (task) task.sessionId = null;
+    } else {
+      this.applyDisplayOwner(id);
+      const remainingStates = [...sessions.values()].map((r) => r.state);
+      const aggregate = remainingStates.reduce<BotStateName>(
+        (worst, cur) => (STATE_PRIORITY[cur] < STATE_PRIORITY[worst] ? cur : worst),
+        "idle",
+      );
+      this.updateTask(id, aggregate);
+    }
+    return (sessions.size ?? 0) === 0;
   }
 
   updateTask(id: string, state: BotStateName) {

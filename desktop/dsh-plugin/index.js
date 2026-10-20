@@ -103,6 +103,20 @@ function sessionIdOf(agent) {
   return typeof id === "string" ? id : String(id ?? "");
 }
 
+/**
+ * A delegated child is a real agent, but the island has one DSH pill. DSH
+ * stamps the child on the session header (origin "subagent"), not on the
+ * agent object; agent.origin is only a fallback. Its turn, question and
+ * approval must not be announced as the main session — those events open the
+ * island. subagent/start and subagent/end stay ticker lines.
+ */
+function isSubagent(subject) {
+  if (!subject || typeof subject !== "object") return false;
+  if (subject.origin === "subagent") return true;
+  const header = subject.session?.header ?? subject.header;
+  return header?.origin === "subagent";
+}
+
 /** The one line an unknown error is worth. Never the whole stack: the island shows one line. */
 function errorText(error) {
   if (typeof error === "string") return error;
@@ -284,6 +298,25 @@ export function apply(ctx, config) {
   const turnOpen = new Set();
   /** The agent of each live session, so a session event finds its own agent. */
   const agentsBySession = new Map();
+  /** Session ids DSH marked as subagents, for events that only carry an id. */
+  const childSessions = new Set();
+  const noteChild = (subject) => {
+    if (!isSubagent(subject)) return false;
+    const sid = sessionIdOf(subject);
+    if (sid) childSessions.add(sid);
+    return true;
+  };
+  const isChild = (subject) => {
+    if (noteChild(subject)) return true;
+    const sid = sessionIdOf(subject);
+    return sid !== "" && childSessions.has(sid);
+  };
+  const forgetChild = (subject) => {
+    const sid = sessionIdOf(subject);
+    const child = isSubagent(subject) || (sid !== "" && childSessions.has(sid));
+    if (sid) childSessions.delete(sid);
+    return child;
+  };
   /** Last time each session's usage was read, so a slow gauge is not re-read. */
   const usageState = new Map();
   /** Sessions that have run a tool since their turn opened. */
@@ -292,14 +325,15 @@ export function apply(ctx, config) {
   let readPressure = null;
   let current = null;
   const remember = (agent) => {
-    if (!agent || agent.origin === "subagent") return;
+    if (!agent || isSubagent(agent)) return;
     current = agent;
   };
 
   ctx.on("agent/created", ({ agent }) => {
-    remember(agent);
     const sid = sessionIdOf(agent);
     agentsBySession.set(sid, agent);
+    if (noteChild(agent)) return;
+    remember(agent);
     display(pipe, {
       hook_event_name: "SessionStart",
       session_id: sid,
@@ -313,7 +347,9 @@ export function apply(ctx, config) {
     agentsBySession.delete(sid);
     usageState.delete(sid);
     sawWork.delete(sid);
+    turnOpen.delete(sid);
     if (current && sessionIdOf(current) === sid) current = null;
+    if (forgetChild(agent)) return;
     display(pipe, {
       hook_event_name: "SessionEnd",
       session_id: sid,
@@ -328,6 +364,7 @@ export function apply(ctx, config) {
   ctx.on("session/created", (session) => {
     const sid = session?.id ?? "";
     if (!sid) return;
+    if (noteChild(session)) return;
     const cwd = session?.header?.cwd ?? "";
     display(pipe, {
       hook_event_name: "SessionStart",
@@ -340,6 +377,7 @@ export function apply(ctx, config) {
   ctx.on("session/disposed", (session) => {
     const sid = session?.id ?? "";
     if (!sid) return;
+    if (forgetChild(session)) return;
     display(pipe, {
       hook_event_name: "SessionEnd",
       session_id: String(sid),
@@ -367,6 +405,12 @@ export function apply(ctx, config) {
   ctx.on("workspace/session-stop", (request) => {
     const sid = request?.sessionId ? String(request.sessionId) : "";
     if (!sid) return;
+    if (childSessions.has(sid) || isSubagent(agentsBySession.get(sid))) {
+      turnOpen.delete(sid);
+      sawWork.delete(sid);
+      childSessions.delete(sid);
+      return;
+    }
     turnOpen.delete(sid);
     sawWork.delete(sid);
     display(pipe, {
@@ -426,7 +470,7 @@ export function apply(ctx, config) {
   // are optional the same way the meter is: a profile that does not load them
   // keeps working, it just has nothing to report.
   const sendJobs = (jobsService, sessionId) => {
-    if (!sessionId) return;
+    if (!sessionId || childSessions.has(String(sessionId))) return;
     let jobs;
     try {
       jobs = jobsService.list(sessionId);
@@ -519,10 +563,10 @@ export function apply(ctx, config) {
     ctx.inject(["permissionPresets"], (permCtx) => {
       presetsService = permCtx.permissionPresets;
       ctx.on("agent/created", ({ agent }) => {
-        if (agent?.session) sendPreset(agent.session);
+        if (agent?.session && !isChild(agent)) sendPreset(agent.session);
       });
       ctx.on("session/event", (session, event) => {
-        if (event?.type === "permission/preset") {
+        if (event?.type === "permission/preset" && !isChild(session)) {
           sendPreset(session);
         }
       });
@@ -532,6 +576,7 @@ export function apply(ctx, config) {
   }
 
   ctx.on("agent/pre-step", (payload, next) => {
+    if (isChild(payload?.agent)) return next();
     remember(payload?.agent);
     const sid = sessionIdOf(payload?.agent);
     turnOpen.add(sid);
@@ -559,6 +604,7 @@ export function apply(ctx, config) {
   });
 
   ctx.on("session/event", (session, event) => {
+    if (isChild(session)) return;
     if (event?.type !== "assistant/message") return;
     const sid = session?.id ?? sessionIdOf(session);
     const text = textOf(event.data?.message?.content ?? event.data?.content);
@@ -574,6 +620,7 @@ export function apply(ctx, config) {
   // answer comes with Stop.
   const streamState = new Map();
   ctx.on("agent/assistant-stream", ({ agent, frame }) => {
+    if (isChild(agent)) return;
     const sid = sessionIdOf(agent);
     if (frame?.type === "start") {
       streamState.set(sid, { text: "", lastSent: 0 });
@@ -606,6 +653,7 @@ export function apply(ctx, config) {
   });
 
   ctx.on("tools/pre-execute", (exec, next) => {
+    if (isChild(exec?.agent)) return next();
     const callId = exec?.callId ? String(exec.callId) : "";
     if (callId) calls.set(callId, { name: exec.name, arguments: exec.arguments ?? {} });
     sawWork.add(sessionIdOf(exec?.agent));
@@ -621,6 +669,7 @@ export function apply(ctx, config) {
   });
 
   ctx.on("tools/post-execute", (exec, result, next) => {
+    if (isChild(exec?.agent)) return next();
     const cached = calls.get(String(exec?.callId ?? ""));
     const failed = result?.isError === true;
     display(pipe, {
@@ -639,7 +688,7 @@ export function apply(ctx, config) {
   // Observe the frozen, lossless-JSON final outcome of every tool call.
   // Provides a concise result status or error detail without leaking large payload.
   ctx.on("tools/result", (exec, result) => {
-    if (!result) return;
+    if (!result || isChild(exec?.agent)) return;
     if (result.isError) {
       const errStr = errorText(result.error);
       if (errStr && errStr !== "Agent error") {
@@ -657,6 +706,7 @@ export function apply(ctx, config) {
     const sid = sessionIdOf(payload?.agent);
     turnOpen.delete(sid);
     sawWork.delete(sid);
+    if (isChild(payload?.agent)) return;
     const text = lastAssistant.get(sid) ?? "";
     display(pipe, {
       hook_event_name: "Stop",
@@ -672,6 +722,7 @@ export function apply(ctx, config) {
     const sid = sessionIdOf(payload?.agent);
     turnOpen.delete(sid);
     sawWork.delete(sid);
+    if (isChild(payload?.agent)) return;
     display(pipe, {
       hook_event_name: "StopFailure",
       session_id: sid,
@@ -684,6 +735,7 @@ export function apply(ctx, config) {
   // that decision), so this is a ticker line and never the red state: a red
   // Mochi for a request that succeeded on the second try would be a lie.
   ctx.on("agent/request-error", (payload, next) => {
+    if (isChild(payload?.agent)) return next();
     display(pipe, {
       hook_event_name: "Warning",
       session_id: sessionIdOf(payload?.agent),
@@ -699,8 +751,15 @@ export function apply(ctx, config) {
   // (plan mode does this) opens and closes a "turn" that never ran, and a
   // finished card for it would be noise.
   ctx.on("agent/status", ({ agent, status }) => {
-    if (status !== "idle") return;
     const sid = sessionIdOf(agent);
+    if (isChild(agent)) {
+      if (status === "idle") {
+        turnOpen.delete(sid);
+        sawWork.delete(sid);
+      }
+      return;
+    }
+    if (status !== "idle") return;
     if (!turnOpen.has(sid)) return;
     turnOpen.delete(sid);
     if (!sawWork.has(sid)) return;
@@ -716,6 +775,7 @@ export function apply(ctx, config) {
   // Context compaction failed: the session carries on, but its context is now
   // bigger than it should be. A line, not an error state.
   ctx.on("compaction/summary-error", (payload) => {
+    if (isChild(payload?.session)) return;
     display(pipe, {
       hook_event_name: "Warning",
       session_id: sessionIdOf(payload?.session ?? current),
@@ -811,6 +871,7 @@ export function apply(ctx, config) {
   };
 
   ctx.on("approval/request", (req, next) => {
+    if (isChild(req?.agent)) return next();
     const callId = req?.callId ? String(req.callId) : "";
     const cached = callId ? calls.get(callId) : undefined;
     const tool = req?.toolName || cached?.name || "tool";
@@ -832,6 +893,7 @@ export function apply(ctx, config) {
   });
 
   ctx.on("user-questions/request", (req, next) => {
+    if (isChild(req?.agent)) return next();
     const questions = Array.isArray(req?.questions) ? req.questions : [];
     if (questions.length === 0) return next();
     const sessionId = sessionIdOf(req?.agent ?? current);

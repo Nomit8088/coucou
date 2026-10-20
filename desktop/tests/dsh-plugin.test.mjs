@@ -637,3 +637,73 @@ test("permissionPresets reports current preset on session start", async () => {
   assert.equal(ev.preset, "workspace-write");
   assert.deepEqual(ev.presets, ["workspace-write", "danger-full-access"]);
 });
+
+test("a subagent finishing or choosing does not open the island", async () => {
+  // DSH puts origin on the session header, not on the agent. Those events used
+  // to be forwarded as the main session, and the island opened its finished
+  // card and its question card for them.
+  const { listeners } = await startPlugin();
+  const child = {
+    id: "child",
+    session: { id: "child", header: { cwd: "D:\\dev\\proj", origin: "subagent", parentSession: "main" } },
+  };
+  fire(listeners, "agent/created", { agent: agent("main") });
+  fire(listeners, "agent/created", { agent: child });
+  fire(listeners, "session/created", child.session);
+  fire(listeners, "agent/pre-step", {
+    agent: child,
+    messages: [{ role: "user", source: { kind: "user" }, content: [{ type: "text", text: "do the child task" }] }],
+  }, () => Promise.resolve());
+  fire(listeners, "tools/pre-execute", {
+    callId: "c-child", name: "pwsh", arguments: { command: "echo hi" }, agent: child,
+  }, () => Promise.resolve());
+  fire(listeners, "session/event", child.session, {
+    type: "assistant/message",
+    data: { message: { content: [{ type: "text", text: "child finished" }] } },
+  });
+  fire(listeners, "agent/turn-stopping", { agent: child });
+  fire(listeners, "agent/status", { agent: child, status: "idle" });
+  fire(listeners, "agent/error", { agent: child, error: new Error("child boom") });
+  decide = "allow";
+  const approval = await listeners.get("approval/request")[0]({
+    agent: child, toolName: "pwsh", callId: "c-child",
+  }, () => Promise.resolve("allowed-once"));
+  const answer = await listeners.get("user-questions/request")[0]({
+    agent: child,
+    questions: [{ id: "q1", question: "Which?", options: [{ label: "A" }, { label: "B" }] }],
+  }, () => Promise.resolve({ answers: [{ id: "q1", selected: ["A"] }] }));
+  fire(listeners, "subagent/end", { id: "child", provider: "explore" });
+  await waitFor(2, "the subagent ticker line");
+
+  assert.equal(approval, "allowed-once", "the child decision still reaches DSH");
+  assert.deepEqual(answer, { answers: [{ id: "q1", selected: ["A"] }] });
+  assert.deepEqual(written.map((e) => e.hook_event_name), ["SessionStart", "SubagentStop"]);
+  assert.equal(written[0].session_id, "main");
+  assert.equal(written[1].session_id, "main", "the ticker line stays on the main session");
+  assert.equal(written.some((e) => e.session_id === "child"), false);
+
+  fire(listeners, "session/event", session("main"), {
+    type: "assistant/message",
+    data: { message: { content: [{ type: "text", text: "main finished" }] } },
+  });
+  fire(listeners, "agent/turn-stopping", { agent: agent("main") });
+  await waitFor(3, "the main Stop");
+  const stop = written.at(-1);
+  assert.equal(stop.hook_event_name, "Stop");
+  assert.equal(stop.session_id, "main");
+  assert.equal(stop.last_assistant_message, "main finished");
+});
+
+test("an agent marked origin subagent is not the current session", async () => {
+  const { listeners } = await startPlugin();
+  const legacy = { id: "legacy", origin: "subagent", session: session("legacy") };
+  fire(listeners, "agent/created", { agent: agent("main") });
+  fire(listeners, "agent/created", { agent: legacy });
+  fire(listeners, "agent/turn-stopping", { agent: legacy });
+  fire(listeners, "fs/observed", { path: "C:\\dev\\missing.txt" }, { kind: "absent" });
+  await waitFor(2, "the main session's warning");
+
+  assert.equal(written.filter((e) => e.hook_event_name === "Stop").length, 0);
+  const warning = written.find((e) => e.hook_event_name === "Warning");
+  assert.equal(warning.session_id, "main");
+});
