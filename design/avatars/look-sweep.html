@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Whale look sweep</title>
+  <style>
+    body{margin:0;background:#181b22;color:#e0e6ed;font-family:sans-serif;display:flex;flex-direction:column;align-items:center;padding:24px;gap:18px}
+    .row{display:flex;gap:18px}
+    .card{background:#232733;border:1px solid #333a4c;border-radius:16px;padding:14px;display:flex;flex-direction:column;align-items:center;width:300px}
+    canvas{background:rgba(0,0,0,.2);border-radius:12px}
+    .label{margin-top:10px;font-size:12px;color:#9cb0cb;text-align:center;line-height:1.5}
+    h3{margin:0;font-size:14px;color:#cfe0f5}
+    .bad{border-color:#7a3b3b}
+    .good{border-color:#3f6ecb;box-shadow:0 0 16px rgba(63,110,203,.22)}
+  </style>
+</head>
+<body>
+  <h3>横向视线扫描：限制前 / 限制后</h3>
+  <div class="row" id="rowOld"></div>
+  <div class="row" id="rowNew"></div>
+
+<script>const FACE=new Path2D("M132 293C142 204 225 170 319 175C416 172 500 218 509 308C525 368 519 432 492 474C460 528 397 555 321 557C244 558 177 534 141 486C112 449 113 409 119 365C121 340 125 313 132 293Z");
+const BACK=new Path2D("M135 303C97 378 121 484 75 548C103 571 131 571 156 553L143 591Q174 595 196 575L196 607Q233 596 252 535L387 535Q409 598 445 608L444 575Q470 598 497 588L486 553Q522 579 568 550C515 489 541 385 502 306Z");
+const BACK_LACE=new Path2D("M87 533Q112 555 148 543Q156 565 177 568Q164 583 148 576Q122 586 108 567Q91 566 80 550Z M485 543Q520 555 554 533L568 550Q546 570 524 564Q504 583 486 571L472 559Z");
+const BACK_DARK=new Path2D("M163 447Q159 528 143 554Q176 544 195 511L191 585Q223 557 233 515Z M448 446L413 515Q421 560 448 589L441 518Q462 546 486 555Q467 503 472 451Z");
+const HEADBAND=new Path2D("M103 284C83 174 172 91 308 89C445 84 540 169 537 281L503 317L131 318Z");
+const RUFFLE=new Path2D("M-27 18 Q-35-4-30-27 Q-28-43 0-45 Q28-43 30-27 Q35-4 27 18Z");
+const RUFFLES=[[125,236,-70],[151,188,-52],[192,149,-34],[245,125,-17],[305,117,0],[366,124,17],[422,147,34],[468,184,52],[501,231,70],[517,282,87]];
+const FIN=new Path2D("M501 326C541 332 541 376 562 412C581 446 604 470 624 480C614 498 591 504 569 496C537 489 514 466 501 438C487 406 480 361 501 326Z");
+const FIN_CREASE=new Path2D("M507 343C529 366 531 406 552 439Q579 474 611 479C575 485 547 467 529 444C509 415 504 379 507 343Z");
+const FIN_BELLY=new Path2D("M510 438C535 471 578 491 624 480C618 492 608 499 595 500Q581 511 567 501Q550 505 539 492Q521 489 519 476Q507 465 510 438Z");
+const FIN_DET=new Path2D("M510 438Q525 463 543 473Q546 485 552 493Q531 484 519 476Q507 465 510 438Z");
+const CROWN=new Path2D("M117 403C93 352 98 286 128 234C167 169 234 130 308 126C390 118 463 156 503 219C542 277 549 358 520 423C507 472 480 507 450 525L184 525Q137 503 117 403Z");
+const CROWN_SH=new Path2D("M119 299C132 229 189 170 255 149Q361 121 434 165C352 133 272 156 221 195Q160 238 119 299Z");
+const FR_BRIDGE=new Path2D("M365 155C404 158 436 195 436 250L423 310L391 330L380 230Z");
+const FR_ML=new Path2D("M330 144C260 133 195 167 155 219C129 255 117 303 119 347C174 329 230 296 267 258C251 287 243 310 243 330C280 304 313 259 326 212C337 180 338 153 330 144Z");
+const FR_UL=new Path2D("M291 148C235 139 177 170 148 211C125 244 118 273 118 298Q134 289 149 275Q133 303 130 317C176 298 214 258 240 213C256 185 274 161 291 148Z");
+const FR_MID=new Path2D("M325 146C283 161 259 203 262 258C263 304 277 337 303 349Q290 316 300 290C308 340 345 378 384 384Q372 366 376 343C413 311 429 254 410 202C393 166 362 148 325 146Z");
+const FR_R=new Path2D("M370 156C417 177 438 224 417 279C418 324 454 353 469 401Q477 372 472 346C493 378 489 413 478 438C519 408 532 355 518 293C506 236 463 190 370 156Z");
+const FR_UR=new Path2D("M382 159C437 164 480 196 501 234Q522 263 524 295Q510 284 496 278Q508 302 508 320C479 298 456 269 447 242C433 202 410 175 382 159Z");
+const SL_L=new Path2D("M150 248C106 284 95 349 108 414C112 457 132 491 163 514C144 479 140 440 150 405Q155 463 182 493C165 448 161 398 178 350C188 315 176 277 150 248Z");
+const SL_R=new Path2D("M499 275C531 313 544 383 529 445C521 489 505 527 470 548Q482 527 485 500Q462 529 428 520C471 483 474 437 468 394L462 346Z");
+const SL_DL=new Path2D("M129 328Q114 419 142 467Q133 415 149 373Z");
+const SL_DR=new Path2D("M514 352Q536 445 493 510Q519 429 504 392Z");
+const HL_L=new Path2D("M163 232C190 192 233 168 272 167C228 185 199 211 178 240Q168 248 155 252Z");
+const HL_R=new Path2D("M402 175C444 188 480 217 496 252Q487 245 479 242C461 216 433 192 402 175Z");
+const HL_M=new Path2D("M300 181C278 212 276 251 287 281C283 240 292 208 311 184Z");
+const BOW_TAIL=new Path2D("M-2 9L-10 71L14 57L28 72L13 10Z");
+const BOW_W=new Path2D("M-4-4C-25-36-48-48-49-24C-50-5-45 19-33 30C-26 36-13 25-2 11C11 32 31 38 37 24C43 11 44-19 36-30C29-40 9-21-4-4Z");
+const BOW_C=new Path2D("M-6 5L-34-4Q-44 3-30 8Z M5 5L27-6Q36 1 24 8Z");
+const AHOGE=new Path2D("M330 142C365 111 374 73 344 51C305 22 252 32 220 58C260 9 324 8 366 34C412 62 401 116 354 142Z");
+const AHOGE_SH=new Path2D("M222 56Q285 5 353 35Q386 51 388 82Q393 52 366 34C324 8 260 9 222 56Z");
+
+function grads(ctx){
+  const gHair=ctx.createLinearGradient(128,0,512,640);
+  gHair.addColorStop(0,"#465aa3");gHair.addColorStop(.55,"#4869b0");gHair.addColorStop(1,"#729dd1");
+  const gBangs=ctx.createLinearGradient(288,0,352,640);
+  gBangs.addColorStop(0,"#43579d");gBangs.addColorStop(.65,"#5075bb");gBangs.addColorStop(1,"#779ed0");
+  const gBack=ctx.createLinearGradient(0,0,640,640);
+  gBack.addColorStop(0,"#33417e");gBack.addColorStop(1,"#303d78");
+  const gSkin=ctx.createRadialGradient(332,320,20,332,320,280);
+  gSkin.addColorStop(0,"#fffaf5");gSkin.addColorStop(1,"#fae8df");
+  const gLace=ctx.createLinearGradient(0,0,192,640);
+  gLace.addColorStop(0,"#fffafd");gLace.addColorStop(1,"#ede8f2");
+  const gFin=ctx.createLinearGradient(500,320,624,500);
+  gFin.addColorStop(0,"#263469");gFin.addColorStop(.6,"#354985");gFin.addColorStop(1,"#435c9e");
+  const gFinBelly=ctx.createLinearGradient(0,430,0,500);
+  gFinBelly.addColorStop(0,"#d7d8e9");gFinBelly.addColorStop(1,"#f3eef7");
+  const gRibbon=ctx.createLinearGradient(-49,-40,44,38);
+  gRibbon.addColorStop(0,"#7eafe1");gRibbon.addColorStop(1,"#5486c5");
+  return {gHair,gBangs,gBack,gSkin,gLace,gFin,gFinBelly,gRibbon};
+}
+
+function behind(ctx,R){
+  const s=R/205;ctx.save();ctx.scale(s,s);ctx.translate(-320,-390);
+  const g=grads(ctx);
+  ctx.fillStyle=g.gBack;ctx.fill(BACK);
+  ctx.fillStyle="#e6e0ee";ctx.fill(BACK_LACE);
+  ctx.fillStyle="#435996";ctx.fill(BACK_DARK);
+  ctx.fillStyle="#d5d1e5";ctx.fill(HEADBAND);
+  ctx.fillStyle=g.gLace;
+  for(const [x,y,d] of RUFFLES){ctx.save();ctx.translate(x,y);ctx.rotate(d*Math.PI/180);ctx.fill(RUFFLE);ctx.restore();}
+  for(const mir of [1,-1]){
+    ctx.save();
+    if(mir<0){ctx.translate(320,0);ctx.scale(-1,1);ctx.translate(-320,0);}
+    ctx.fillStyle=g.gFin;ctx.fill(FIN);
+    ctx.fillStyle="rgba(82,108,173,.55)";ctx.fill(FIN_CREASE);
+    ctx.fillStyle=g.gFinBelly;ctx.fill(FIN_BELLY);
+    ctx.fillStyle="rgba(201,201,223,.55)";ctx.fill(FIN_DET);
+    ctx.restore();
+  }
+  ctx.fillStyle=g.gHair;ctx.fill(CROWN);
+  ctx.fillStyle="rgba(62,82,149,.22)";ctx.fill(CROWN_SH);
+  ctx.fillStyle=g.gSkin;ctx.fill(FACE);
+  ctx.fillStyle="rgba(250,203,208,.55)";
+  for(const bx of [179,452]){ctx.save();ctx.translate(bx,463);ctx.rotate(8*Math.PI/180);ctx.beginPath();ctx.ellipse(0,0,33,21,0,0,Math.PI*2);ctx.fill();ctx.restore();}
+  ctx.restore();
+}
+
+function front(ctx,R){
+  const s=R/205;ctx.save();ctx.scale(s,s);ctx.translate(-320,-390);
+  const g=grads(ctx);
+  ctx.fillStyle=g.gBangs;
+  for(const p of [FR_BRIDGE,FR_ML,FR_UL,FR_MID,FR_R,FR_UR])ctx.fill(p);
+  ctx.fillStyle="rgba(152,189,234,.22)";ctx.fill(HL_L);
+  ctx.fillStyle="rgba(152,189,234,.19)";ctx.fill(HL_R);
+  ctx.fillStyle="rgba(162,192,236,.13)";ctx.fill(HL_M);
+  ctx.strokeStyle="rgba(52,77,145,.22)";ctx.lineWidth=3;ctx.lineCap="round";
+  ctx.stroke(new Path2D("M278 157C224 166 181 212 157 256"));
+  ctx.stroke(new Path2D("M398 168C449 190 474 229 485 263"));
+  ctx.fillStyle=g.gHair;ctx.fill(SL_L);ctx.fill(SL_R);
+  ctx.fillStyle="rgba(60,82,149,.55)";ctx.fill(SL_DL);ctx.fill(SL_DR);
+  ctx.save();ctx.translate(526,355);ctx.rotate(9*Math.PI/180);
+  ctx.fillStyle="#354a8b";ctx.fill(BOW_TAIL);
+  ctx.fillStyle=g.gRibbon;ctx.fill(BOW_W);
+  ctx.fillStyle="rgba(70,120,182,.55)";ctx.fill(BOW_C);
+  ctx.fillStyle="#5e91cd";ctx.beginPath();ctx.roundRect(-10,-6,17,22,7);ctx.fill();
+  ctx.restore();
+  ctx.save();ctx.translate(330,142);ctx.translate(-330,-142);ctx.fillStyle="#455aa5";ctx.fill(AHOGE);
+  ctx.fillStyle="rgba(83,107,180,.5)";ctx.fill(AHOGE_SH);ctx.restore();
+  ctx.restore();
+}
+
+// Renders one pose. clampFrac undefined = old behaviour; otherwise the eye
+// centre is clamped to ±clampFrac·R in body units.
+function scene(canvas, yaw, clampFrac){
+  const ctx=canvas.getContext("2d");
+  const W=canvas.width,H=canvas.height;
+  const R=W*0.36;
+  const rx=R*1.14, ry=R*0.88;
+  const cx=W/2, cy=H/2+R*0.06;
+  ctx.save();ctx.translate(cx,cy);
+  behind(ctx,R);
+  const s=R/205;
+  const m=new DOMMatrix().scale(s,s).translate(-320,-390);
+  const clip=new Path2D();clip.addPath(FACE,m);
+  ctx.save();ctx.clip(clip);
+  ctx.fillStyle="#21263f";
+  for(const sd of [-1,1]){
+    const eyeYaw=sd*0.37+yaw;
+    const cp=Math.cos(-0.04);
+    const raw=Math.sin(eyeYaw)*cp*rx;
+    const lim=clampFrac===undefined?Infinity:clampFrac*R;
+    const ex=Math.max(-lim,Math.min(lim,raw));
+    const ey=-Math.sin(-0.04)*ry;
+    const w=R*0.21, h=R*0.44;
+    ctx.save();ctx.translate(ex,ey);
+    ctx.beginPath();ctx.roundRect(-w/2,-h/2,w,h,Math.min(w/2,h/2));ctx.fill();
+    ctx.restore();
+  }
+  ctx.restore();
+  front(ctx,R);
+  ctx.restore();
+}
+
+function build(rowId, clampFrac, cls){
+  const row=document.getElementById(rowId);
+  for(const yaw of [-0.34,0,0.34]){
+    const card=document.createElement("div");
+    card.className="card "+cls;
+    const cv=document.createElement("canvas");
+    cv.width=300;cv.height=300;
+    const lab=document.createElement("div");
+    lab.className="label";
+    const dir=yaw<0?"向左 (yaw -0.34)":yaw>0?"向右 (yaw +0.34)":"正视 (yaw 0)";
+    lab.textContent=dir+(clampFrac?` · 限位 ${clampFrac}R`:" · 无限制");
+    card.appendChild(cv);card.appendChild(lab);row.appendChild(card);
+    scene(cv,yaw,clampFrac);
+  }
+}
+build("rowOld",undefined,"bad");
+build("rowNew",0.52,"good");
+</script>
+</body>
+</html>

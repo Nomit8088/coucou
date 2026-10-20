@@ -633,7 +633,11 @@ export class BotEngine {
         tp = this.lookY * 0.08 + 0.09;
         this.tgTilt = 0.12;
       } else {
-        // Comfort clamp to keep eyes clear of low fringe bangs
+        // Horizontal travel is trimmed for the whale: the face is narrower
+        // once the sidelocks are in, and a damped glance reads as a head turn
+        // rather than eyes sliding under the hair. Vertical keeps the comfort
+        // clamp that keeps eyes clear of the low fringe.
+        ty = ty * 0.55;
         tp = Math.min(0.12, Math.max(-0.25, tp));
         this.tgTilt = this.cfg.tilt;
       }
@@ -844,7 +848,11 @@ export class BotEngine {
         const sm = new DOMMatrix().scale(s, s).translate(-320, -390);
         whaleFaceClip.addPath(getWhaleFacePath(), sm);
       }
-      this.drawEyes(x, whaleFaceClip, R, rx, ry, "#21263f", 0.21, 0.44);
+      // The whale's face is framed by sidelocks and low inner fringe, so the
+      // eye centres may not travel as far out as Mochi's: clamp the lateral
+      // travel to keep both eyes on visible skin while the head still follows
+      // the pointer.
+      this.drawEyes(x, whaleFaceClip, R, rx, ry, "#21263f", 0.21, 0.44, R * 0.52);
 
       // 3. Mouth hole when slot is open/morphing
       if (this.morph > 0.05) this.drawMouth(x, whaleFaceClip, R);
@@ -982,6 +990,10 @@ export class BotEngine {
     customInk?: string,
     customEyeW?: number,
     customEyeH?: number,
+    /** Hard lateral limit for the eye centre, in body units. The whale's
+     *  sidelocks and inner fringe reach in from both sides, so its eyes may
+     *  not travel as far out as Mochi's on a bare superellipse. */
+    clampX?: number,
   ) {
     let shape: EyeShape = this.eyeOverride ?? this.cfg.eye;
     // Dancing: happy eyes in the calm states.
@@ -1007,7 +1019,8 @@ export class BotEngine {
       const cp = Math.cos(eyePitch);
       if (Math.cos(eyeYaw) * cp <= 0.04) continue;
 
-      const ex = Math.sin(eyeYaw) * cp * rx;
+      const ex0 = Math.sin(eyeYaw) * cp * rx;
+      const ex = clampX === undefined ? ex0 : Math.max(-clampX, Math.min(clampX, ex0));
       const ey = -Math.sin(eyePitch) * ry + (this.morph > 0 ? ry * 0.14 * this.morph : 0);
       const fx = lerp(Math.max(0.18, Math.cos(eyeYaw)), 1, this.morph * 0.7);
       const fy = lerp(Math.max(0.18, cp), 1, this.morph * 0.7);
