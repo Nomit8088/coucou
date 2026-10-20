@@ -11,9 +11,9 @@ import { PUMPKIN_BODY, drawOutfitBehind, drawOutfitFront, makeHead } from "./out
 import type { Outfit } from "./wardrobe";
 import {
   type WhaleContext,
-  drawWhaleBehind,
-  drawWhaleFront,
-  getWhaleFacePath,
+  drawWhale,
+  WHALE_EYE,
+  HEAD_SQUASH,
 } from "./whale-avatar";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -838,29 +838,20 @@ export class BotEngine {
         eyeShape: this.eyeOverride ?? this.cfg.eye,
       };
 
-      // 1. Behind layers: back hair, ears, headband, hair crown, face base, blush
-      drawWhaleBehind(x, whaleCtx);
+      // The head is squashed vertically when drawn, so the eyes are drawn in an
+      // un-squashed space: positions, sizes and the face clip all land round
+      // again once the parent transform applies.
+      drawWhale(x, whaleCtx, (ctx, faceClip) => {
+        ctx.save();
+        ctx.scale(1, 1 / HEAD_SQUASH);
+        this.drawEyes(ctx, faceClip, R, rx, ry, "#21263f", WHALE_EYE.w, WHALE_EYE.h, R * 0.52);
+        ctx.restore();
+      });
 
-      // 2. Eyes (clipped to face base with DeepSeek navy ink #21263f)
-      const whaleFaceClip = new Path2D();
-      const s = R / 205;
-      if (typeof DOMMatrix !== "undefined") {
-        const sm = new DOMMatrix().scale(s, s).translate(-320, -390);
-        whaleFaceClip.addPath(getWhaleFacePath(), sm);
-      }
-      // The whale's face is framed by sidelocks and low inner fringe, so the
-      // eye centres may not travel as far out as Mochi's: clamp the lateral
-      // travel to keep both eyes on visible skin while the head still follows
-      // the pointer.
-      this.drawEyes(x, whaleFaceClip, R, rx, ry, "#21263f", 0.21, 0.44, R * 0.52);
+      // The mailbox morph is a Mochi form; the whale keeps its head, so the
+      // slot and mouth are simply not drawn here.
 
-      // 3. Mouth hole when slot is open/morphing
-      if (this.morph > 0.05) this.drawMouth(x, whaleFaceClip, R);
-
-      // 4. Front layers: fringe bangs, sidelocks, hair highlights, bow, ahoge
-      drawWhaleFront(x, whaleCtx);
-
-      // 5. Wardrobe outfits (if selected)
+      // Wardrobe outfits sit on top of the finished head.
       if (head) drawOutfitFront(x, this.outfit, head, outfitState);
     } else {
       if (head) drawOutfitBehind(x, this.outfit, head, outfitState);
