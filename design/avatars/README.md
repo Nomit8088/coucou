@@ -30,6 +30,7 @@ Tauri 项目可直接把 `windows/icon.ico`、`macos/icon.icns`、`icon-512.png`
 
 | 图层 id | 内容 |
 |---|---|
+| `head` | 整颗头，带统一的比例变换（见下） |
 | `back-hair` | 后发与发尾高光 |
 | `headband` | 白色荷叶边发饰 |
 | `whale-ears` | 两侧鲸鱼耳鳍（`whale-ear-left` 是右侧的镜像） |
@@ -41,6 +42,8 @@ Tauri 项目可直接把 `windows/icon.ico`、`macos/icon.icns`、`icon-512.png`
 | `expression` | `eyes` 与 `blush`，表情替换改这里 |
 
 配色集中在 `<defs>` 的渐变里（`hair` / `bangs` / `back` / `skin` / `lace` / `ribbon` / `fin` / `fin-belly`）。
+
+**关于 `head` 组的来历**：桌宠渲染时会把整颗头纵向压到 86%（`HEAD_SQUASH`），因为原始画稿是 607 × 590 的近正方形，在图标尺寸下像一块竖着的牌子。图标要和桌宠长得一样，所以这个变换已经烘焙进 SVG：外层 `head` 组统一做 `scale(1.045, 0.8987)`，眼睛再用 1.1127 的 y 反向缩放抵消，保持圆形。这段变换由 `apply_head_proportions.py` 生成，脚本幂等，已有该组时不会重复叠加。
 
 改完重新导出：
 
