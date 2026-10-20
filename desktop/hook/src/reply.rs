@@ -287,8 +287,10 @@ mod tests {
         let question = json!({
             "questions": [{ "question": "Which one?", "options": [{ "label": "A" }, { "label": "B" }] }]
         });
-        // No Claude Code pill: an answer with no agent is not printed.
-        assert!(stdout("", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
+        let out = stdout("", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).unwrap();
+        let v: Value = serde_json::from_str(&out).unwrap();
+        assert_eq!(v["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert_eq!(v["hookSpecificOutput"]["decision"]["updatedInput"]["answers"]["Which one?"], "B");
         assert!(stdout("codex", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
         assert!(stdout("dsh", "PermissionRequest", Some(r#"{"answers":{"Which one?":"B"}}"#), Some(&question)).is_none());
     }
@@ -327,22 +329,26 @@ mod tests {
         });
         // Auto mode
         let auto = decision_json("plan_auto", Some(&plan_input)).unwrap();
-        assert!(auto.contains(r#""behavior":"allow""#));
-        assert!(auto.contains(r#""mode":"auto""#));
-        assert!(auto.contains(r#""updatedInput":{"plan":"# Build feature\n1. Step one\n2. Step two"}"#));
+        let auto_val: Value = serde_json::from_str(&auto).unwrap();
+        assert_eq!(auto_val["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert_eq!(auto_val["hookSpecificOutput"]["decision"]["updatedPermissions"][0]["mode"], "auto");
+        assert_eq!(auto_val["hookSpecificOutput"]["decision"]["updatedInput"]["plan"], "# Build feature\n1. Step one\n2. Step two");
 
         // Manual mode
         let manual = decision_json("plan_default", Some(&plan_input)).unwrap();
-        assert!(manual.contains(r#""behavior":"allow""#));
-        assert!(manual.contains(r#""mode":"default""#));
+        let manual_val: Value = serde_json::from_str(&manual).unwrap();
+        assert_eq!(manual_val["hookSpecificOutput"]["decision"]["behavior"], "allow");
+        assert_eq!(manual_val["hookSpecificOutput"]["decision"]["updatedPermissions"][0]["mode"], "default");
 
         // Change plan
         let change = decision_json("plan_change", Some(&plan_input)).unwrap();
-        assert!(change.contains(r#""behavior":"deny""#));
-        assert!(change.contains(r#""interrupt":true"#));
+        let change_val: Value = serde_json::from_str(&change).unwrap();
+        assert_eq!(change_val["hookSpecificOutput"]["decision"]["behavior"], "deny");
+        assert_eq!(change_val["hookSpecificOutput"]["decision"]["interrupt"], true);
 
         // Plain allow on a plan tool preserves input
         let plain = decision_json("allow", Some(&plan_input)).unwrap();
-        assert!(plain.contains(r#""updatedInput":{"plan":"# Build feature\n1. Step one\n2. Step two"}"#));
+        let plain_val: Value = serde_json::from_str(&plain).unwrap();
+        assert_eq!(plain_val["hookSpecificOutput"]["decision"]["updatedInput"]["plan"], "# Build feature\n1. Step one\n2. Step two");
     }
 }

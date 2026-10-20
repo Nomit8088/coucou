@@ -870,6 +870,7 @@ mod tests {
                 "soundVolume",
                 "autoCloseInterval",
                 "openOnHover",
+                "showClock",
                 "absenceInterval",
                 "activeIntegrations",
                 "mainPill",
