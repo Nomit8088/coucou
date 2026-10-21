@@ -22,7 +22,7 @@ const HOOK = {
 };
 
 const INFO = {
-  appVersion: "0.2.5",
+  appVersion: "0.2.6",
   identifier: "fr.louisraille.NotchBuddy",
   os: "windows",
   arch: "x86_64",
@@ -54,7 +54,8 @@ const format = (info = INFO) => formatDiagnostics(info, "Mozilla/5.0 Edg/123", N
 
 test("the summary names the app, the host and every path a report needs", () => {
   const text = format();
-  assert.match(text, /Coucou 0\.2\.5 \(fr\.louisraille\.NotchBuddy\)/);
+  // Derived from INFO so a version bump never needs a test edit.
+  assert.ok(text.includes(`Coucou ${INFO.appVersion} (fr.louisraille.NotchBuddy)`), text);
   assert.match(text, /Host: windows x86_64/);
   assert.match(text, /WebView: Mozilla\/5\.0 Edg\/123/);
   assert.ok(text.includes("Settings: C:\\Users\\me\\.claude\\settings.json"), text);
