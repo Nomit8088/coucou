@@ -6,7 +6,7 @@ import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
 import { gitHubAlert, gitNotice, type GitHubEvent } from "../core/github";
 import { availablePills } from "../core/pills";
 import { Sound } from "../core/sound";
-import { State } from "../core/state";
+import { State, type GitNotice } from "../core/state";
 import type { Island } from "./island";
 
 const GITHUB = "integration_github";

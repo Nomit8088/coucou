@@ -793,7 +793,11 @@ export class Island {
     if (State.mode === "expanded" && this.dshSessionCard()) {
       h = DSH_SESSION_H;
     }
-    if (State.mode === "expanded" && State.view === "overview" && State.showingDiffDetail) {
+    if (
+      State.mode === "expanded" &&
+      State.view === "overview" &&
+      (State.showingDiffDetail || State.showingIntegrationDetail)
+    ) {
       h = DIFF_DETAIL_H;
     }
     const r = State.mode === "expanded" ? EXPANDED_CORNER : ROUNDED_CORNER;

@@ -607,7 +607,11 @@ fn secret_set(app: AppHandle, key: String, value: String) -> Result<(), String> 
     if key == local_chat::CUSTOM_KEY {
         return Err("use local_set_key".into());
     }
-    let before = matches!(key.as_str(), "github-token" | "gitlab-url" | "gitlab-token").then(|| secrets::get(&key));
+    let watched = matches!(
+        key.as_str(),
+        "github-token" | "gitlab-url" | "gitlab-token"
+    );
+    let before = watched.then(|| secrets::get(&key));
     secrets::set(&key, &value)?;
     if let Some(before) = before {
         if secrets::get(&key) != before {

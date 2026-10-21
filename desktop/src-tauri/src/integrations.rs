@@ -1109,21 +1109,29 @@ async fn gitlab_get(base: &reqwest::Url, token: &str, path: &str) -> Option<Valu
     response.json().await.ok()
 }
 
-async fn gitlab_graphql(base: &reqwest::Url, token: &str) -> Option<Value> {
+async fn gitlab_graphql(base: &reqwest::Url, token: &str, query: &str) -> Option<Value> {
     let url = format!("{}{}", base.as_str().trim_end_matches('/'), "/api/graphql");
     let response = client()
         .post(url)
         .header("PRIVATE-TOKEN", token)
         .header("Content-Type", "application/json")
-        .json(&json!({ "query": crate::gitlab::GRAPHQL_QUERY }))
+        .json(&json!({ "query": query }))
         .send()
         .await
         .ok()?;
+    let status = response.status().as_u16();
     if !response.status().is_success() {
+        log::line(format!("gitlab graphql HTTP {status}"));
         return None;
     }
     let root: Value = response.json().await.ok()?;
-    root.get("data").filter(|d| d.is_object())?;
+    let errors = root.get("errors").and_then(Value::as_array).map(Vec::len).unwrap_or(0);
+    if errors > 0 {
+        log::line(format!("gitlab graphql errors: {errors}"));
+    }
+    if root.get("data").and_then(|d| d.get("currentUser")).and_then(Value::as_object).is_none() {
+        return None;
+    }
     Some(root)
 }
 
@@ -1254,27 +1262,38 @@ async fn poll_gitlab_force(app: &AppHandle, force: bool) {
         }
     }
     let watch = git_watch(app, false);
-    let pulse = if let Some(root) = gitlab_graphql(&base, &token).await {
-        crate::gitlab::GitlabPulse::parse(&root, now)
+    let pulse = if let Some(root) = gitlab_graphql(&base, &token, crate::gitlab::GRAPHQL_QUERY).await {
+        let mut pulse = crate::gitlab::GitlabPulse::parse(&root, now);
+        if let Some(pulse) = pulse.as_mut() {
+            if let Some(review) = gitlab_graphql(&base, &token, crate::gitlab::GRAPHQL_REVIEW_QUERY).await {
+                pulse.merge_review(&review);
+            }
+        }
+        pulse
     } else {
         None
     };
     let mut pulse = if let Some(pulse) = pulse {
         pulse
     } else {
+        log::line("gitlab graphql unavailable — REST pipelines");
         let user = gitlab_get(&base, &token, "/api/v4/user").await;
         let login = user
             .as_ref()
             .and_then(|u| u.get("username").and_then(Value::as_str))
             .unwrap_or("")
             .to_string();
-        let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=8").await;
-        let assigned = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=assigned_to_me&per_page=8").await;
-        let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=8").await;
+        let mine = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=created_by_me&per_page=20").await;
+        let assigned = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=assigned_to_me&per_page=20").await;
+        let mut review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&scope=to_be_reviewed&per_page=20").await;
         if review.is_none() {
-            review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=8").await;
+            review = gitlab_get(&base, &token, "/api/v4/merge_requests?state=opened&reviewer_id=me&per_page=20").await;
         }
-        crate::gitlab::GitlabPulse::from_rest(login, mine.as_ref(), assigned.as_ref(), review.as_ref(), now)
+        let mut pulse = crate::gitlab::GitlabPulse::from_rest(login, mine.as_ref(), assigned.as_ref(), review.as_ref(), now);
+        gitlab_fill_pipelines(&base, &token, &mut pulse.mine).await;
+        gitlab_fill_pipelines(&base, &token, &mut pulse.assigned).await;
+        gitlab_fill_pipelines(&base, &token, &mut pulse.review).await;
+        pulse
     };
     let old_pulse = GITLAB.lock().unwrap().pulse.clone();
     gitlab_attach_notes(&base, &token, &mut pulse, old_pulse.as_ref()).await;

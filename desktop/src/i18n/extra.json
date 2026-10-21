@@ -3912,6 +3912,116 @@
    "pt-BR": "Abrir os comentários",
    "ru": "Открыть комментарии",
    "id": "Buka komentar"
+  },
+  "Hooks": {
+   "zh-Hans": "Hooks",
+   "hi": "Hooks",
+   "es": "Hooks",
+   "ar": "Hooks",
+   "fr": "Hooks",
+   "bn": "Hooks",
+   "pt-BR": "Hooks",
+   "ru": "Хуки",
+   "id": "Hooks"
+  },
+  "{found} of {expected} events hooked": {
+   "zh-Hans": "已接入 {found}/{expected} 个事件",
+   "hi": "{expected} में से {found} इवेंट जुड़े हैं",
+   "es": "{found} de {expected} eventos conectados",
+   "ar": "تم ربط {found} من {expected} أحداث",
+   "fr": "{found} événements sur {expected} branchés",
+   "bn": "{expected}টির মধ্যে {found}টি ইভেন্ট যুক্ত",
+   "pt-BR": "{found} de {expected} eventos conectados",
+   "ru": "Подключено событий: {found} из {expected}",
+   "id": "{found} dari {expected} peristiwa terhubung"
+  },
+  "settings.json could not be read: {error}": {
+   "zh-Hans": "无法读取 settings.json：{error}",
+   "hi": "settings.json पढ़ा नहीं जा सका: {error}",
+   "es": "No se pudo leer settings.json: {error}",
+   "ar": "تعذّرت قراءة settings.json: {error}",
+   "fr": "Impossible de lire settings.json : {error}",
+   "bn": "settings.json পড়া যায়নি: {error}",
+   "pt-BR": "Não foi possível ler settings.json: {error}",
+   "ru": "Не удалось прочитать settings.json: {error}",
+   "id": "Tidak dapat membaca settings.json: {error}"
+  },
+  "The hooks point at another Coucou build and will not reach this one. Reinstall them from here.": {
+   "zh-Hans": "这些 hooks 指向另一个 Coucou 版本，无法连接到当前版本。请在这里重新安装。",
+   "hi": "ये hooks किसी दूसरे Coucou बिल्ड की ओर इंगित करते हैं और इस तक नहीं पहुँचेंगे। इन्हें यहीं से फिर से इंस्टॉल करें।",
+   "es": "Los hooks apuntan a otra versión de Coucou y no llegarán a esta. Vuelve a instalarlos desde aquí.",
+   "ar": "تشير هذه الـ hooks إلى إصدار Coucou آخر ولن تصل إلى هذا الإصدار. أعد تثبيتها من هنا.",
+   "fr": "Les hooks pointent vers une autre version de Coucou et n'atteindront pas celle-ci. Réinstalle-les depuis ici.",
+   "bn": "এই hooks অন্য একটি Coucou বিল্ডের দিকে নির্দেশ করছে এবং এখানে পৌঁছাবে না। এখান থেকেই আবার ইনস্টল করুন।",
+   "pt-BR": "Os hooks apontam para outra versão do Coucou e não vão chegar a esta. Reinstale-os daqui.",
+   "ru": "Эти хуки указывают на другую сборку Coucou и не достигнут этой. Переустановите их здесь.",
+   "id": "Hooks ini mengarah ke build Coucou lain dan tidak akan sampai ke versi ini. Pasang ulang dari sini."
+  },
+  "Some events are not hooked: {events}": {
+   "zh-Hans": "部分事件尚未接入：{events}",
+   "hi": "कुछ इवेंट जुड़े नहीं हैं: {events}",
+   "es": "Algunos eventos no están conectados: {events}",
+   "ar": "بعض الأحداث غير مربوطة: {events}",
+   "fr": "Certains événements ne sont pas branchés : {events}",
+   "bn": "কিছু ইভেন্ট যুক্ত নয়: {events}",
+   "pt-BR": "Alguns eventos não estão conectados: {events}",
+   "ru": "Некоторые события не подключены: {events}",
+   "id": "Beberapa peristiwa belum terhubung: {events}"
+  },
+  "Diagnostics": {
+   "zh-Hans": "诊断",
+   "hi": "डायग्नोस्टिक्स",
+   "es": "Diagnóstico",
+   "ar": "التشخيص",
+   "fr": "Diagnostic",
+   "bn": "ডায়াগনস্টিকস",
+   "pt-BR": "Diagnóstico",
+   "ru": "Диагностика",
+   "id": "Diagnostik"
+  },
+  "A summary of this install to paste into a bug report. No API keys, no message contents.": {
+   "zh-Hans": "这份安装摘要可直接粘贴到问题报告里。不包含 API 密钥和消息内容。",
+   "hi": "इस इंस्टॉल का सारांश, बग रिपोर्ट में चिपकाने के लिए। कोई API कुंजी नहीं, कोई संदेश सामग्री नहीं।",
+   "es": "Un resumen de esta instalación para pegar en un informe de error. Sin claves API ni contenido de mensajes.",
+   "ar": "ملخص لهذا التثبيت للصقه في تقرير خطأ. لا مفاتيح API ولا محتوى رسائل.",
+   "fr": "Un résumé de cette installation à coller dans un rapport de bug. Aucune clé API, aucun contenu de message.",
+   "bn": "এই ইনস্টলের সারসংক্ষেপ, বাগ রিপোর্টে পেস্ট করার জন্য। কোনো API কী নেই, কোনো বার্তার বিষয়বস্তু নেই।",
+   "pt-BR": "Um resumo desta instalação para colar em um relatório de bug. Sem chaves de API nem conteúdo de mensagens.",
+   "ru": "Сводка об этой установке для отчёта об ошибке. Без API-ключей и содержимого сообщений.",
+   "id": "Ringkasan pemasangan ini untuk ditempel ke laporan bug. Tanpa kunci API, tanpa isi pesan."
+  },
+  "Copy diagnostics": {
+   "zh-Hans": "复制诊断信息",
+   "hi": "डायग्नोस्टिक्स कॉपी करें",
+   "es": "Copiar diagnóstico",
+   "ar": "نسخ التشخيص",
+   "fr": "Copier le diagnostic",
+   "bn": "ডায়াগনস্টিকস কপি করুন",
+   "pt-BR": "Copiar diagnóstico",
+   "ru": "Скопировать диагностику",
+   "id": "Salin diagnostik"
+  },
+  "Could not build the diagnostics: {error}": {
+   "zh-Hans": "无法生成诊断信息：{error}",
+   "hi": "डायग्नोस्टिक्स बना नहीं सके: {error}",
+   "es": "No se pudo generar el diagnóstico: {error}",
+   "ar": "تعذّر إنشاء التشخيص: {error}",
+   "fr": "Impossible de produire le diagnostic : {error}",
+   "bn": "ডায়াগনস্টিকস তৈরি করা যায়নি: {error}",
+   "pt-BR": "Não foi possível gerar o diagnóstico: {error}",
+   "ru": "Не удалось собрать диагностику: {error}",
+   "id": "Tidak dapat membuat diagnostik: {error}"
+  },
+  "{count} queued": {
+   "zh-Hans": "{count} 个排队中",
+   "hi": "{count} कतार में",
+   "es": "{count} en cola",
+   "ar": "{count} في الانتظار",
+   "fr": "{count} en attente",
+   "bn": "{count}টি সারিতে",
+   "pt-BR": "{count} na fila",
+   "ru": "{count} в очереди",
+   "id": "{count} dalam antrean"
   }
  }
 }

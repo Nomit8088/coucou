@@ -78,7 +78,12 @@ mod tests {
 
     #[test]
     fn deepseek_and_gitlab_credentials_are_allowed() {
-        for key in ["deepseek-api-key", "gitlab-url", "gitlab-token", "chat-c-abc"] {
+        for key in [
+            "deepseek-api-key",
+            "gitlab-url",
+            "gitlab-token",
+            "chat-c-abc",
+        ] {
             assert!(allowed(key), "{key}");
         }
         assert!(!allowed("chat-"));

@@ -313,6 +313,8 @@ class AppState {
   sessionDiffs = new Map<string, FileDiff[]>();
   /** The overview is showing the full-width editor-style diff detail. */
   showingDiffDetail = false;
+  /** The overview is showing a full-width integration detail (e.g. GitLab). */
+  showingIntegrationDetail = false;
   private sessionDiffTimers = new Map<string, number>();
   /** Never reset, so an id can never point at a newer diff than the one tapped. */
   private nextDiffId = 0;

@@ -560,6 +560,7 @@ function gitWatchRows(id: "integration_github" | "integration_gitlab"): HTMLElem
   );
 }
 
+
 function integrationsSection(present: Record<string, boolean>): HTMLElement {
   const note = h("div", { class: "hint" });
   const list = h("div", { style: "display:flex;flex-direction:column;gap:14px" });
