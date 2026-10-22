@@ -311,22 +311,22 @@ mod tests {
 
     #[test]
     fn release_urls_reject_external_or_non_release_links() {
-        assert!(release_link(
-            "https://github.com/Nomit8088/coucou/releases/download/v1/Coucou.exe",
-            true
-        ));
-        assert!(release_link(
-            "https://github.com/Nomit8088/coucou/releases/tag/v1",
-            false
-        ));
+        // The build's own repository is the only accepted host and path, whatever
+        // it happens to be, so the fixtures follow the compile-time repo.
+        let asset = format!("https://github.com/{GITHUB_REPO}/releases/download/v1/Coucou.exe");
+        let page = format!("https://github.com/{GITHUB_REPO}/releases/tag/v1");
+        assert!(release_link(&asset, true), "{asset}");
+        assert!(release_link(&page, false), "{page}");
+        // A repository that is certainly not this one, so the prefix check bites.
+        let other = if GITHUB_REPO == "other/repo" { "someone/else" } else { "other/repo" };
         for url in [
-            "http://github.com/Nomit8088/coucou/releases/download/v1/Coucou.exe",
-            "https://github.com.evil.test/Nomit8088/coucou/releases/download/v1/Coucou.exe",
-            "https://github.com/other/repo/releases/download/v1/Coucou.exe",
-            "https://github.com/Nomit8088/coucou/blob/main/Coucou.exe",
-            "https://github.com/Nomit8088/coucou/releases/download/v1/Coucou.exe?x=1",
+            format!("http://github.com/{GITHUB_REPO}/releases/download/v1/Coucou.exe"),
+            format!("https://github.com.evil.test/{GITHUB_REPO}/releases/download/v1/Coucou.exe"),
+            format!("https://github.com/{other}/releases/download/v1/Coucou.exe"),
+            format!("https://github.com/{GITHUB_REPO}/blob/main/Coucou.exe"),
+            format!("https://github.com/{GITHUB_REPO}/releases/download/v1/Coucou.exe?x=1"),
         ] {
-            assert!(!release_link(url, true), "{url}");
+            assert!(!release_link(&url, true), "{url}");
         }
     }
 }
