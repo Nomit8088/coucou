@@ -27,7 +27,8 @@ use ::windows::Win32::UI::WindowsAndMessaging::{
     EnumChildWindows, EnumWindows, GetClassNameW, GetCursorPos, GetWindow, GetWindowLongPtrW,
     GetWindowTextW, GetWindowThreadProcessId, IsIconic, IsWindowVisible, SetForegroundWindow,
     SetWindowLongPtrW, SetWindowPos, ShowWindow, GWL_EXSTYLE, GW_OWNER, HWND_TOPMOST,
-    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_RESTORE, WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SW_RESTORE, WS_EX_LAYERED, WS_EX_NOACTIVATE,
+    WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT,
 };
 
 use super::LocalTime;
@@ -365,6 +366,30 @@ pub fn set_activating(win: &WebviewWindow, activating: bool) {
 
 /// Click-through here is the poll's WS_EX_TRANSPARENT toggle, not a region.
 pub fn set_input_region(_win: &WebviewWindow, _rect: Option<(f64, f64, f64, f64)>) {}
+
+/// Click-through, applied without going through tao.
+///
+/// `WebviewWindow::set_ignore_cursor_events` rebuilds every window style from
+/// tao's cached flags and then calls `ShowWindow(SW_SHOW)`, which **activates**
+/// the window. That is how the island used to take the foreground from whatever
+/// the user was typing in as soon as the cursor crossed it, and it is not
+/// something a window sitting on top of other applications may do.
+///
+/// The style bits are exactly the ones tao produces (WS_EX_TRANSPARENT plus
+/// WS_EX_LAYERED while click-through), so the window looks the same; only the
+/// ShowWindow — and with it the activation — is gone. No SetWindowPos either:
+/// nothing here may move the z-order or disturb a drag running underneath.
+pub fn set_click_through(win: &WebviewWindow, ignore: bool) {
+    let Some(hwnd) = hwnd_of(win) else { return };
+    unsafe {
+        let ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        let bits = WS_EX_TRANSPARENT.0 as isize | WS_EX_LAYERED.0 as isize;
+        let want = if ignore { ex | bits } else { ex & !bits };
+        if want != ex {
+            SetWindowLongPtrW(hwnd, GWL_EXSTYLE, want);
+        }
+    }
+}
 
 /// The cursor poll already parks itself with the island (island.rs): nothing to do.
 pub fn set_pointer_watch(_active: bool) {}

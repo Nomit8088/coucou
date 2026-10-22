@@ -452,10 +452,6 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 #[cfg(not(target_os = "macos"))]
                 let Some((x, y)) = cursor_physical().map(|(cx, cy)|
                     ((cx - origin.x as f64) / scale, (cy - origin.y as f64) / scale)) else { continue };
-                let size = match win.inner_size() {
-                    Ok(s) => (s.width as f64 / scale, s.height as f64 / scale),
-                    Err(_) => (PANEL_W, PANEL_H),
-                };
                 // Read the button before deciding to skip: a click that does not
                 // move the cursor must still be seen, or an island that is open
                 // would never learn that the user clicked beside it.
@@ -469,6 +465,18 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // Click-through: the window only takes the mouse over the island
                 // shape. A small entry margin means the flag is already off by the
                 // time a moving cursor reaches a button.
+                //
+                // Nothing else may take the mouse — not even while a button is
+                // held. The window is a 720×320 panel whose lower part is empty,
+                // and it used to take the whole panel for as long as the button
+                // was down, so a press anywhere in the top centre of the screen
+                // was routed to us instead of the window underneath. A QQ title
+                // bar sitting there was enough: QQ follows its drags itself
+                // without capturing the mouse, so the moment the panel became the
+                // window under the cursor it stopped receiving mouse moves and
+                // the window never moved. Native windows (WeChat, consoles) take
+                // a mouse capture and never noticed — which is exactly why only
+                // some apps broke.
                 let r = *gate.rect.lock().unwrap();
                 let on_island = r.w > 0.0
                     && x >= r.x - HIT_MARGIN
@@ -479,22 +487,13 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 // A file being dragged has to be able to find us. WS_EX_TRANSPARENT
                 // — what click-through is on Windows — hides the window from
                 // WindowFromPoint, so OLE finds no drop target and shows the "no
-                // drop" cursor. macOS has no such problem: AppKit delivers drags to
-                // registered destinations whatever ignoresMouseEvents says. So while
-                // a button is held anywhere over the panel, the whole panel takes
-                // the mouse, which also makes the drop zone as forgiving as the Mac's.
-                // A press may be the start of a drag: make sure the drop target is
-                // ours before the file arrives.
+                // drop" cursor. The island plus its entry margin is the drop zone,
+                // so that is what takes the mouse; a press anywhere else belongs
+                // to the window underneath and must stay there.
                 if down && !was_down {
                     let handle = app.clone();
                     let _ = app.run_on_main_thread(move || platform::unblock_webview_drops(&handle));
                 }
-
-                let dragging = down
-                    && x >= 0.0
-                    && x <= size.0
-                    && y >= 0.0
-                    && y <= size.1;
 
                 // A click that missed the island while it was open folds it, as
                 // clicking outside a card does on the Mac. The poll already reads
@@ -517,10 +516,10 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                 }
                 was_down = down;
 
-                let accept = on_island || dragging;
+                let accept = on_island;
                 if gate.ignoring.load(Ordering::Relaxed) == accept {
                     gate.ignoring.store(!accept, Ordering::Relaxed);
-                    let _ = win.set_ignore_cursor_events(!accept);
+                    platform::set_click_through(&win, !accept);
                 }
 
                 let _ = win.emit("cursor", CursorPayload { x, y });
@@ -564,6 +563,6 @@ pub fn refresh_click_through(app: &AppHandle, gate: &PollGate) {
 
 pub fn set_ignore_cursor(app: &AppHandle, ignore: bool) {
     if let Some(win) = window(app) {
-        let _ = win.set_ignore_cursor_events(ignore);
+        platform::set_click_through(&win, ignore);
     }
 }

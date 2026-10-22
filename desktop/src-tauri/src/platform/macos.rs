@@ -305,6 +305,11 @@ pub fn pin_to_monitor(_win: &WebviewWindow, _x: i32, _y: i32) {
     refresh_displays();
 }
 pub fn set_input_region(_win: &WebviewWindow, _rect: Option<(f64, f64, f64, f64)>) {}
+/// `ignoresMouseEvents` only flips hit-testing: AppKit never activates a window
+/// because of it, so the plain Tauri call is all this needs.
+pub fn set_click_through(win: &WebviewWindow, ignore: bool) {
+    let _ = win.set_ignore_cursor_events(ignore);
+}
 pub fn set_pointer_watch(_active: bool) {}
 pub fn set_outside_click_watch(_win: &WebviewWindow, _active: bool) {}
 pub fn unblock_webview_drops(_app: &AppHandle) {}
