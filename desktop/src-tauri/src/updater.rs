@@ -6,7 +6,13 @@ use serde_json::Value;
 #[cfg(any(windows, target_os = "macos"))]
 use std::process::Command;
 
-const GITHUB_REPO: &str = "Nomit8088/coucou";
+/// `owner/repo` this build reads releases from. `build.rs` sets it from the
+/// checkout's `origin` (or `COUCOU_UPDATE_REPO`), so a private mirror updates
+/// from itself while a plain build keeps reading the public repository.
+const GITHUB_REPO: &str = match option_env!("COUCOU_UPDATE_REPO") {
+    Some(repo) => repo,
+    None => "Nomit8088/coucou",
+};
 const USER_AGENT: &str = "Coucou-App";
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -19,6 +25,8 @@ pub struct UpdateInfo {
     pub release_url: String,
     pub download_url: Option<String>,
     pub file_name: Option<String>,
+    /// The repository this build updates from, so the UI never hardcodes one.
+    pub repo: String,
 }
 
 fn parse_semver(v: &str) -> Option<(u64, u64, u64)> {
@@ -173,6 +181,7 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
         release_url,
         download_url,
         file_name,
+        repo: GITHUB_REPO.to_string(),
     })
 }
 

@@ -1,7 +1,15 @@
 import type { UpdateInfo } from "./bridge";
 import { HOST_OS, platformCapabilities, type HostOs } from "./platform";
 
-export const RELEASES_URL = "https://github.com/Nomit8088/coucou/releases";
+/** The public repository, used only when the backend did not name one. */
+export const DEFAULT_REPO = "Nomit8088/coucou";
+
+/** Release page of the repository this build updates from. */
+export function releasesUrl(repo: string = DEFAULT_REPO): string {
+  return `https://github.com/${repo}/releases`;
+}
+
+export const RELEASES_URL = releasesUrl();
 
 /** A UI action, not a promise of silent installation on an unsupported OS. */
 export function updateAction(info: UpdateInfo, os: HostOs = HOST_OS): {
@@ -19,5 +27,5 @@ export function updateAction(info: UpdateInfo, os: HostOs = HOST_OS): {
       }
     } catch {}
   }
-  return { kind: "release", url: info.releaseUrl || RELEASES_URL };
+  return { kind: "release", url: info.releaseUrl || releasesUrl(info.repo) };
 }

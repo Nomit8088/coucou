@@ -263,6 +263,8 @@ export interface UpdateInfo {
   releaseUrl: string;
   downloadUrl: string | null;
   fileName: string | null;
+  /** The repository this build updates from ("owner/repo"). */
+  repo: string;
 }
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume" | "like";

@@ -24,7 +24,7 @@ import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
 import { statusDot, renderDiff } from "./parts";
 import { HOST_OS, platformCapabilities } from "../core/platform";
-import { updateAction } from "../core/updater";
+import { releasesUrl, updateAction } from "../core/updater";
 import { formatDiagnostics } from "../core/diagnostics";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
@@ -1345,7 +1345,7 @@ function updaterSection(): HTMLElement {
       const viewBtn = h("button", {
         text: t("View on GitHub"),
         style: "cursor: pointer; border-radius: 6px; padding: 5px 12px;",
-        onclick: () => void Bridge.openUrl(info.releaseUrl || "https://github.com/Nomit8088/coucou/releases"),
+        onclick: () => void Bridge.openUrl(info.releaseUrl || releasesUrl(info.repo)),
       });
       actions.append(viewBtn);
 
