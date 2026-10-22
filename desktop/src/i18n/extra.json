@@ -23,6 +23,28 @@
    "ru": "Дата и время в середине острова, когда он свёрнут.",
    "id": "Tanggal dan jam di tengah pulau saat ringkas."
   },
+  "Open on new mail": {
+   "zh-Hans": "新邮件时展开",
+   "hi": "नए मेल पर खोलें",
+   "es": "Abrir con correo nuevo",
+   "ar": "الفتح عند وصول بريد جديد",
+   "fr": "Ouvrir à la réception d'un e-mail",
+   "bn": "নতুন মেইলে খুলুন",
+   "pt-BR": "Abrir ao receber e-mail",
+   "ru": "Открывать при новом письме",
+   "id": "Buka saat email baru"
+  },
+  "A new mail opens the island on the mailbox. Off: only the chime and the badge.": {
+   "zh-Hans": "收到新邮件时把灵动岛展开到邮箱卡片。关闭后只有提示音和角标。",
+   "hi": "नया मेल आने पर आइलैंड मेलबक्स पर खुलता है। बंद होने पर केवल ध्वनि और बैज दिखते हैं।",
+   "es": "Un correo nuevo abre la isla en el buzón. Desactivado: solo el sonido y la insignia.",
+   "ar": "بريد جديد يفتح الجزيرة على صندوق البريد. عند الإيقاف: الصوت والشارة فقط.",
+   "fr": "Un nouvel e-mail ouvre l'îlot sur la boîte de réception. Désactivé : seulement le son et le badge.",
+   "bn": "নতুন মেইল এলে আইল্যান্ড মেইলবক্সে খোলে। বন্ধ থাকলে শুধু শব্দ ও ব্যাজ।",
+   "pt-BR": "Um e-mail novo abre a ilha na caixa de entrada. Desativado: só o som e o selo.",
+   "ru": "Новое письмо открывает остров на почтовом ящике. Выключено: только звук и значок.",
+   "id": "Email baru membuka pulau pada kotak masuk. Nonaktif: hanya bunyi dan lencana."
+  },
   "has a plan ready": {
    "zh-Hans": "计划已就绪",
    "hi": "योजना तैयार है",

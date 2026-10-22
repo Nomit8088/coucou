@@ -81,6 +81,11 @@ pub struct Settings {
     pub github_watch: GitWatch,
     /// Which GitLab merge requests the island watches for pipelines, new MRs and comments.
     pub gitlab_watch: GitWatch,
+    /// A new mail opens the island on the mailbox (src/island/integrations.ts).
+    /// On by default: the mail pill is only on screen while the overview is
+    /// open, so a badge on it is invisible, and `reveal()` does nothing at all
+    /// once the island is already up.
+    pub mail_popup: bool,
 }
 
 /// Which pull/merge requests an integration follows. New ones the user opened
@@ -199,6 +204,7 @@ impl Default for Settings {
             music_like_hotkeys: BTreeMap::new(),
             github_watch: GitWatch::default(),
             gitlab_watch: GitWatch::default(),
+            mail_popup: true,
         }
     }
 }
@@ -896,6 +902,7 @@ mod tests {
                 "musicLikeHotkeys",
                 "githubWatch",
                 "gitlabWatch",
+                "mailPopup",
             ]
         );
         let _ = std::fs::remove_dir_all(&dir);

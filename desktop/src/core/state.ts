@@ -177,6 +177,11 @@ export interface Settings {
   githubWatch: GitWatch;
   /** Which GitLab MRs the island watches. */
   gitlabWatch: GitWatch;
+  /**
+   * A new mail opens the island on the mailbox. Off: only the chime and the
+   * pill badge (which is invisible while the island is compact).
+   */
+  mailPopup: boolean;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
   desktopMochi?: {
     onDesktop: boolean;
@@ -229,6 +234,7 @@ export const DEFAULT_SETTINGS: Settings = {
   language: "",
   githubWatch: { created: true, assigned: true, review: true },
   gitlabWatch: { created: true, assigned: true, review: true },
+  mailPopup: true,
 };
 
 type Listener = () => void;

@@ -719,6 +719,9 @@ async fn poll_qqmail(app: AppHandle) {
                 label: if last.subject.is_empty() { last.from.clone() } else { last.subject.clone() },
                 detail: Some(last.from.clone()),
             });
+            if let Some(seen) = &event {
+                log::line(format!("qqmail: new mail “{}” · {} unseen", seen.label, mailbox.unread));
+            }
             emit(&app, IntegrationUpdate {
                 id: "integration_qqmail",
                 data: serde_json::to_value(&mailbox).unwrap_or_else(|_| json!({})),
@@ -726,18 +729,24 @@ async fn poll_qqmail(app: AppHandle) {
                 event,
             });
         }
-        Err(crate::mail::Error::Auth) => emit(&app, IntegrationUpdate {
-            id: "integration_qqmail",
-            data: json!({}),
-            error: Some(crate::i18n::t("Sign-in refused — check the authorisation code")),
-            event: None,
-        }),
-        Err(err) => emit(&app, IntegrationUpdate {
-            id: "integration_qqmail",
-            data: json!({}),
-            error: Some(crate::i18n::tf("No connection: {error}", &[("error", &err.to_string())])),
-            event: None,
-        }),
+        Err(crate::mail::Error::Auth) => {
+            log::line("qqmail: sign-in refused — check the authorisation code".to_string());
+            emit(&app, IntegrationUpdate {
+                id: "integration_qqmail",
+                data: json!({}),
+                error: Some(crate::i18n::t("Sign-in refused — check the authorisation code")),
+                event: None,
+            });
+        }
+        Err(err) => {
+            log::line(format!("qqmail: no connection: {err}"));
+            emit(&app, IntegrationUpdate {
+                id: "integration_qqmail",
+                data: json!({}),
+                error: Some(crate::i18n::tf("No connection: {error}", &[("error", &err.to_string())])),
+                event: None,
+            });
+        }
     }
 }
 

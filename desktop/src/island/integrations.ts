@@ -149,7 +149,18 @@ function handle(island: Island, update: IntegrationUpdate) {
       Sound.play(event.success ? "finish" : "error");
       // Same as the Swift pollers: show the compact island so the badge is seen,
       // but never steal the screen for a successful deploy.
-      island.reveal();
+      //
+      // A new mail is the exception: its pill only exists on screen while the
+      // overview is open, so badging it said nothing — and `reveal()` does
+      // nothing at all when the island is already up. Open the mailbox instead,
+      // but never over an island the user is reading, and only while the
+      // "Open on new mail" switch is on.
+      if (update.id === "integration_qqmail" && State.settings.mailPopup !== false && State.mode !== "expanded") {
+        State.setFocus(update.id);
+        island.alert("overview");
+      } else {
+        island.reveal();
+      }
 
       const existing = clearTimers.get(update.id);
       if (existing != null) window.clearTimeout(existing);
