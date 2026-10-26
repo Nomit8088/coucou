@@ -31,8 +31,11 @@ import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
 import { DRAG_THRESHOLD } from "../mochi/desktop-logic";
 import { CompactMusicWidget } from "./compact-music";
+import { Updates } from "./update";
+import { UPDATE_BLUE, showsUpdateHint } from "../whats-new/whats-new";
 
 const BOT_OVERHANG = 40;
+const UPDATE_BLUE_RGB = hexToRGB(UPDATE_BLUE);
 
 /** Extra canvas on each side of Mochi, for the witch hat's brim and the Santa hat's tip. */
 const BOT_SIDE = 24;
@@ -87,6 +90,8 @@ export class Island {
   private lastFrame = 0;
   private dirty = true;
   private canvasPx = 0;
+  /** The pixel ratio Mochi's bitmap was sized for: it changes with the monitor. */
+  private canvasDpr = 0;
 
   // Rust starts the window at full size so the launch greeting has room.
   private collapsed = false;
@@ -170,6 +175,20 @@ export class Island {
     State.isPinned = true;
     this.fsm.pinned = true;
     this.fsm.forcePetit();
+  }
+
+  /** A new Coucou waits and Mochi has nothing else to say (he is blue). */
+  private updateHintOn(): boolean {
+    return !State.paused && showsUpdateHint(Updates.waiting(), State.effectiveState, State.pendingApproval != null);
+  }
+
+  /**
+   * What a click opens on: while Mochi is blue, the new version ("Coucou X is
+   * out", Download and install); otherwise the usual view. A waiting
+   * permission or question always comes first.
+   */
+  private openingView(): IslandViewName {
+    return this.updateHintOn() ? "update" : State.defaultView();
   }
 
   // ── DOM ─────────────────────────────────────────────────────────────────────
@@ -419,7 +438,7 @@ export class Island {
           if (!this.wasInIsland) this.fsm.mouseLeft();
           break;
         case "home":
-          this.expand(State.defaultView());
+          this.expand(this.openingView());
           if (!this.wasInIsland) this.fsm.mouseLeft();
           // Hooks may have been installed in a terminal since: the idle cards
           // say so on the next open, without polling while the island is shut.
@@ -1207,6 +1226,10 @@ export class Island {
       const gctx = this.greetingCanvas.getContext("2d");
       if (gctx) {
         const dpr = Math.min(2, window.devicePixelRatio || 1);
+        if (this.greetingCanvas.width !== Math.round(EXPANDED_W * dpr)) {
+          this.greetingCanvas.width = Math.round(EXPANDED_W * dpr);
+          this.greetingCanvas.height = Math.round(150 * dpr);
+        }
         gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         this.greeting.draw(gctx);
       }
@@ -1287,8 +1310,11 @@ export class Island {
     const hCss = w + BOT_OVERHANG;
     const wCss = w + BOT_SIDE * 2;
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (this.canvasPx !== w) {
+    // Drawn at the current ratio, so a bitmap sized for another monitor's
+    // would show Mochi too big and cut, or too small.
+    if (this.canvasPx !== w || this.canvasDpr !== dpr) {
       this.canvasPx = w;
+      this.canvasDpr = dpr;
       this.botCanvas.width = Math.round(wCss * dpr);
       this.botCanvas.height = Math.round(hCss * dpr);
       this.botCanvas.style.width = `${wCss}px`;
@@ -1301,10 +1327,15 @@ export class Island {
     if (!ctx) return;
 
     const focus = State.focusTask;
+    // A new Coucou waits: over an idle or sleeping Mochi, the blue and the arrow
+    // badge (whats-new.ts). Anything Mochi has to say comes first.
+    this.engine.setUpdateHint(this.updateHintOn() ? UPDATE_BLUE_RGB : null);
     // While a plan card is open Mochi wears the plan's colour, like its pill.
     this.engine.bodyColor = planCardOpen()
       ? hexToRGB(openPlanColor())
-      : focus?.isIntegration
+      : this.engine.showsUpdateHint
+        ? UPDATE_BLUE_RGB
+        : focus?.isIntegration
         ? hexToRGB(focus.color)
         : null;
     this.engine.particleOverhang = BOT_OVERHANG;

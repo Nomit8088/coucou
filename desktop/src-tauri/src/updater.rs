@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 #[cfg(any(windows, target_os = "macos"))]
 use std::process::Command;
+use tauri::Emitter;
 
 /// `owner/repo` this build reads releases from. `build.rs` sets it from the
 /// checkout's `origin` (or `COUCOU_UPDATE_REPO`), so a private mirror updates
@@ -130,7 +131,7 @@ fn select_asset(json: &Value, os: &str, arch: &str) -> Option<(String, String)> 
 }
 
 #[tauri::command]
-pub async fn check_for_update() -> Result<UpdateInfo, String> {
+pub async fn check_for_update(app: tauri::AppHandle) -> Result<UpdateInfo, String> {
     let client = reqwest::Client::builder()
         .user_agent(USER_AGENT)
         .timeout(std::time::Duration::from_secs(10))
@@ -173,7 +174,7 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
         .map(|(url, name)| (Some(url), Some(name)))
         .unwrap_or_default();
 
-    Ok(UpdateInfo {
+    let info = UpdateInfo {
         has_update,
         current_version,
         latest_version,
@@ -182,7 +183,11 @@ pub async fn check_for_update() -> Result<UpdateInfo, String> {
         download_url,
         file_name,
         repo: GITHUB_REPO.to_string(),
-    })
+    };
+    // The island keeps the blue Mochi honest: a check made from the settings
+    // window tells it what came back, whether or not a new version is out.
+    let _ = app.emit("update-found", info.clone());
+    Ok(info)
 }
 
 #[tauri::command]

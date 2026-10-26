@@ -2693,6 +2693,61 @@ input[type="range"]::-webkit-slider-thumb {
   pointer-events: none;
 }
 
+/* ── What's new after an update (views/whatsnew.ts) ─────────────────────────
+   Text from x = 116 like the other cards; the items in two columns, each an
+   icon in the update's blue, a title and its line. Ported from upstream minus
+   the "Your Coucou so far" chips (they counted Flow dictations). */
+
+.whatsnew-stack {
+  padding: 4px 16px 4px 116px;
+  gap: 7px;
+}
+
+.whatsnew-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 14px;
+}
+
+.whatsnew-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  min-width: 0;
+}
+
+.whatsnew-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.18);
+}
+
+.whatsnew-text {
+  min-width: 0;
+}
+
+.whatsnew-item-title {
+  font: 600 12px var(--font);
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.whatsnew-item-detail {
+  font: 400 10.5px/1.3 var(--font);
+  color: var(--dim-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 /* ── Spotify: the pill's controls and the now-playing card ──────────────────
    SpotifyPill, MusicControlButton and SpotifyCardView (SpotifyViews.swift,
    NowPlayingViews.swift): sizes and colours are the Mac's. */

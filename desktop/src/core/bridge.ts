@@ -34,6 +34,8 @@ export interface BootInfo {
   hookPath: string;
   /** False where the OS has no global cursor (Wayland): see Island.followPageCursor. */
   cursorPoll: boolean;
+  /** No settings.json before this launch: a fresh install (no what's new card). */
+  firstRun?: boolean;
 }
 
 export const Bridge = {
@@ -253,6 +255,8 @@ export const Bridge = {
   checkForUpdate: () => call<UpdateInfo>("check_for_update"),
   downloadAndInstallUpdate: (downloadUrl: string) =>
     call<string>("download_and_install_update", { downloadUrl }),
+  /** The tray Mochi in the update blue while a new version waits (tray.rs). */
+  trayUpdateHint: (on: boolean) => call<void>("tray_update_hint", { on }),
 };
 
 export interface UpdateInfo {

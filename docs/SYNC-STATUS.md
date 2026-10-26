@@ -16,13 +16,15 @@
 
 | 项目 | Commit | 说明 |
 |---|---|---|
-| 源仓库上游已比较 | `47e4da358ca932867c1b7c84dba5275ae7375535` | `Louis-CFM/coucou` `main`，2026-10-20 10:33（Asia/Shanghai）；上一轮基线 `434d6a2b…` 之后的 66 个提交已逐项分类（见下） |
-| Fork 记录快照 | `56a0aed863a35b1d5dc1bbd61793740fcb640825` + 2026-10-20 工作区改动 | 本轮在 `v0.2.2` 之上完成 PR #709、#703、#761、#788 逻辑移植 |
+| 源仓库上游已比较 | `47d1c2da12bf1dce8fb28b825757d497c1e1d88d` | `Louis-CFM/coucou` `main`，2026-10-23；上一轮基线 `47e4da35…` 之后的 99 个提交已逐项分类，其中 3 项已移植（见「本轮同步（2026-10-26）」） |
+| Fork 记录快照 | `dd467b95040ebd2eed728c2cac6f474bcc981c97` + 2026-10-26 工作区改动 | 本轮完成 DPI 修复、蓝 Mochi、What's new 卡（去 Flow） |
 | 共同祖先 | `c946650bec0e37fd902322c8f149b7e83f06d22f` | 本轮比较使用的 merge-base（未变） |
-| 比较结果 | 源仓库前移 66 commits（含 Mac 0.5.0~0.5.2 与 Windows/Linux 0.5.1） | `compare/434d6a2b...47e4da35` |
-| 记录时间 | 2026-10-20 11:30（Asia/Shanghai） | 本文档本轮更新时间 |
+| 比较结果 | 源仓库前移 99 commits（含 Mac 0.5.3、Windows/Linux 0.5.2~0.5.3、Android 0.3.0~0.3.7） | `compare/47e4da35...47d1c2da` |
+| 记录时间 | 2026-10-26 11:40（Asia/Shanghai） | 本文档本轮更新时间 |
 
-下次同步从源仓库 `47e4da35…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
+下次同步从源仓库 `47d1c2da…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
+
+> 2026-10-26 补记：`47e4da35…` → `47d1c2da12bf1dce8fb28b825757d497c1e1d88d` 的 99 个提交已完成逐项分类，其中 #1/#2/#3 已移植并验证（见「本轮同步（2026-10-26）」），基线前移到 `47d1c2da…`。
 
 推荐定位命令：
 
@@ -123,6 +125,49 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 - `desktop` 测试：`node node_modules/typescript/bin/tsc --noEmit` 0 错误通过。
 - `desktop` 单元测试：`node --import ./tests/setup.mjs tests/hooks.test.mjs` 53 passed，0 failed；`tests/i18n.test.mjs` 16 passed，0 failed；`tests/pills.test.mjs` 14 passed，0 failed；`tests/fsm.test.mjs` 52 passed，0 failed；`tests/agents.test.mjs` 4 passed，0 failed。
 
+## 本轮同步（2026-10-26）
+
+- 源仓库范围：`47e4da358ca932867c1b7c84dba5275ae7375535`(Mac 0.5.2 / Win-Linux 0.5.1) → `47d1c2da12bf1dce8fb28b825757d497c1e1d88d`(Mac 0.5.3 / Win-Linux 0.5.3 / Android 0.3.0)
+- 提交规模：99 个（80 个非合并 + 19 个合并），覆盖 Mac 0.5.3、Windows/Linux 0.5.2~0.5.3、Android 0.3.0~0.3.7
+- Fork 快照：`dd467b95040ebd2eed728c2cac6f474bcc981c97`（`main`，领先 `origin/main` 2 个提交）
+- 共同祖先：`c946650bec0e37fd902322c8f149b7e83f06d22f`（未变）
+- 平台分布：44 个提交只动 `android/`（另 9 个同时动文档/CI），5 个只动 `NotchBuddy/`，17 个动 `windows/`（对应本 Fork 的 `desktop/`），其余为 CHANGELOG/README/Homebrew cask/CI
+- 决策：**已移植 #1 / #2 / #3**（逻辑移植，非 cherry-pick）；同步游标前移到 `47d1c2da…`。`#4` 延期、`#5` 参考不落地，均为已决策项，不算跳过
+
+### 候选清单（按实施顺序）
+
+| # | 源提交 | 内容 | 落地面 | 规模 | 决策 |
+|---|---|---|---|---|---|
+| 1 | `852df6f5729fbf342da1fbce2af87ae483ce58ee` | 换显示器（不同缩放比）后 Mochi 的 canvas 位图仍按旧 DPR 尺寸，被裁切或虚化；同时把 `resolution` 媒体查询改为每次变更后重新挂载 | `desktop/src/island/island.ts`（`canvasPx` → 增加 `canvasDpr`）、`desktop/src/desktop/main.ts`、`desktop/src/mochi/minibots.ts`、`desktop/src/views/wardrobe.ts`、`desktop/src/main.ts` | 5 文件 / 41 行 | **已直接移植**：`island.ts` 增加 `canvasDpr` 并在问候画布上按 DPR 重建位图；`desktop/main.ts`、`minibots.ts`、`wardrobe.ts` 三处画布跟随 DPR；`main.ts` 的 `screen-changed` 改为 `reposition` + `ensureRunning`，并按上游把 `resolution` 媒体查询改为每次变更后重新挂载。上游的 `checkZoom()` 未移植（本 Fork 从未做 #467 的窗口/缩放同步） |
+| 2 | `dc672ba4d537b9a2c1f18820b32180ec621dff61`<br>`57063af97924aadd8406fbd755131e5a89a544bc`（仅 `mochi/engine.ts` 部分） | 有新版等待时 Mochi 变蓝并戴上箭头徽标，托盘图标同步变蓝 | `desktop/src/mochi/engine.ts`（新增 `arrow` 徽标 + `setUpdateHint`）、`desktop/src-tauri/src/tray.rs`（`tint_blue` / `tray_update_hint`）、`desktop/src/core/bridge.ts` | 约 150~200 行 | **已逻辑移植**：`engine.ts` 的 `arrow` 徽标 + `setUpdateHint`/`showsUpdateHint`/`stateBadge`、`tray.rs` 的 `tint_blue` + `tray_update_hint` 命令（含单测）、`bridge.ts` 的 `trayUpdateHint`。不引入上游 `update.rs`：`check_for_update` 增加 `AppHandle` 并向所有窗口发 `update-found`，`island/update.ts` 收下、持久化到 localStorage（版本比当前新才认），据此决定蓝色与托盘；「稍后」24 小时 |
+| 3 | `5075a2041e8a27e6e3dd205aee84feed4e58845a`<br>`57063af…`（`whats-new/*`、`views/whatsnew.ts`、`island/update.ts`）<br>`b292400c839d0e93eaa9161ed7085367ed9b192b`<br>`d6cdc363141b42b3d94e9b1f05824f633cd69be7` | 更新后展示 What's new 卡（含发布数据与校验脚本） | 新增 `desktop/src/whats-new/`、`desktop/src/views/whatsnew.ts`、`desktop/src/island/update.ts`、`scripts/test-whats-new.py`、i18n | 约 800 行 + 数据文件 | **已逻辑移植并裁剪**：新增 `src/whats-new/{whats-new.ts,whats-new.json,icons.ts,controller.ts}`、`src/views/whatsnew.ts`、新增 `whatsnew` 视图与布局。去掉依赖 Flow/Notetaker 的「Your Coucou so far」第二步与咖啡链接（用户要求：不需要 Flow 的部分）；`scripts/test-whats-new.py` 未移植，改由 `tests/whats-new.test.mjs` 校验「当前版本有词条且十种语言齐全」。首装判定用 Rust `BootInfo.firstRun`（启动时 settings.json 不存在），替代上游的 `usedBefore(consent/history/flow/notes)` |
+| 4 | `0453d296f7ebba569ee8e5556c5077d5617c7638`<br>`c5cea3f25f2bc2610ab9f178ca71aa0df45b2cdc`<br>`a7fe6ce318d6b3fbcc352cbb863187a8ba65c1c2` | WhatsApp 胶囊（实验性）：接收消息、会话列表、回复；一键安装 GOWA 网关并校验 SHA-256；可对接自建 GOWA / OpenWA | 新增 `desktop/src-tauri/src/whatsapp/`（9 文件）、`desktop/src/{core,island,views,settings}/whatsapp.ts`、`secrets.rs` 3 个内部 key、`Cargo.toml` 增加 `miniz_oxide`（已由 png 传递依赖） | 约 6.4k 行 | **延期评估（单独立项 + 安全评审）**：技术上比预期可移植——Rust 侧只依赖 serde/tauri/reqwest/tokio，不碰 `phone_link`/`voice`/`flow`；前端只依赖本 Fork 已有的 `bridge`/`state`/`sound`/`layout`/`i18n`/`views/dom`。代价是外部网关进程、本地 webhook 端口与凭据存储，需单独评审后再动 |
+| 5 | `15a2be2bdd7f7a9af877bb5a9c9d4ef2640e8eac`（GitLab pulse）<br>`3a7416f54a2cb321a1b31e00ece29d43ddcb068a`（Gitea pulse）<br>`3b42d32c828e6b7bf60250c911a78fadf2b24f1c`<br>`0b536440b6032452718947dc2bd3cec58024b7f3` | 把 GitLab/Gitea 收进统一的 forge 卡（贡献日历、统计、列表），并修多 forge 卡片串状态 | 上游 `windows/src-tauri/src/integrations.rs` + `windows/src/views/github.ts` | 约 700 行 | **参考不落地**：本 Fork 的 GitLab 是独立的 `src-tauri/src/gitlab.rs` + 简化卡片，接受上游等于重写现有实现；Gitea 属新增第三方集成，按需另立 |
+
+### 明确不做 / 不适用
+
+| 源提交 | 原因 |
+|---|---|
+| 44 个只动 `android/` 的提交（Android 0.3.0~0.3.7：主题、TalkBack、语言、周报、快捷方式、Share target 等） | 本 Fork 没有 `android/`，全部不适用 |
+| 5 个只动 `NotchBuddy/` 的提交（Mac 蓝 Mochi、WhatsApp Status、What's new 数据） | Swift 原生端；即便做 #2，也只移植 Tauri 侧逻辑 |
+| `55e6b64` / `326ddef`（Phone link 周报能力） | 本 Fork 无 `phone_link` 模块 |
+| `45d4bd6` / `6c4c8b6` / `ddc1685` / `5b6f213`（版本号、README、Homebrew cask、CHANGELOG） | 本 Fork 自有发布流程与版本线 |
+
+### 待决与隐患
+
+- 待用户确认：#4（WhatsApp 胶囊）是否立项。
+- 版本号随本轮升到 `0.3.2`（`package.json`、`package-lock.json`、`Cargo.toml`、`Cargo.lock`、`tauri.conf.json`），`whats-new.json` 已按 `0.3.2` 写了词条；发版打 tag 前若改版本号，必须同步改词条的 `version`。
+- `57063af` 中 `windows/src/i18n/extra.json` 有 10496 行变更，绝大部分是重排噪声；本 Fork 的 `extra.json` 是手写维护的，只能按 key 增补，禁止整文件覆盖（本轮新增 5 条）。
+- `desktop/src/views/github.ts` 的 `openSection` 仍是模块级单例（上游在 `3b42d32` 改为 per-provider `Map`）。本 Fork 目前只有一张 forge 卡，暂无用户可见问题；引入第二张卡前必须先按上游改法拆分。
+
+### 本轮验证
+
+- `node node_modules/typescript/bin/tsc --noEmit`：0 错误。
+- `node --import ./tests/setup.mjs --test "tests/**/*.test.mjs"`：443 测试，441 passed、2 skipped、0 failed（新增 `tests/whats-new.test.mjs` 10 项，覆盖版本比较、词条与十种语言、图标、首装/升级/降级决策、蓝色规则与引擎徽标、release 页 URL）。
+- `npm run build`：通过（82 modules，`dist/` 正常产出）。D 盘沙箱下需把 esbuild 二进制放到 C 盘并设 `ESBUILD_BINARY_PATH`。
+- `CARGO_TARGET_DIR=<C 盘临时目录> cargo check -p coucou --offline`：通过（仅既有 warning）。
+- `cargo test -p coucou --offline`：245 passed、0 failed、1 ignored（新增 `tray::tests::the_body_turns_blue_the_outline_stays`）。
+
 ## 功能状态总表
 
 | 领域 | 源仓库近期状态 | 本 Fork 状态 | 同步策略 |
@@ -132,7 +177,9 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 | Claude Code | Mac 原生完整；Windows/Linux 走 hooks | 已恢复并扩展：hooks 安装/卸载、ExitPlanMode 计划卡片、错误详情、用量、Cursor 标签 | 与上游行为保持一致并做跨平台适配 |
 | 智能体提问 | Antigravity 提问通知 (#709) | 已移植：ask_question 识别、提问状态与响铃 | 已完成移植与单测 |
 | 紧凑时钟 | Island clock (#788) | 已移植：紧凑灵动岛居中时钟与设置项 | 纯前端与 settings 扩展 |
-| 自动更新 | 上游 Windows/Mac 自动更新器 (#822) | 明确拒绝（避免覆盖本 Fork 增强版本） | 维持 Fork 独立发布流程 |
+| 自动更新 | 上游 Windows/Mac 自动更新器 (#822) | 明确拒绝（避免覆盖本 Fork 增强版本）；只吸收「有新版时 Mochi 与托盘变蓝」（2026-10-26） | 维持 Fork 独立发布流程，检查仍是手动的 |
+| 更新说明卡 | What's new after update (#910 周期内) | 已移植（去掉依赖 Flow 的第二步） | 每版在 `whats-new.json` 补词条，测试会拦 |
+| 多显示器 / DPI | 换屏后按新 DPR 重画 | 已移植（`canvasDpr` + 媒体查询重挂载） | 与上游一致 |
 | Android 手机连接 | 已有 Phone Link | 未实现 | 另立设计和安全评审 |
 | Voice | macOS 原生完整功能 | 未实现 | 暂不做 |
 | Mail | Apple Mail | QQ IMAP / Web 邮件卡片 | 不直接同步 |

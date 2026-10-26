@@ -24,6 +24,8 @@ export type IslandViewName =
   | "greeting"
   | "recap"
   | "wardrobe"
+  | "update"
+  | "whatsnew"
   | "notice";
 
 export type BotStateName =
@@ -98,6 +100,11 @@ export const VIEW_LAYOUTS: Record<IslandViewName, ViewLayout> = {
   // to the shared image.
   recap: { height: 184, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
   wardrobe: { height: 160, botX: 68, botY: null, botDiameter: 58, agentMode: "none" },
+  update: { height: 160, botX: 62, botY: null, botDiameter: 58, agentMode: "none" },
+  // After an update: what the new version brings, in one step (no "Your Coucou
+  // so far": its numbers came from Flow). Two rows of two items, each with up
+  // to three lines of detail, fit here.
+  whatsnew: { height: 196, botX: 62, botY: null, botDiameter: 58, agentMode: "none" },
   notice: { height: 160, botX: 62, botY: null, botDiameter: 58, agentMode: "column" },
 };
 

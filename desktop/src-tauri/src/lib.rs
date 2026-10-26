@@ -69,7 +69,13 @@ pub struct BootInfo {
     /// False where the OS has no global cursor (Wayland): the page then reports
     /// the cursor from its own mouse events.
     cursor_poll: bool,
+    /// No settings.json before this launch: a fresh install, which gets the
+    /// greeting rather than the what's new card.
+    first_run: bool,
 }
+
+/// Whether this launch is the first of this install; set once, in `setup`.
+static FIRST_RUN: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 #[tauri::command]
 fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
@@ -86,6 +92,7 @@ fn boot(app: AppHandle, shared: State<Shared>) -> BootInfo {
         version: env!("CARGO_PKG_VERSION").to_string(),
         hook_path: settings::hook_exe_path().to_string_lossy().to_string(),
         cursor_poll: platform::CURSOR_POLL,
+        first_run: FIRST_RUN.get().copied().unwrap_or(false),
     }
 }
 
@@ -914,9 +921,13 @@ pub fn run() {
             spotify::spotify_installed,
             updater::check_for_update,
             updater::download_and_install_update,
+            tray::tray_update_hint,
         ])
         .setup(move |app| {
             let handle = app.handle().clone();
+            // Before anything can save a preference: what's new tells a fresh
+            // install from an upgraded one with it.
+            let _ = FIRST_RUN.set(settings::first_run());
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
             tray::build(&handle)?;

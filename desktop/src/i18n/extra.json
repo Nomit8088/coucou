@@ -4077,6 +4077,61 @@
    "pt-BR": "{count} na fila",
    "ru": "{count} в очереди",
    "id": "{count} dalam antrean"
+  },
+  "You're on Coucou {version}": {
+   "zh-Hans": "你正在使用 Coucou {version}",
+   "hi": "आप Coucou {version} पर हैं",
+   "es": "Estás en Coucou {version}",
+   "ar": "أنت على Coucou {version}",
+   "fr": "Tu es sur Coucou {version}",
+   "bn": "আপনি Coucou {version}-এ আছেন",
+   "pt-BR": "Você está no Coucou {version}",
+   "ru": "У вас Coucou {version}",
+   "id": "Anda memakai Coucou {version}"
+  },
+  "All changes": {
+   "zh-Hans": "全部改动",
+   "hi": "सभी बदलाव",
+   "es": "Todos los cambios",
+   "ar": "كل التغييرات",
+   "fr": "Tous les changements",
+   "bn": "সব পরিবর্তন",
+   "pt-BR": "Todas as mudanças",
+   "ru": "Все изменения",
+   "id": "Semua perubahan"
+  },
+  "Coucou {version} is out": {
+   "zh-Hans": "Coucou {version} 已发布",
+   "hi": "Coucou {version} आ गया है",
+   "es": "Ya está Coucou {version}",
+   "ar": "صدر Coucou {version}",
+   "fr": "Coucou {version} est sorti",
+   "bn": "Coucou {version} এসে গেছে",
+   "pt-BR": "O Coucou {version} saiu",
+   "ru": "Вышел Coucou {version}",
+   "id": "Coucou {version} sudah terbit"
+  },
+  "You have {version}": {
+   "zh-Hans": "你用的是 {version}",
+   "hi": "आपके पास {version} है",
+   "es": "Tienes {version}",
+   "ar": "لديك {version}",
+   "fr": "Tu as {version}",
+   "bn": "আপনার কাছে {version} আছে",
+   "pt-BR": "Você tem a {version}",
+   "ru": "У вас {version}",
+   "id": "Anda punya {version}"
+  },
+  "Later": {
+   "zh-Hans": "稍后",
+   "hi": "बाद में",
+   "es": "Más tarde",
+   "ar": "لاحقًا",
+   "fr": "Plus tard",
+   "bn": "পরে",
+   "pt-BR": "Mais tarde",
+   "ru": "Позже",
+   "id": "Nanti"
   }
  }
 }

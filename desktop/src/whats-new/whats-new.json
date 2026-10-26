@@ -1,0 +1,118 @@
+{
+  "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every release adds its entry here: 1 to 4 items, a short title and one line each, an icon from whats-new/icons.ts. Ported from upstream without the Flow steps.",
+  "releases": [
+    {
+      "version": "0.3.2",
+      "items": [
+        {
+          "icon": "update",
+          "title": {
+            "en": "New version in the island",
+            "zh-Hans": "岛里的新版提示",
+            "hi": "आइलैंड में नया वर्ज़न",
+            "es": "Nueva versión en la isla",
+            "ar": "إصدار جديد في الشريط",
+            "fr": "Nouvelle version dans l'île",
+            "bn": "আইল্যান্ডে নতুন ভার্সন",
+            "pt-BR": "Nova versão na ilha",
+            "ru": "Новая версия на острове",
+            "id": "Versi baru di pulau"
+          },
+          "detail": {
+            "en": "A newer Coucou turns Mochi and the tray blue. Click to see it.",
+            "zh-Hans": "有新版本时，Mochi 与托盘图标变蓝，点一下就能看到。",
+            "hi": "नया संस्करण: Mochi और ट्रे नीले। देखने के लिए क्लिक करें।",
+            "es": "Versión nueva: Mochi y la bandeja se ponen azules. Clic para verla.",
+            "ar": "إصدار أحدث: يتحوّل Mochi والتراي إلى الأزرق. انقر لتراه.",
+            "fr": "Version plus récente : Mochi et la barre passent au bleu. Clique.",
+            "bn": "নতুন ভার্সন: Mochi ও ট্রে নীল। দেখতে ক্লিক করুন।",
+            "pt-BR": "Versão nova: Mochi e a bandeja ficam azuis. Clique para ver.",
+            "ru": "Новая версия: Mochi и трей синеют. Нажмите, чтобы увидеть.",
+            "id": "Versi baru: Mochi dan tray jadi biru. Klik untuk melihat."
+          }
+        },
+        {
+          "icon": "bell",
+          "title": {
+            "en": "Do not disturb",
+            "zh-Hans": "免打扰",
+            "hi": "परेशान न करें",
+            "es": "No molestar",
+            "ar": "عدم الإزعاج",
+            "fr": "Ne pas déranger",
+            "bn": "বিরক্ত করবেন না",
+            "pt-BR": "Não perturbe",
+            "ru": "Не беспокоить",
+            "id": "Jangan ganggu"
+          },
+          "detail": {
+            "en": "Nothing opens the island on its own; use the tray or a shortcut.",
+            "zh-Hans": "没有任何事件会自己弹出小岛，需要时从托盘或快捷键打开。",
+            "hi": "कुछ भी आइलैंड नहीं खोलता; ट्रे या शॉर्टकट से खोलें।",
+            "es": "Nada abre la isla solo; usa la bandeja o un atajo.",
+            "ar": "لا شيء يفتح الشريط وحده؛ استخدم التراي أو اختصارًا.",
+            "fr": "Rien n'ouvre l'île tout seul ; passe par la barre ou un raccourci.",
+            "bn": "কিছুই আইল্যান্ড খোলে না; ট্রে বা শর্টকাট ব্যবহার করুন।",
+            "pt-BR": "Nada abre a ilha sozinho; use a bandeja ou um atalho.",
+            "ru": "Ничто не открывает остров само: трей или сочетание клавиш.",
+            "id": "Tak ada yang membuka pulau sendiri; pakai tray atau pintasan."
+          }
+        },
+        {
+          "icon": "eye",
+          "title": {
+            "en": "Whole on every monitor",
+            "zh-Hans": "换显示器不再被裁",
+            "hi": "हर मॉनिटर पर पूरा",
+            "es": "Entero en cada monitor",
+            "ar": "كامل على كل شاشة",
+            "fr": "Entier sur chaque écran",
+            "bn": "সব মনিটরে অক্ষত",
+            "pt-BR": "Inteiro em cada monitor",
+            "ru": "Целиком на любом мониторе",
+            "id": "Utuh di setiap monitor"
+          },
+          "detail": {
+            "en": "On a screen with another scale, Mochi is redrawn, not cut.",
+            "zh-Hans": "换到缩放比例不同的屏幕，Mochi 会按新比例重画，不再被裁。",
+            "hi": "दूसरे स्केल की स्क्रीन पर Mochi फिर से बनता है, कटता नहीं।",
+            "es": "En una pantalla con otra escala, Mochi se redibuja, no se corta.",
+            "ar": "على شاشة بمقياس آخر يُعاد رسم Mochi بدل أن يُقطع.",
+            "fr": "Sur un écran d'une autre échelle, Mochi est redessiné, pas coupé.",
+            "bn": "ভিন্ন স্কেলের স্ক্রিনে Mochi আবার আঁকা হয়, কাটে না।",
+            "pt-BR": "Numa tela com outra escala, o Mochi é redesenhado, não cortado.",
+            "ru": "На экране с другим масштабом Mochi перерисовывается, а не режется.",
+            "id": "Di layar dengan skala lain, Mochi digambar ulang, tidak terpotong."
+          }
+        },
+        {
+          "icon": "sparkles",
+          "title": {
+            "en": "This card",
+            "zh-Hans": "这张卡",
+            "hi": "यह कार्ड",
+            "es": "Esta tarjeta",
+            "ar": "هذه البطاقة",
+            "fr": "Cette carte",
+            "bn": "এই কার্ড",
+            "pt-BR": "Este cartão",
+            "ru": "Эта карточка",
+            "id": "Kartu ini"
+          },
+          "detail": {
+            "en": "After each update, the island says once what changed. Nothing is sent.",
+            "zh-Hans": "以后每次更新，岛里只说一次改了什么，不会外发任何内容。",
+            "hi": "हर अपडेट के बाद आइलैंड एक बार बताता है क्या बदला। कुछ नहीं भेजा जाता।",
+            "es": "Tras cada actualización, la isla dice una vez qué cambió. Nada se envía.",
+            "ar": "بعد كل تحديث يقول الشريط مرة واحدة ما تغيّر. لا شيء يُرسل.",
+            "fr": "Après chaque mise à jour, l'île dit une fois ce qui a changé. Rien n'est envoyé.",
+            "bn": "প্রতিটি আপডেটের পরে আইল্যান্ড একবার জানায় কী বদলেছে। কিছু পাঠানো হয় না।",
+            "pt-BR": "Depois de cada atualização, a ilha diz uma vez o que mudou. Nada é enviado.",
+            "ru": "После обновления остров один раз говорит, что изменилось. Ничего не уходит.",
+            "id": "Setiap pembaruan, pulau memberi tahu sekali apa yang berubah. Tak ada yang dikirim."
+          }
+        }
+      ]
+    }
+  ]
+}

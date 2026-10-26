@@ -11,6 +11,8 @@ import { registerShortcutHandlers } from "./island/shortcuts";
 import { applySpotify, registerSpotifyHandlers } from "./island/spotify";
 import { isMusicPill } from "./core/spotify";
 import { Recap } from "./recap/recap";
+import { Updates } from "./island/update";
+import { WhatsNew } from "./whats-new/controller";
 import { onLanguageChange, resolveLanguage, setLanguage, systemLanguages } from "./i18n/i18n";
 
 /** Shows the language Settings asks for ("" = the system's, when Coucou has it). */
@@ -81,7 +83,27 @@ async function main() {
     }
   });
 
-  await onEvent<null>("screen-changed", () => void Bridge.reposition());
+  await onEvent<null>("screen-changed", () => {
+    void Bridge.reposition();
+    island.ensureRunning();
+  });
+
+  // A query only matches the ratio it was made for: once it changes, watch the
+  // new one, or the next monitor's scale goes unnoticed.
+  // One frame redraws Mochi at the new ratio, even while the loop is idle.
+  const watchRatio = () => {
+    window
+      .matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`)
+      .addEventListener?.(
+        "change",
+        () => {
+          watchRatio();
+          island.ensureRunning();
+        },
+        { once: true },
+      );
+  };
+  watchRatio();
 
   // Settings → Reload sounds: read the sounds folder again, and let them hear it.
   await onEvent<null>("sounds-changed", () => {
@@ -114,6 +136,11 @@ async function main() {
   island.onGreetingDone = checkRecap;
   island.onWake = checkRecap;
   await onEvent<null>("recap-check", checkRecap);
+
+  // A newer version waiting turns Mochi and the tray blue (island/update.ts);
+  // what's new says, once per version, what this one brought.
+  void Updates.register({ redraw: () => island.ensureRunning() }, boot?.version ?? "");
+  WhatsNew.launch(island, { version: boot?.version ?? "", firstRun: boot?.firstRun ?? false });
 
   island.launch();
 

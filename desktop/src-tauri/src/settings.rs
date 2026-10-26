@@ -224,6 +224,13 @@ fn settings_path() -> PathBuf {
     config_dir().join("settings.json")
 }
 
+/// Whether this install has never saved a preference: no settings.json at all.
+/// Read once at startup (`lib.rs` keeps it), before anything could write one:
+/// a fresh install says hello with the greeting, not with release notes.
+pub fn first_run() -> bool {
+    !settings_path().exists()
+}
+
 pub fn load() -> Settings {
     load_from(&settings_path())
 }
