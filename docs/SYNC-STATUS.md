@@ -17,7 +17,7 @@
 | 项目 | Commit | 说明 |
 |---|---|---|
 | 源仓库上游已比较 | `47d1c2da12bf1dce8fb28b825757d497c1e1d88d` | `Louis-CFM/coucou` `main`，2026-10-23；上一轮基线 `47e4da35…` 之后的 99 个提交已逐项分类，其中 3 项已移植（见「本轮同步（2026-10-26）」） |
-| Fork 记录快照 | `dd467b95040ebd2eed728c2cac6f474bcc981c97` + 2026-10-26 工作区改动 | 本轮完成 DPI 修复、蓝 Mochi、What's new 卡（去 Flow） |
+| Fork 记录快照 | `7401530b70e3870cb525e5d2b36307ae20365ece` | 本轮完成 DPI 修复、蓝 Mochi、What's new 卡（去 Flow），版本 0.3.2 |
 | 共同祖先 | `c946650bec0e37fd902322c8f149b7e83f06d22f` | 本轮比较使用的 merge-base（未变） |
 | 比较结果 | 源仓库前移 99 commits（含 Mac 0.5.3、Windows/Linux 0.5.2~0.5.3、Android 0.3.0~0.3.7） | `compare/47e4da35...47d1c2da` |
 | 记录时间 | 2026-10-26 11:40（Asia/Shanghai） | 本文档本轮更新时间 |
