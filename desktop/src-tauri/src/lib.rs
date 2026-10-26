@@ -107,11 +107,7 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
         log::line(format!("could not save settings: {err}"));
     }
     if autostart_changed {
-        let manager = app.autolaunch();
-        let result = if settings.autostart { manager.enable() } else { manager.disable() };
-        if let Err(err) = result {
-            eprintln!("[coucou] autostart: {err}");
-        }
+        sync_autostart(&app, settings.autostart);
     }
     if screen_changed {
         let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
@@ -128,6 +124,60 @@ fn save_settings(app: AppHandle, shared: State<Shared>, settings: Settings) {
     }
     // Keep the other window in step (island ⇄ settings window).
     let _ = app.emit("settings-changed", settings);
+}
+
+/// Whether the OS will really start Coucou at login for today's executable.
+///
+/// The plugin's `is_enabled` only says that an entry exists. An update deletes
+/// it (the previous version's uninstaller owns that value) and moving the app
+/// leaves it pointing at the old path: both read as "off" or "on" while nothing
+/// actually starts. Windows is checked by reading the `Run` value back;
+/// elsewhere the plugin's own answer is all there is.
+fn starts_at_login(app: &AppHandle) -> bool {
+    #[cfg(windows)]
+    {
+        use winreg::enums::HKEY_CURRENT_USER;
+        use winreg::RegKey;
+        let Some(run) = RegKey::predef(HKEY_CURRENT_USER)
+            .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")
+            .ok()
+        else {
+            return false;
+        };
+        let Ok(written) = run.get_value::<String, _>(app.package_info().name.as_str()) else {
+            return false;
+        };
+        let Ok(exe) = std::env::current_exe() else { return false };
+        // The plugin writes "<path> <args>", unquoted: with no arguments at all
+        // that is the path plus a trailing space.
+        let exe = exe.to_string_lossy().to_string();
+        written.trim().trim_matches('"').eq_ignore_ascii_case(&exe)
+    }
+    #[cfg(not(windows))]
+    {
+        app.autolaunch().is_enabled().unwrap_or(false)
+    }
+}
+
+/// Keeps the OS's login item in step with the preference — at launch, where an
+/// update or a moved install can have left it stale, and whenever the toggle
+/// changes. A failure is written to coucou.log rather than swallowed: that is
+/// what "Launch at startup doesn't work" looked like before.
+fn sync_autostart(app: &AppHandle, wanted: bool) {
+    let manager = app.autolaunch();
+    if wanted {
+        if starts_at_login(app) {
+            return;
+        }
+        match manager.enable() {
+            Ok(()) => log::line("autostart: registered for login"),
+            Err(err) => log::line(format!("autostart: could not register: {err}")),
+        }
+    } else if manager.is_enabled().unwrap_or(false) {
+        if let Err(err) = manager.disable() {
+            log::line(format!("autostart: could not unregister: {err}"));
+        }
+    }
 }
 
 /// The island reports the system's languages at launch, for "System" in
@@ -899,6 +949,13 @@ pub fn run() {
             island::spawn_cursor_poll(handle.clone(), gate.clone());
 
             log::line(format!("--- Coucou {} started ---", env!("CARGO_PKG_VERSION")));
+            // The login item can go missing behind our back: an update's
+            // uninstaller removes it, and a moved install leaves it on the old
+            // path. Put it back to match the preference. A dev build keeps its
+            // hands off it — that entry belongs to the installed app.
+            if !cfg!(debug_assertions) {
+                sync_autostart(&handle, loaded.autostart);
+            }
             hooks::ensure_hook_exe(&handle);
             pipe::start(handle.clone());
             integrations::start(handle.clone());

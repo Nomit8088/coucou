@@ -32,6 +32,9 @@ webpki-roots = "1"
 
 [target.'cfg(windows)'.dependencies]
 keyring = { version = "3", features = ["windows-native"] }
+# Reads back the Run key the autostart plugin writes, to notice an entry gone
+# stale (same crate and version as the plugin's own dependency).
+winreg = "0.55"
 # The island's file drop reads paths straight from WebView2 (webview_drop.rs).
 # Same versions as wry, so nothing new is compiled.
 webview2-com = "0.39"
