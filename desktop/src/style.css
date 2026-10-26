@@ -500,6 +500,25 @@ body {
   color: var(--ink);
 }
 
+/* The open island's −, at the end of the header: the tabs' 22 pt round target
+   rather than a bare glyph. Under Do not disturb the same click hides the
+   island instead of folding it, and the button wears the moon's tint so that
+   reads before the click. */
+.header-actions button.minimize {
+  width: 22px;
+  height: 22px;
+  border-radius: 11px;
+}
+
+.header-actions button.minimize:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: #b0b5be;
+}
+
+.header-actions button.minimize.quiet {
+  color: #8b93ff;
+}
+
 #views {
   position: relative;
   flex: 1 1 auto;

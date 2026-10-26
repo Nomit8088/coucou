@@ -275,7 +275,7 @@ test("Ctrl+↓ ↑ walk a card's list, Ctrl+O opens, Ctrl+E is the overview's di
 
 let did;
 const host = {
-  alert: (v) => did.push(`alert:${v}`),
+  open: (v) => did.push(`open:${v}`),
   setView: (v) => did.push(`setView:${v}`),
   collapse: () => did.push("collapse"),
   emote: (e) => did.push(`emote:${e}`),
@@ -319,7 +319,7 @@ test("the wardrobe shortcut's own event opens the wardrobe", () => {
 
 test("a global shortcut arrives as an event and opens the chat", () => {
   emit("shortcut", "openChat");
-  assert.deepEqual(did, ["resume", "alert:prompt"]);
+  assert.deepEqual(did, ["resume", "open:prompt"]);
 });
 
 test("island keys are read before the chat field sees them, and only while open", () => {
@@ -353,7 +353,7 @@ test("island keys are read before the chat field sees them, and only while open"
 
 test("the island toggle opens with the keyboard, and closes an open island", () => {
   runGlobalShortcut(host, "toggleIsland", resume);
-  assert.deepEqual(did, ["resume", "alert:overview", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:overview", "keyboard"]);
   did = [];
   State.mode = "expanded";
   runGlobalShortcut(host, "toggleIsland", resume);
@@ -368,13 +368,13 @@ test("go to alert: the permission first, then a question, else Mochi is annoyed"
   State.upsertExternalAgent("agent_gemini", "Gemini", "#fff");
   State.updateTask("agent_gemini", "question");
   runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:question", "keyboard"]);
   assert.equal(State.focusId, "agent_gemini");
 
   did = [];
   State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_dsh", tool: "write", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:approval", "keyboard"]);
   assert.equal(State.focusId, "agent_dsh");
   // Nothing is ever decided from a shortcut.
   assert.deepEqual(sent("approval_decision"), []);
@@ -384,7 +384,7 @@ test("go to alert brings up the unified card: any agent's pill, a question as a 
   State.upsertExternalAgent("agent_codex", "Codex", "#fff", true);
   State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_codex", tool: "Bash", command: "ls" };
   runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:approval", "keyboard"]);
   assert.equal(State.focusId, "agent_codex");
 
   did = [];
@@ -393,7 +393,7 @@ test("go to alert brings up the unified card: any agent's pill, a question as a 
     questions: [{ question: "Which?", options: [], multiSelect: false }],
   };
   runGlobalShortcut(host, "goToAlert", resume);
-  assert.deepEqual(did, ["resume", "alert:question", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:question", "keyboard"]);
   assert.equal(State.focusId, "agent_dsh");
   assert.deepEqual(sent("approval_decision"), []);
   assert.deepEqual(sent("approval_answer"), []);
@@ -402,7 +402,7 @@ test("go to alert brings up the unified card: any agent's pill, a question as a 
 test("the island toggle opens on a waiting card, and folds it rather than dropping it", () => {
   State.pendingApproval = { requestId: "r1", sessionId: "s", pillId: "agent_dsh", tool: "write", command: "ls" };
   runGlobalShortcut(host, "toggleIsland", resume);
-  assert.deepEqual(did, ["resume", "alert:approval", "keyboard"]);
+  assert.deepEqual(did, ["resume", "open:approval", "keyboard"]);
   did = [];
   State.mode = "expanded";
   // The island's collapse() folds a waiting card (Island.foldApproval).
@@ -433,7 +433,7 @@ test("next and previous pill wrap around and open the overview", () => {
   assert.equal(State.focusId, ids[ids.length - 1]);
   runGlobalShortcut(host, "nextPill", resume);
   assert.equal(State.focusId, ids[0]);
-  assert.deepEqual(did, ["resume", "alert:overview", "resume", "alert:overview"]);
+  assert.deepEqual(did, ["resume", "open:overview", "resume", "open:overview"]);
 });
 
 test("mute flips the sound, saves it, and Mochi reacts", () => {

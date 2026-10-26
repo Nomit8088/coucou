@@ -879,6 +879,11 @@ function generalSection(): HTMLElement {
       h("label", { text: t("Launch at startup") }),
       toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
     ),
+    h("div", { class: "row" },
+      h("label", { text: t("Do not disturb") }),
+      toggle(settings.doNotDisturb, (v) => { settings.doNotDisturb = v; void save(); }),
+    ),
+    h("div", { class: "hint", text: t("Nothing opens the island on its own. Minimizing takes it off the screen until you open Coucou from the tray.") }),
     ...recapRows(),
     languageRow(),
   );

@@ -18,7 +18,10 @@ import {
 
 /** What the recap needs from the island. */
 export interface RecapHost {
+  /** An event (Monday morning): Do not disturb keeps it shut. */
   alert(view: IslandViewName): void;
+  /** The user asked for it (the tray): Do not disturb never applies. */
+  open(view: IslandViewName): void;
 }
 
 /** Views the Monday card may replace; anything else is the user busy with something. */
@@ -49,7 +52,7 @@ class RecapController {
   /** Tray → Weekly recap. Shows the card even for an empty week. */
   async open(host: RecapHost) {
     await this.load();
-    host.alert("recap");
+    host.open("recap");
   }
 
   /** Monday ≥ 8 am, not shown yet this week, something to show, nobody interrupted. */

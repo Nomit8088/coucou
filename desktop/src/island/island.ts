@@ -179,6 +179,12 @@ export class Island {
       setView: (v) => this.setView(v),
       cancelDrop: () => this.discardDrop(),
       collapse: () => this.collapse(),
+      minimize: () => this.minimize(),
+      toggleDoNotDisturb: () => {
+        State.settings.doNotDisturb = !State.settings.doNotDisturb;
+        void Bridge.saveSettings(State.settings);
+        State.notify();
+      },
       foldApproval: () => this.foldApproval(),
       setFocus: (id) => {
         State.setFocus(id);
@@ -539,19 +545,68 @@ export class Island {
     this.collapse();
   }
 
-  /** Alert from the hook server: open on this view. Pinned alerts never auto-close. */
+  /**
+   * The open island's −. Normally it folds to the compact island, exactly as a
+   * click outside it does. Under Do not disturb it leaves the screen instead
+   * (`dismiss`), and no event brings it back: only the user does — the tray's
+   * Open Coucou, a shortcut, or launching the app again.
+   */
+  minimize() {
+    // A waiting card is only ever folded, never dropped by a close.
+    if (State.pendingApproval) {
+      this.foldApproval();
+      return;
+    }
+    if (!State.settings.doNotDisturb) {
+      this.collapse();
+      return;
+    }
+    State.isPinned = false;
+    this.fsm.pinned = false;
+    this.fsm.dismiss();
+  }
+
+  /** Do not disturb keeps the island from opening on its own. */
+  private get quiet(): boolean {
+    return State.settings.doNotDisturb;
+  }
+
+  /**
+   * Alert from the hook server: open on this view. Pinned alerts never auto-close.
+   * Do not disturb: an island that is not already open stays shut — the card is
+   * kept all the same (State.pendingApproval) and comes up the next time the
+   * user opens the island.
+   */
   alert(view: IslandViewName) {
+    if (this.quiet && State.mode !== "expanded") return;
+    this.open(view);
+  }
+
+  /**
+   * The user asked for the island (the tray, a shortcut, launching Coucou
+   * again). Do not disturb does not apply: it only silences what the island
+   * does on its own.
+   */
+  open(view: IslandViewName) {
     this.fsm.pinned = State.isPinned;
     this.fsm.forceHome();
     this.expand(view);
   }
 
+  /** Something happened: show the compact island. Nothing while Do not disturb is on. */
   reveal() {
+    if (this.quiet) return;
+    this.fsm.reveal();
+  }
+
+  /** The user asked to see the island (Pause off in the tray): Do not disturb does not apply. */
+  revealForUser() {
     this.fsm.reveal();
   }
 
   /** Music started playing: the compact island, without the peek sound (musicReveal). */
   revealSilently() {
+    if (this.quiet) return;
     this.silentReveal = true;
     this.fsm.reveal();
     this.silentReveal = false;

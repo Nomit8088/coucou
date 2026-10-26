@@ -59,11 +59,11 @@ async function main() {
     switch (what) {
       case "settings":
         setPaused(false);
-        island.alert("settings");
+        island.open("settings");
         break;
       case "open":
         setPaused(false);
-        island.alert(State.defaultView());
+        island.open(State.defaultView());
         break;
       case "recap":
         setPaused(false);
@@ -71,12 +71,12 @@ async function main() {
         break;
       case "wardrobe":
         setPaused(false);
-        island.alert("wardrobe");
+        island.open("wardrobe");
         break;
       case "pause":
         setPaused(!State.paused);
         if (State.paused) island.fsm.forceHidden();
-        else island.reveal();
+        else island.revealForUser();
         break;
     }
   });

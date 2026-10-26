@@ -33,6 +33,10 @@ export interface ViewActions {
   /** "Cancel" on a dropped file: forgets it and goes back home. */
   cancelDrop(): void;
   collapse(): void;
+  /** The header's −: folds the island, or takes it off the screen under Do not disturb. */
+  minimize(): void;
+  /** Do not disturb: nothing opens the island on its own. */
+  toggleDoNotDisturb(): void;
   /** Folds a waiting card to the compact island without answering it. */
   foldApproval(): void;
   setFocus(id: string): void;
@@ -124,6 +128,14 @@ export function buildHeader(actions: ViewActions): ViewHost {
 
   const gearBtn = h("button", { title: tl("Settings"), onclick: () => go("settings") }, svg(ICONS.gear, 14));
   const soundBtn = h("button", { title: tl("Mute"), onclick: () => actions.toggleSound() }, svg(ICONS.speakerOn, 14));
+  // Fold the open island: a Windows title bar's −, at the end of the header.
+  // Under Do not disturb it hides the island instead (Island.minimize), so it
+  // takes the moon's tint — see `quiet` in sync().
+  const minimizeBtn = h(
+    "button",
+    { class: "minimize", title: tl("Minimize"), onclick: () => actions.minimize() },
+    svg(ICONS.minus, 14),
+  );
   // Plan usage pills (off by default): before the gear, Claude first, as on the Mac.
   const claudePill = buildPlanPill(false);
   const codexPill = buildPlanPill(true);
@@ -139,7 +151,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
     "div",
     { id: "header" },
     h("div", { class: "tabs" }, tabHome, tabChat, tabDrop),
-    h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn),
+    h("div", { class: "header-actions" }, planPills, gearBtn, soundBtn, minimizeBtn),
   );
   const headerActions = el.lastElementChild as HTMLElement;
 
@@ -155,6 +167,7 @@ export function buildHeader(actions: ViewActions): ViewHost {
       gearBtn.append(svg(v === "settings" ? ICONS.gearFill : ICONS.gear, 14));
       clear(soundBtn);
       soundBtn.append(svg(State.settings.soundEnabled ? ICONS.speakerOn : ICONS.speakerOff, 14));
+      minimizeBtn.classList.toggle("quiet", State.settings.doNotDisturb);
       syncPlanPills();
       el.style.opacity = v === "confused" ? "0" : "1";
     },
@@ -958,6 +971,7 @@ function buildNote(): ViewHost {
 
 function buildSettings(actions: ViewActions): ViewHost {
   const soundSwitch = h("button", { class: "switch", onclick: () => actions.toggleSound() });
+  const dndSwitch = h("button", { class: "switch", onclick: () => actions.toggleDoNotDisturb() });
   const volume = h("input", {
     type: "range", min: "0", max: "0.2", step: "0.005",
     oninput: (e: Event) => actions.setVolume(Number((e.target as HTMLInputElement).value)),
@@ -979,6 +993,15 @@ function buildSettings(actions: ViewActions): ViewHost {
     "div",
     { class: "settings-rows" },
     h("div", { class: "settings-row" }, soundSwitch, h("span", { text: tl("Sound") }), volume),
+    // Do not disturb: nothing opens the island on its own, and − hides it.
+    h(
+      "div",
+      { class: "settings-row" },
+      svg(ICONS.moon, 12),
+      h("span", { text: tl("Do not disturb") }),
+      h("div", { class: "grow" }),
+      dndSwitch,
+    ),
     h(
       "div",
       { class: "settings-row" },
@@ -1011,6 +1034,7 @@ function buildSettings(actions: ViewActions): ViewHost {
       soundSwitch.classList.toggle("on", s.soundEnabled);
       volume.value = String(s.soundVolume);
       volume.style.opacity = s.soundEnabled ? "1" : "0.4";
+      dndSwitch.classList.toggle("on", s.doNotDisturb);
       if (Math.round(s.autoCloseInterval) === 0) {
         autoLabel.textContent = t("Auto-close · Never");
       } else {

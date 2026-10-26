@@ -15,7 +15,8 @@ import { State } from "../core/state";
 
 /** What the shortcuts need from the island. */
 export interface ShortcutHost {
-  alert(view: IslandViewName): void;
+  /** Opens the island because the user pressed a key: Do not disturb never applies. */
+  open(view: IslandViewName): void;
   setView(view: IslandViewName): void;
   collapse(): void;
   emote(name: BotEmoteName): void;
@@ -40,7 +41,7 @@ function focusPill(host: ShortcutHost, id: string | null, open: boolean) {
   State.setFocus(id);
   State.cardSelection = null;
   Sound.play("blip");
-  if (open) host.alert("overview");
+  if (open) host.open("overview");
   else host.setView("overview");
 }
 
@@ -53,14 +54,14 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
       } else {
         resume();
         // A waiting card is what the island opens on (State.defaultView).
-        host.alert(State.defaultView());
+        host.open(State.defaultView());
         host.takeKeyboard();
       }
       break;
 
     case "openChat":
       resume();
-      host.alert("prompt");
+      host.open("prompt");
       break;
 
     case "goToAlert": {
@@ -71,12 +72,12 @@ export function runGlobalShortcut(host: ShortcutHost, action: string, resume: ()
         // its card (permission or question) up. Nothing is answered from here.
         resume();
         State.setFocus(pending.pillId);
-        host.alert(pending.questions ? "question" : "approval");
+        host.open(pending.questions ? "question" : "approval");
         host.takeKeyboard();
       } else if (asking) {
         resume();
         State.setFocus(asking.id);
-        host.alert("question");
+        host.open("question");
         host.takeKeyboard();
       } else {
         // Nothing is waiting: Mochi says so.

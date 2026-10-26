@@ -1310,6 +1310,28 @@
    "ru": "Дисплей под курсором",
    "id": "Layar di bawah kursor"
   },
+  "Do not disturb": {
+   "zh-Hans": "免打扰",
+   "hi": "परेशान न करें",
+   "es": "No molestar",
+   "ar": "عدم الإزعاج",
+   "fr": "Ne pas déranger",
+   "bn": "বিরক্ত করবেন না",
+   "pt-BR": "Não perturbe",
+   "ru": "Не беспокоить",
+   "id": "Jangan ganggu"
+  },
+  "Nothing opens the island on its own. Minimizing takes it off the screen until you open Coucou from the tray.": {
+   "zh-Hans": "小岛不会自己弹出。此时点击最小化会把它完全收起，直到你在托盘里点「打开 Coucou」。",
+   "hi": "द्वीप अपने आप नहीं खुलता। छोटा करने पर यह स्क्रीन से हट जाता है, जब तक आप ट्रे से Coucou नहीं खोलते।",
+   "es": "Nada abre la isla por sí solo. Minimizar la quita de la pantalla hasta que abras Coucou desde la bandeja.",
+   "ar": "لا شيء يفتح الشريط من تلقاء نفسه. التصغير يزيله من الشاشة حتى تفتح Coucou من شريط النظام.",
+   "fr": "Rien n'ouvre l'île tout seul. Réduire la retire de l'écran jusqu'à ce que vous ouvriez Coucou depuis la barre des tâches.",
+   "bn": "দ্বীপ নিজে থেকে খোলে না। ছোট করলে এটি স্ক্রিন থেকে সরে যায়, যতক্ষণ আপনি ট্রে থেকে Coucou না খোলেন।",
+   "pt-BR": "Nada abre a ilha sozinha. Minimizar tira a ilha da tela até você abrir o Coucou pela bandeja.",
+   "ru": "Ничто не открывает остров само. Сворачивание убирает его с экрана, пока вы не откроете Coucou из трея.",
+   "id": "Tidak ada yang membuka pulau dengan sendirinya. Mengecilkan menghilangkannya dari layar sampai Anda membuka Coucou dari tray."
+  },
   "Docs": {
    "zh-Hans": "文档",
    "hi": "दस्तावेज़",
@@ -1672,6 +1694,17 @@
    "pt-BR": "Reunião",
    "ru": "Встреча",
    "id": "Rapat"
+  },
+  "Minimize": {
+   "zh-Hans": "最小化",
+   "hi": "छोटा करें",
+   "es": "Minimizar",
+   "ar": "تصغير",
+   "fr": "Réduire",
+   "bn": "ছোট করুন",
+   "pt-BR": "Minimizar",
+   "ru": "Свернуть",
+   "id": "Kecilkan"
   },
   "Monday": {
    "zh-Hans": "星期一",

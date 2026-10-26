@@ -14,7 +14,12 @@ const original = internals.invoke;
 let prefs;
 let history;
 let shown;
-const host = { alert: (view) => shown.push(view) };
+// The user's tray click goes through `open` (Do not disturb never applies to
+// it); the Monday card the island opens on its own goes through `alert`.
+const host = {
+  alert: (view) => shown.push(view),
+  open: (view) => shown.push(view),
+};
 
 beforeEach(() => {
   mock.timers.enable({ apis: ["setTimeout"] });

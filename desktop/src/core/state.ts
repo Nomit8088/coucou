@@ -132,6 +132,12 @@ export interface Settings {
   /** "primary", "cursor", or `at:<x>,<y>` for one display (logical origin). */
   screen: string;
   autostart: boolean;
+  /**
+   * Nothing opens the island on its own while this is on, and minimizing takes
+   * it off the screen instead of folding it: only the tray's Open (or a
+   * shortcut the user presses) brings it back.
+   */
+  doNotDisturb: boolean;
   hooksInstalled: boolean;
   /** Claude model used by the chat. */
   model: string;
@@ -215,6 +221,7 @@ export const DEFAULT_SETTINGS: Settings = {
   mainPill: DEFAULT_MAIN_PILL,
   screen: "primary",
   autostart: false,
+  doNotDisturb: false,
   hooksInstalled: false,
   model: "deepseek-chat",
   showPlanInNotch: false,

@@ -28,6 +28,10 @@ pub struct Settings {
     /// "primary" = the main display, "cursor" = whichever display the mouse is on.
     pub screen: String,
     pub autostart: bool,
+    /// Nothing opens the island on its own while this is on, and its − takes it
+    /// off the screen instead of folding it (src/island/island.ts). Off by
+    /// default: an island that never comes up on its own is the exception.
+    pub do_not_disturb: bool,
     pub hooks_installed: bool,
     /// Claude model used by the chat. Changeable in the settings window.
     pub model: String,
@@ -184,6 +188,7 @@ impl Default for Settings {
             main_pill: "agent_dsh".into(),
             screen: "primary".into(),
             autostart: false,
+            do_not_disturb: false,
             hooks_installed: false,
             model: default_model(),
             show_plan_in_notch: false,
@@ -478,6 +483,7 @@ mod tests {
   "mainPill": "agent_cursor",
   "screen": "cursor",
   "autostart": true,
+  "doNotDisturb": true,
   "hooksInstalled": true,
   "model": "some-model",
   "showPlanInNotch": true,
@@ -882,6 +888,7 @@ mod tests {
                 "mainPill",
                 "screen",
                 "autostart",
+                "doNotDisturb",
                 "hooksInstalled",
                 "model",
                 "showPlanInNotch",
