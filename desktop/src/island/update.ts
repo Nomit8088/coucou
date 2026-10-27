@@ -110,7 +110,15 @@ class UpdateController {
     if (!url || this.installing) return;
     this.installing = true;
     State.notify();
-    const started = await Bridge.downloadAndInstallUpdate(url);
+    let started = false;
+    try {
+      // A private build also hands over the API URL: github.com's own download
+      // path answers 404 to a token, so the token needs the API endpoint.
+      await Bridge.downloadAndInstallUpdate(url, this.info?.downloadApiUrl ?? null);
+      started = true;
+    } catch {
+      started = false;
+    }
     if (!started) {
       // Nothing was started: the card offers the release page instead.
       this.installing = false;

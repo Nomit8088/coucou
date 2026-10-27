@@ -7,7 +7,7 @@
 // still matches the diff that was shown.
 
 import "./settings.css";
-import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport } from "../core/bridge";
+import { Bridge, onEvent, type HookPreview, type HookStatus, type ShortcutsReport, type UpdateChannel, type UpdateInfo } from "../core/bridge";
 import { ensureProviders, newProviderId, urlAllowed } from "../core/providers";
 import {
   availableShortcuts, islandShortcuts, SHORTCUT_TEXT, activeKeys, displayKeys, duplicates, effective,
@@ -24,7 +24,7 @@ import { agentsSection } from "./agents";
 import { colorDot } from "./colors";
 import { statusDot, renderDiff } from "./parts";
 import { HOST_OS, platformCapabilities } from "../core/platform";
-import { releasesUrl, updateAction } from "../core/updater";
+import { DEFAULT_REPO, releasesUrl, updateAction } from "../core/updater";
 import { formatDiagnostics } from "../core/diagnostics";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
@@ -1270,10 +1270,14 @@ async function render() {
 
   declaredViews.length = 0;
   shortcutsListener = null;
+  // Which repository this build reads, and whether it needs a token for it: the
+  // updater section says so before anyone clicks a button that would 404.
+  const channel: UpdateChannel =
+    (await Bridge.updateChannel()) ?? { repo: DEFAULT_REPO, private: false, hasToken: false };
   clear(root);
   root.append(
     h("h1", {}, h("span", { text: "Coucou" }), h("span", { class: "version", text: version })),
-    updaterSection(),
+    updaterSection(channel),
     diagnosticsSection(),
     claudeSection(status),
     agentsSection(agents),
@@ -1290,34 +1294,90 @@ async function render() {
   );
 }
 
-function updaterSection(): HTMLElement {
+function updaterSection(channel: UpdateChannel): HTMLElement {
   const statusEl = h("span", { class: "hint", style: "margin-left: 10px; font-size: 13px;" });
+  /** The backend's own words: a bare "failed" is what made this undiagnosable. */
+  const detailEl = h("div", {
+    class: "hint",
+    style: "font-size: 11.5px; line-height: 1.4; margin-top: 6px; word-break: break-word;",
+  });
   const checkBtn = h("button", {
     text: t("Check for updates"),
     style: "font-size: 12px; padding: 4px 10px; cursor: pointer; border-radius: 6px;",
   });
+  let hasToken = channel.hasToken;
 
   const card = h("div", {
     style: "display:none; margin-top: 10px; padding: 12px 14px; background: rgba(255,255,255,0.06); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1);",
   });
 
+  // A private repository answers 404 to an anonymous release request, so this
+  // build needs a read-only token to see its own releases. The token lives in
+  // the credential store, never in the binary: an installer anyone can run must
+  // not carry read access to the private history.
+  const tokenBlock = h("div", { style: "display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px;" });
+  if (channel.private) {
+    const input = h("input", {
+      type: "password",
+      placeholder: hasToken ? t("(stored)") : "",
+      autocomplete: "off",
+      spellcheck: "false",
+      style: "flex:1 1 auto;min-width:0",
+    }) as HTMLInputElement;
+    const saveBtn = h("button", { text: t("Save") });
+    const dotEl = statusDot(hasToken);
+    saveBtn.addEventListener("click", async () => {
+      const value = input.value.trim();
+      try {
+        await Bridge.secretSet("update-token", value);
+        hasToken = value.length > 0;
+        input.value = "";
+        input.placeholder = hasToken ? t("(stored)") : "";
+        dotEl.style.background = hasToken ? "#22c55e" : "#f4505e";
+      } catch {
+        dotEl.style.background = "#f5a524";
+      }
+    });
+    tokenBlock.append(
+      h("div", { class: "row" },
+        h("label", { style: "min-width:104px", text: t("Update token") }),
+        input,
+        saveBtn,
+        dotEl,
+      ),
+      h("div", {
+        class: "hint",
+        text: t("This build updates from {repo}. A private repository needs a read-only token to read its own releases. The token stays in the {store}, never in the installer.", { repo: channel.repo, store: keyStore() }),
+      }),
+    );
+  }
+
   checkBtn.onclick = async () => {
     checkBtn.textContent = t("Checking…");
     statusEl.textContent = "";
+    detailEl.textContent = "";
     card.style.display = "none";
     clear(card);
 
-    const info = await Bridge.checkForUpdate();
-    checkBtn.textContent = t("Check for updates");
-
-    if (!info) {
-      statusEl.textContent = t("Failed to check for updates");
-      statusEl.style.color = "#ff6b6b";
+    let info: UpdateInfo;
+    try {
+      info = await Bridge.checkForUpdate();
+    } catch (err) {
+      checkBtn.textContent = t("Check for updates");
+      // A private repository only ever answers 404 to an anonymous request: say
+      // what to do instead of repeating the API's wording.
+      const needsToken = channel.private && !hasToken;
+      statusEl.textContent = needsToken
+        ? t("A read-only token is required to read this build's private releases.")
+        : t("Failed to check for updates");
+      statusEl.style.color = needsToken ? "#f5a524" : "#ff6b6b";
+      detailEl.textContent = err instanceof Error ? err.message : String(err);
       return;
     }
 
-    if (info.hasUpdate) {
-      statusEl.textContent = t("New version available: v{0}", { 0: info.latestVersion });
+    checkBtn.textContent = t("Check for updates");
+
+    if (info.hasUpdate) {      statusEl.textContent = t("New version available: v{0}", { 0: info.latestVersion });
       statusEl.style.color = "#4cd964";
 
       const title = h("div", {
@@ -1347,10 +1407,12 @@ function updaterSection(): HTMLElement {
             return;
           }
           downloadBtn.textContent = t("Downloading installer…");
-          const res = await Bridge.downloadAndInstallUpdate(action.url);
-          if (res) {
+          try {
+            // A private build also hands over the API URL: github.com's own
+            // download path answers 404 to a token.
+            await Bridge.downloadAndInstallUpdate(action.url, info.downloadApiUrl);
             downloadBtn.textContent = t("Installer started!");
-          } else {
+          } catch {
             downloadBtn.textContent = t("Download failed, try in browser");
             void Bridge.openUrl(action.url);
           }
@@ -1376,7 +1438,9 @@ function updaterSection(): HTMLElement {
   return h(
     "div",
     { style: "margin: -6px 0 18px 0; display: flex; flex-direction: column;" },
+    ...(channel.private ? [tokenBlock] : []),
     h("div", { style: "display: flex; align-items: center;" }, checkBtn, statusEl),
+    detailEl,
     card,
   );
 }

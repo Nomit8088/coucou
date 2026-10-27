@@ -4132,6 +4132,39 @@
    "pt-BR": "Mais tarde",
    "ru": "Позже",
    "id": "Nanti"
+  },
+  "Update token": {
+   "zh-Hans": "更新令牌",
+   "hi": "अपडेट टोकन",
+   "es": "Token de actualización",
+   "ar": "رمز التحديث",
+   "fr": "Jeton de mise à jour",
+   "bn": "আপডেট টোকেন",
+   "pt-BR": "Token de atualização",
+   "ru": "Токен обновления",
+   "id": "Token pembaruan"
+  },
+  "This build updates from {repo}. A private repository needs a read-only token to read its own releases. The token stays in the {store}, never in the installer.": {
+   "zh-Hans": "此构建从 {repo} 读取更新。私有仓库需要一个只读令牌才能读取自己的发布版本；令牌保存在 {store} 中，不会写进安装包。",
+   "hi": "यह बिल्ड {repo} से अपडेट लेता है। निजी रिपॉज़िटरी को अपनी रिलीज़ पढ़ने के लिए केवल-पढ़ने वाला टोकन चाहिए; टोकन {store} में रहता है, इंस्टॉलर में कभी नहीं।",
+   "es": "Esta compilación se actualiza desde {repo}. Un repositorio privado necesita un token de solo lectura para leer sus propias versiones; el token se queda en {store}, nunca en el instalador.",
+   "ar": "يقرأ هذا الإصدار التحديثات من {repo}. يحتاج المستودع الخاص إلى رمز للقراءة فقط ليقرأ إصداراته؛ يبقى الرمز في {store} ولا يُدرج في المثبّت أبدًا.",
+   "fr": "Cette compilation se met à jour depuis {repo}. Un dépôt privé a besoin d'un jeton en lecture seule pour lire ses propres versions ; le jeton reste dans {store}, jamais dans l'installateur.",
+   "bn": "এই বিল্ডটি {repo} থেকে আপডেট নেয়। ব্যক্তিগত রিপোজিটরির নিজের রিলিজ পড়তে শুধু-পড়ার টোকেন দরকার; টোকেনটি {store}-এ থাকে, ইনস্টলারে কখনও নয়।",
+   "pt-BR": "Esta compilação é atualizada a partir de {repo}. Um repositório privado precisa de um token somente leitura para ler as próprias versões; o token fica no {store}, nunca no instalador.",
+   "ru": "Эта сборка обновляется из {repo}. Приватному репозиторию нужен токен только для чтения, чтобы читать свои выпуски; токен хранится в {store} и никогда не попадает в установщик.",
+   "id": "Build ini memperbarui dari {repo}. Repositori privat memerlukan token hanya-baca untuk membaca rilisnya sendiri; token tersimpan di {store}, tidak pernah di dalam pemasang."
+  },
+  "A read-only token is required to read this build's private releases.": {
+   "zh-Hans": "读取此构建的私有发布版本需要一个只读令牌。",
+   "hi": "इस बिल्ड की निजी रिलीज़ पढ़ने के लिए केवल-पढ़ने वाला टोकन आवश्यक है।",
+   "es": "Se necesita un token de solo lectura para leer las versiones privadas de esta compilación.",
+   "ar": "يلزم رمز للقراءة فقط لقراءة الإصدارات الخاصة بهذا الإصدار.",
+   "fr": "Un jeton en lecture seule est nécessaire pour lire les versions privées de cette compilation.",
+   "bn": "এই বিল্ডের ব্যক্তিগত রিলিজ পড়তে শুধু-পড়ার টোকেন প্রয়োজন।",
+   "pt-BR": "É preciso um token somente leitura para ler as versões privadas desta compilação.",
+   "ru": "Чтобы прочитать приватные выпуски этой сборки, нужен токен только для чтения.",
+   "id": "Token hanya-baca diperlukan untuk membaca rilis privat build ini."
   }
  }
 }

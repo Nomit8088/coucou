@@ -252,9 +252,12 @@ export const Bridge = {
   spotifyInstalled: (pillId: string) => call<boolean>("spotify_installed", { pillId }),
 
   // ── Online updater ────────────────────────────────────────────────────────
-  checkForUpdate: () => call<UpdateInfo>("check_for_update"),
-  downloadAndInstallUpdate: (downloadUrl: string) =>
-    call<string>("download_and_install_update", { downloadUrl }),
+  /** Which repository this build reads, and whether it needs a token for it. */
+  updateChannel: () => call<UpdateChannel>("update_channel"),
+  /** Throws: the settings window shows the reason instead of a bare failure. */
+  checkForUpdate: () => callOrThrow<UpdateInfo>("check_for_update"),
+  downloadAndInstallUpdate: (downloadUrl: string, apiUrl?: string | null) =>
+    callOrThrow<string>("download_and_install_update", { downloadUrl, apiUrl: apiUrl ?? null }),
   /** The tray Mochi in the update blue while a new version waits (tray.rs). */
   trayUpdateHint: (on: boolean) => call<void>("tray_update_hint", { on }),
 };
@@ -266,9 +269,18 @@ export interface UpdateInfo {
   releaseNotes: string;
   releaseUrl: string;
   downloadUrl: string | null;
+  /** Same asset through the authenticated API; a private build only. */
+  downloadApiUrl: string | null;
   fileName: string | null;
   /** The repository this build updates from ("owner/repo"). */
   repo: string;
+}
+
+/** Which repository this build reads, and whether it is a private one. */
+export interface UpdateChannel {
+  repo: string;
+  private: boolean;
+  hasToken: boolean;
 }
 
 export type SpotifyAction = "playPause" | "next" | "previous" | "seek" | "shuffle" | "repeat" | "volume" | "like";

@@ -919,6 +919,7 @@ pub fn run() {
             spotify::spotify_control,
             spotify::spotify_open,
             spotify::spotify_installed,
+            updater::update_channel,
             updater::check_for_update,
             updater::download_and_install_update,
             tray::tray_update_hint,

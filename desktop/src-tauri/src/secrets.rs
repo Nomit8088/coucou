@@ -27,6 +27,10 @@ pub const KNOWN_KEYS: &[&str] = &[
     // code QQ's settings hand out for third-party clients (mail.rs).
     "qqmail-address",
     "qqmail-auth-code",
+    // A read-only GitHub token for builds that update from a private fork: a
+    // private repository's releases answer 404 to an anonymous request, so the
+    // updater needs a credential it can revoke on its own (updater.rs).
+    "update-token",
 ];
 
 /// Custom chat providers get one credential each: `chat-` plus a short id.
