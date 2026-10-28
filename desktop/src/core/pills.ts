@@ -82,6 +82,9 @@ export const PILL_CATALOG: readonly PillDefinition[] = [
     subtitle: N_("Integration"), source: "n8n", support: "yes", connect: key("qqmail-auth-code") },
 ];
 
+/** Where QQ Mail's web client lives: its card and its notice both open it. */
+export const QQMAIL_WEB_URL = "https://wx.mail.qq.com/";
+
 /** The always-on pill unless the user picks another workspace tool. */
 export const DEFAULT_MAIN_PILL = "agent_dsh";
 

@@ -624,13 +624,13 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
     }
     if (def.id === "integration_qqmail") {
       // The mailbox is the one integration whose pill the compact island never
-      // shows, so a new mail has to open the island to be seen at all.
+      // shows, so a new mail has to bring up its own card to be seen at all.
       rows.append(
         h("div", { class: "row" },
           h("label", { style: "min-width:104px", text: t("Open on new mail") }),
           toggle(settings.mailPopup, (v) => { settings.mailPopup = v; void save(); }),
         ),
-        h("div", { class: "hint", text: t("A new mail opens the island on the mailbox. Off: only the chime and the badge.") }),
+        h("div", { class: "hint", text: t("A new mail opens a card in the island. Off: only the chime and the badge.") }),
       );
     }
     if (def.mediaApp != null) {

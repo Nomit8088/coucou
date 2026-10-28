@@ -145,6 +145,23 @@ fn is_new(key: &'static str, id: &str) -> bool {
     }
 }
 
+/// Whether this poll brought a mail worth announcing — remembering the newest
+/// uid as the baseline.
+///
+/// An INBOX with nothing unseen is a baseline too, just an empty one. Without
+/// this the first mail after a quiet mailbox looked exactly like the launch's
+/// first poll and was never announced: the card said 1 unseen and nothing
+/// popped up.
+fn new_mail(key: &'static str, uid: Option<u32>) -> bool {
+    match uid {
+        Some(uid) => is_new(key, &uid.to_string()),
+        None => {
+            is_new(key, "");
+            false
+        }
+    }
+}
+
 /// The card's error line, in the interface language (i18n.rs);
 /// `unauthorised_hint` comes translated.
 fn status_error(code: u16, unauthorised_hint: &str) -> String {
@@ -714,7 +731,8 @@ async fn poll_qqmail(app: AppHandle) {
         Ok(mailbox) => {
             // The newest arrival gets the badge and the sound, once.
             let newest = mailbox.messages.last();
-            let event = newest.filter(|m| is_new("qqmail", &m.uid.to_string())).map(|last| IntegrationEvent {
+            let arrived = new_mail("qqmail", newest.map(|m| m.uid));
+            let event = newest.filter(|_| arrived).map(|last| IntegrationEvent {
                 success: true,
                 label: if last.subject.is_empty() { last.from.clone() } else { last.subject.clone() },
                 detail: Some(last.from.clone()),
@@ -1421,5 +1439,21 @@ mod tests {
         }]);
         let rows = gitlab_pipelines(&base, Some(&list)).0;
         assert_eq!(rows[0]["url"], json!("https://gitlab.example.com/foo/bar/-/pipelines/5"));
+    }
+
+    /// A key of its own: SEEN is process-wide and the other tests never touch it.
+    #[test]
+    fn a_mail_after_a_quiet_mailbox_is_an_arrival() {
+        let key = "test-mail-notice";
+        // The launch's first poll only fills the card in, as every poller does.
+        assert!(!new_mail(key, Some(40)), "the first poll is the baseline");
+        assert!(!new_mail(key, Some(40)), "the same message is not announced twice");
+        assert!(new_mail(key, Some(41)), "a newer uid is a new mail");
+        // Reading everything leaves no message to compare against — the next
+        // one is still an arrival, not another baseline.
+        assert!(!new_mail(key, None), "an empty INBOX announces nothing");
+        assert!(new_mail(key, Some(42)), "the first mail after a quiet mailbox");
+        assert!(!new_mail(key, None));
+        assert!(new_mail(key, Some(43)));
     }
 }

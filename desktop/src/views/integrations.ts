@@ -8,7 +8,7 @@ import { h, svg, clear, dot } from "./dom";
 import { ICONS } from "./icons";
 import { State, type AgentTask } from "../core/state";
 import { Bridge } from "../core/bridge";
-import { isComingSoon, pillDefinition } from "../core/pills";
+import { isComingSoon, pillDefinition, QQMAIL_WEB_URL } from "../core/pills";
 import { refreshHookPills } from "../island/integrations";
 import { readActivity, readPulse, readStats } from "../core/github";
 import { githubDetail, githubPulseCard } from "./github";
@@ -56,7 +56,7 @@ const OPEN_URLS: Record<string, string> = {
   integration_stripe: "https://dashboard.stripe.com/payments",
   integration_notion: "https://notion.so",
   integration_calcom: "https://app.cal.com/bookings",
-  integration_qqmail: "https://wx.mail.qq.com/",
+  integration_qqmail: QQMAIL_WEB_URL,
 };
 
 /** IntegrationCardView.statusLabel on macOS. */
@@ -396,7 +396,7 @@ function n8nDetail(task: AgentTask, onBack: () => void): HTMLElement {
 
 const QQMAIL_BLUE = "#12B7F5";
 /** The mailbox's web page: a row has no deep link to open instead. */
-const QQMAIL_URL = "https://wx.mail.qq.com/";
+const QQMAIL_URL = QQMAIL_WEB_URL;
 
 /** The unseen count, and the newest of them — newest first, as mail reads. */
 function qqmailCard(): HTMLElement {

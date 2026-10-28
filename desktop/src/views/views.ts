@@ -904,7 +904,7 @@ function buildNotice(actions: ViewActions): ViewHost {
       const notice = State.notice;
       const task = State.tasks.find((t) => t.id === notice?.pillId) ?? State.focusTask;
       clear(who);
-      who.append(agentWho(task, ""));
+      who.append(agentWho(task, notice?.label ?? ""));
       title.textContent = notice?.title ?? "";
       detail.textContent = notice?.detail ?? "";
       detail.style.display = notice?.detail && notice.detail !== notice.title ? "" : "none";

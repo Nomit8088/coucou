@@ -184,8 +184,8 @@ export interface Settings {
   /** Which GitLab MRs the island watches. */
   gitlabWatch: GitWatch;
   /**
-   * A new mail opens the island on the mailbox. Off: only the chime and the
-   * pill badge (which is invisible while the island is compact).
+   * A new mail opens the island on its notice card. Off: only the chime and
+   * the pill badge (which is invisible while the island is compact).
    */
   mailPopup: boolean;
   /** Mochi on the desktop. Rust owns it: whatever the page sends back is ignored. */
@@ -203,6 +203,8 @@ export interface GitWatch {
 
 export interface GitNotice {
   pillId: string;
+  /** Said next to the pill's name — "New email" on the mailbox's notice. */
+  label?: string;
   title: string;
   detail: string;
   url: string;

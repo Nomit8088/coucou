@@ -4,9 +4,10 @@
 
 import { onEvent, Bridge, type IntegrationUpdate } from "../core/bridge";
 import { gitHubAlert, gitNotice, type GitHubEvent } from "../core/github";
-import { availablePills } from "../core/pills";
+import { availablePills, QQMAIL_WEB_URL } from "../core/pills";
 import { Sound } from "../core/sound";
 import { State, type GitNotice } from "../core/state";
+import { t } from "../i18n/i18n";
 import type { Island } from "./island";
 
 const GITHUB = "integration_github";
@@ -41,7 +42,7 @@ function showNotice(island: Island, notice: GitNotice) {
 }
 
 export function registerIntegrationHandlers(island: Island) {
-  void onEvent<IntegrationUpdate>("integration", (update) => handle(island, update));
+  void onEvent<IntegrationUpdate>("integration", (update) => handleIntegrationUpdate(island, update));
   void onEvent<GitHubEvent[]>("github-alerts", (events) => handleGitAlerts(island, events, GITHUB, false));
   void onEvent<GitHubEvent[]>("gitlab-alerts", (events) => handleGitAlerts(island, events, "integration_gitlab", true));
   void refreshConfigured();
@@ -125,7 +126,11 @@ export async function refreshHookPills() {
   State.notify();
 }
 
-function handle(island: Island, update: IntegrationUpdate) {
+/**
+ * One `integration` event from Rust: the card's data, and — when something
+ * actually changed — the pill's state, a sound, and the island.
+ */
+export function handleIntegrationUpdate(island: Island, update: IntegrationUpdate) {
   if (State.paused) return;
 
   const previous = State.integrations[update.id];
@@ -150,14 +155,22 @@ function handle(island: Island, update: IntegrationUpdate) {
       // Same as the Swift pollers: show the compact island so the badge is seen,
       // but never steal the screen for a successful deploy.
       //
-      // A new mail is the exception: its pill only exists on screen while the
-      // overview is open, so badging it said nothing — and `reveal()` does
-      // nothing at all when the island is already up. Open the mailbox instead,
-      // but never over an island the user is reading, and only while the
-      // "Open on new mail" switch is on.
-      if (update.id === "integration_qqmail" && State.settings.mailPopup !== false && State.mode !== "expanded") {
-        State.setFocus(update.id);
-        island.alert("overview");
+      // A new mail gets a card of its own, as a comment on a pull request does:
+      // its pill only exists on screen while the overview is open, so badging it
+      // said nothing — and `reveal()` does nothing at all when the island is
+      // already up, which made every mail after the first one silent. A card
+      // that is waiting for an answer is never covered: the notice waits for it
+      // to go (showNotice → presentDeferredNotice).
+      if (update.id === "integration_qqmail" && State.settings.mailPopup !== false) {
+        showNotice(island, {
+          pillId: update.id,
+          label: t("New email"),
+          title: event.label,
+          detail: event.detail ?? "",
+          url: QQMAIL_WEB_URL,
+          action: t("Open {name}", { name: "QQ Mail" }),
+          tone: "info",
+        });
       } else {
         island.reveal();
       }
@@ -168,12 +181,12 @@ function handle(island: Island, update: IntegrationUpdate) {
         update.id,
         window.setTimeout(() => {
           clearTimers.delete(update.id);
-          const t = State.tasks.find((x) => x.id === update.id);
-          if (!t || (t.state !== "finished" && t.state !== "error")) return;
-          t.state = "idle";
-          t.steps = [];
-          t.stepIndex = 0;
-          t.pillBadge = null;
+          const pill = State.tasks.find((x) => x.id === update.id);
+          if (!pill || (pill.state !== "finished" && pill.state !== "error")) return;
+          pill.state = "idle";
+          pill.steps = [];
+          pill.stepIndex = 0;
+          pill.pillBadge = null;
           State.notify();
         }, 60_000),
       );
