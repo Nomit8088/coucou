@@ -49,8 +49,9 @@ export const Bridge = {
 
   saveSettings: (settings: Settings) => call<void>("save_settings", { settings }),
 
-  /** Shrink the window down to the invisible wake strip (hidden) or back to full. */
-  setCollapsed: (collapsed: boolean) => call<void>("set_collapsed", { collapsed }),
+  /** Fold the window to `width`×`height` (the closed island) or grow it back. */
+  setCollapsed: (collapsed: boolean, width?: number, height?: number) =>
+    call<void>("set_collapsed", { collapsed, width: width ?? null, height: height ?? null }),
 
   /**
    * Looks for clicks that miss the island while it is open (Rust, Windows).

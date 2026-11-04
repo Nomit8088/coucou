@@ -4,6 +4,9 @@
 import { Tracked, Spring, clamp } from "../core/anim";
 import { Bridge, IS_TAURI, onDragDrop } from "../core/bridge";
 import {
+  CLOSED_BOT_D, CLOSED_H, closedContent, closedIsland, closedWidth, type ClosedContent,
+} from "../core/closed";
+import {
   EXPANDED_CORNER, EXPANDED_W, NOTCH_W, PANEL_H, PANEL_W,
   ROUNDED_CORNER, VIEW_LAYOUTS, botGlowColor, botGlowOpacity, botPosition, chatPromptHeight,
   islandSize,
@@ -20,12 +23,13 @@ import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from ".
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
 import { UploadCanvas } from "../upload/canvas";
 import { USC, UploadSeq } from "../upload/sequence";
-import { closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
+import { claudeCompactPillVisible, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
+import { dominantPct, planColor } from "../core/plan";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
 import { h } from "../views/dom";
 import { IslandStateMachine } from "./fsm";
-import { armPendingTimeout, clearPendingTimeout } from "./hooks";
-import { tl } from "../i18n/i18n";
+import { armPendingTimeout, clearPendingTimeout, restoreAlertFocus } from "./hooks";
+import { language, tl } from "../i18n/i18n";
 import { presentDeferredNotice, refreshHookPills } from "./integrations";
 import { DesktopLink } from "./desktop";
 import type { ViewCommand } from "./shortcuts";
@@ -65,6 +69,18 @@ export class Island {
   private greetingCanvas!: HTMLCanvasElement;
   private miniGrid!: HTMLElement;
   private clockEl!: HTMLElement;
+  /** The closed island's one line (core/closed.ts), and what it last showed. */
+  private closedEl!: HTMLElement;
+  private closedDot!: HTMLElement;
+  private closedText!: HTMLElement;
+  private closedKey = "";
+  /** Width of the closed island for what it shows now. */
+  private closedW = 120;
+  /** The size the window was last folded to, so a new one is only sent on a change. */
+  private collapsedTo = { w: 0, h: 0 };
+  private compactPlan!: HTMLElement;
+  private compactPlanDot!: HTMLElement;
+  private compactPlanLabel!: HTMLElement;
   private countdown!: HTMLElement;
   private dismissBtn!: HTMLElement;
   private wakeStrip!: HTMLElement;
@@ -299,12 +315,31 @@ export class Island {
     };
 
     this.wakeStrip = h("div", { id: "wake-strip" });
+    this.closedDot = h("span", { class: "dot" });
+    this.closedText = h("span", { class: "text" });
+    this.closedEl = h("div", { id: "island-closed" }, this.closedDot, this.closedText);
     this.botGlow = h("div", { id: "bot-glow" });
     this.botCanvas = h("canvas", { id: "bot-canvas" });
     this.greetingCanvas = h("canvas", { id: "greeting-canvas" });
     this.miniGrid = h("div", { id: "mini-grid" });
     this.clockEl = h("div", { id: "island-clock" });
     this.countdown = h("div", { id: "countdown" });
+    this.compactPlanDot = h("i", { class: "compact-plan-dot" });
+    this.compactPlanLabel = h("span", { class: "compact-plan-label" });
+    this.compactPlan = h(
+      "button",
+      {
+        id: "compact-plan",
+        title: tl("Claude plan usage"),
+        onmousedown: (e) => { e.stopPropagation(); },
+        onclick: (e) => {
+          e.stopPropagation();
+          if ((e as MouseEvent).button === 0) this.openClaudePlan();
+        },
+      },
+      this.compactPlanDot,
+      this.compactPlanLabel,
+    );
     this.compactMusic = new CompactMusicWidget({
       onHoverChange: () => {
         if (State.mode === "compact") {
@@ -391,7 +426,9 @@ export class Island {
       this.botCanvas,
       this.compactMusic.el,
       this.miniGrid,
+      this.compactPlan,
       this.clockEl,
+      this.closedEl,
       this.dismissBtn,
       this.countdown,
     );
@@ -406,6 +443,9 @@ export class Island {
     this.applyGeometry();
 
     window.setInterval(() => {
+      // The closed island's clock, plan or song changes independently of the
+      // compact island's clock, and its window has to follow its width.
+      this.updateClosed();
       if (State.mode === "compact" && State.settings.showClock) {
         this.updateClock();
       }
@@ -470,6 +510,8 @@ export class Island {
       // A folded card is still waiting: it keeps the island pinned.
       if (!State.pendingApproval) State.isPinned = false;
       void Bridge.focusWindow(false);
+      // Another pill's alert borrowed the front: the pill you had comes back.
+      restoreAlertFocus();
     }
     if (mode !== "expanded") {
       closePlanCard();
@@ -479,6 +521,9 @@ export class Island {
       // nothing while hidden.
       UploadSeq.deactivate();
     }
+    // Folding all the way: the closed island's width for what it will show.
+    if (mode === "hidden") this.updateClosed();
+    else this.closedEl.classList.remove("on");
     this.updateWindowCollapsed();
     this.animateGeometry(modeOrder(mode) < modeOrder(prev));
     // Clicks that miss the island only matter while it is open: Rust looks for
@@ -499,6 +544,18 @@ export class Island {
   /** Navigating out of the drop flow ends the sequence, as on macOS. */
   private stopSequenceIfLeaving(view: IslandViewName) {
     if (UploadSeq.isActive && !UPLOAD_VIEWS.has(view)) UploadSeq.deactivate();
+  }
+
+  /** Click on the compact plan gauge: opens the Claude plan card on the overview. */
+  openClaudePlan() {
+    Sound.resume();
+    State.lastActivity = performance.now();
+    this.fsm.userInteracted();
+    State.planDetailIsCodex = false;
+    State.showingPlanDetail = true;
+    this.fsm.forceHome();
+    this.expand("overview");
+    State.notify();
   }
 
   expand(view: IslandViewName) {
@@ -852,7 +909,19 @@ export class Island {
     return s.playing || this.compactMusic.isHovered;
   }
 
+  /**
+   * The closed island stays on screen (anything but "hidden"). The − button
+   * means "not until the next notification", so a dismissed island leaves no
+   * shape behind either: the window folds to the wake strip as it always did.
+   */
+  private get closedShows(): boolean {
+    return !this.fsm.dismissed && closedIsland(State.settings.closedIsland) !== "hidden";
+  }
+
   private targetSize(): { w: number; h: number; r: number } {
+    if (State.mode === "hidden" && this.closedShows) {
+      return { w: this.closedW, h: CLOSED_H, r: 10 };
+    }
     let { w, h } = islandSize(
       State.mode,
       State.view,
@@ -945,18 +1014,66 @@ export class Island {
       this.collapseTimer = null;
     }
     if (State.mode === "hidden") {
-      // Let the island finish retracting, then drop the window to the wake strip:
-      // from there the OS delivers no cursor events, so nothing polls at all.
+      // Let the island finish folding, then shrink the window to it — to the
+      // closed island, or to the wake strip when that shows nothing: from
+      // there nothing polls the cursor at all.
       this.collapseTimer = window.setTimeout(() => {
         this.collapseTimer = null;
         if (State.mode !== "hidden") return;
         this.collapsed = true;
-        void Bridge.setCollapsed(true);
+        this.sendCollapsedSize(true);
       }, 420);
     } else if (this.collapsed) {
       // Grow the window back before the island animates open.
       this.collapsed = false;
+      this.collapsedTo = { w: 0, h: 0 };
       void Bridge.setCollapsed(false);
+    }
+  }
+
+  /** Tells Rust the folded window's size: the closed island's, or none (the strip). */
+  private sendCollapsedSize(force = false) {
+    const size = this.closedShows ? { w: this.closedW, h: CLOSED_H } : { w: 0, h: 0 };
+    if (!force && size.w === this.collapsedTo.w && size.h === this.collapsedTo.h) return;
+    this.collapsedTo = size;
+    if (size.w > 0) void Bridge.setCollapsed(true, size.w, size.h);
+    else void Bridge.setCollapsed(true);
+  }
+
+  /**
+   * What the closed island shows, redrawn when it changes (the minute, the
+   * song, the plan): a new width animates the island and, once folded,
+   * resizes the window to it.
+   */
+  private updateClosed() {
+    const style = closedIsland(State.settings.closedIsland);
+    const track = Spotify.state.track;
+    const content: ClosedContent | null = State.mode === "hidden" || this.collapsed
+      ? closedContent(style, {
+        now: new Date(),
+        locale: language(),
+        planUsage: State.planUsage,
+        music: State.spotifyPlaying && track ? { title: track.title, artist: track.artist } : null,
+      })
+      : null;
+    const key = content ? `${style}|${content.text}|${content.dot ?? ""}|${content.note}` : style;
+    const shown = State.mode === "hidden" && this.closedShows;
+    this.closedEl.classList.toggle("on", shown && content != null);
+    if (key === this.closedKey) return;
+    this.closedKey = key;
+    this.closedText.textContent = content?.text ?? "";
+    this.closedEl.classList.toggle("note", content?.note === true);
+    this.closedDot.style.display = content?.dot ? "" : "none";
+    if (content?.dot) this.closedDot.style.background = content.dot;
+    // Measured as drawn: the font and the language decide the width.
+    const extras = (content?.dot ? 12 : 0) + (content?.note ? 16 : 0);
+    const w = closedWidth(content ? this.closedText.scrollWidth : 0, extras);
+    if (w !== this.closedW) {
+      this.closedW = w;
+      if (State.mode === "hidden") {
+        this.animateGeometry(w < this.width.value);
+        if (this.collapsed) this.sendCollapsedSize();
+      }
     }
   }
 
@@ -964,9 +1081,15 @@ export class Island {
 
   private wireInput() {
     // The wake strip is the only thing the OS can hit while the island is hidden.
-    this.wakeStrip.addEventListener("mouseenter", () => {
+    // Folded, the window is only the closed island (or the wake strip): the
+    // pointer coming onto it is all there is to hear, and it wakes the island.
+    const wake = () => {
       Sound.resume();
       if (State.mode === "hidden") this.fsm.mouseEntered();
+    };
+    this.wakeStrip.addEventListener("mouseenter", wake);
+    this.root.addEventListener("mouseover", () => {
+      if (this.collapsed) wake();
     });
 
     // A press the page sees that lands on none of the island's own controls is
@@ -1261,8 +1384,10 @@ export class Island {
     // spends most of its life in. Geometry still has to finish retracting.
     const settling =
       this.width.animating || this.height.animating || this.radius.animating;
+    const botMoving = !this.botCx.settled || !this.botCy.settled || !this.botSize.settled;
+    // Closed, only the folding — and Mochi reaching his place in the closed island.
     const busy = State.mode === "hidden"
-      ? settling
+      ? settling || (botMoving && closedIsland(State.settings.closedIsland) === "mochi")
       : settling ||
         !this.botCx.settled || !this.botCy.settled || !this.botSize.settled ||
         greetingActive || this.engine.busy || UploadSeq.isActive || viewAnimating ||
@@ -1277,7 +1402,11 @@ export class Island {
   };
 
   private updateBotTargets() {
-    const p = botPosition(State.mode, State.view, this.height.value, State.uploadProgress);
+    let p = botPosition(State.mode, State.view, this.height.value, State.uploadProgress);
+    // The closed island with Mochi in it, as on a Mac without a notch.
+    if (State.mode === "hidden" && closedIsland(State.settings.closedIsland) === "mochi") {
+      p = { cx: this.width.value / 2, cy: this.height.value / 2, diameter: CLOSED_BOT_D, opacity: 1 };
+    }
     this.botCx.target = p.cx;
     this.botCy.target = p.cy;
     this.botSize.target = p.diameter / 0.6;
@@ -1425,6 +1554,18 @@ export class Island {
     // A wardrobe try-on never outlives the wardrobe.
     if (State.wardrobePreview && !(expanded && State.view === "wardrobe")) State.wardrobePreview = null;
 
+    // The Claude plan gauge in the compact island (Settings → Plan usage).
+    const showPlan = claudeCompactPillVisible();
+    this.compactPlan.style.opacity = showPlan ? "1" : "0";
+    this.compactPlan.style.pointerEvents = showPlan ? "auto" : "none";
+    if (showPlan) {
+      const others = State.otherTasks.slice(0, 4);
+      this.compactPlan.style.right = others.length > 0 ? "58px" : "20px";
+      const pct = dominantPct(State.planUsage);
+      this.compactPlan.style.setProperty("--plan", planColor(pct));
+      this.compactPlanLabel.textContent = pct != null ? `${Math.round(pct)}%` : "—";
+    }
+
     this.header.sync();
     for (const [name, view] of this.views) {
       const on = name === State.view;
@@ -1492,6 +1633,13 @@ export class Island {
 
   /** Applies settings coming from Rust at boot. */
   applySettings() {
+    // The closed island may have changed: what it shows, or whether it shows.
+    this.closedKey = "";
+    this.updateClosed();
+    if (State.mode === "hidden") {
+      this.animateGeometry(true);
+      if (this.collapsed) this.sendCollapsedSize();
+    }
     Sound.setEnabled(State.settings.soundEnabled);
     Sound.setVolume(State.settings.soundVolume);
     this.fsm.homeToPetitDelay = State.settings.autoCloseInterval;

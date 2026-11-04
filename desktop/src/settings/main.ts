@@ -25,6 +25,8 @@ import { colorDot } from "./colors";
 import { statusDot, renderDiff } from "./parts";
 import { HOST_OS, platformCapabilities } from "../core/platform";
 import { DEFAULT_REPO, releasesUrl, updateAction } from "../core/updater";
+import { closedIsland } from "../core/closed";
+import { modelPicker } from "./model-picker";
 import { formatDiagnostics } from "../core/diagnostics";
 import {
   LANGUAGES, N_, isRtl, onLanguageChange, resolveLanguage, setLanguage, systemLanguages, t,
@@ -329,6 +331,7 @@ const PLAN_SETTINGS_TEXT = {
   get claude() { return t("Shows your Claude plan usage (5-hour and weekly limits) in the island's header. Coucou adds a status line relay in ~/.claude/settings.json. If you already have a status line, it keeps working as before. Pro and Max plans only."); },
   get claudeCli() { return t("The numbers come from the Claude Code command-line tool. The Claude desktop app does not report them, so the gauge stays empty if you only use the desktop app."); },
   get showClaude() { return t("Show in notch"); },
+  get showClaudeCompact() { return t("Show in compact island"); },
   get codex() { return t("Shows your Codex plan usage (weekly limit and free resets left) in the island's header. Coucou asks the Codex CLI (codex app-server) when the pill shows; nothing is installed. Codex must be signed in with ChatGPT."); },
   get showCodex() { return t("Show Codex plan in the notch"); },
   get onlyWhenDeclared() { return t("Only shows when Codex is your main tool or an active pill."); },
@@ -346,8 +349,11 @@ function planSection(status: HookStatus): HTMLElement {
     const fresh = await Bridge.hooksStatus();
     if (fresh) Object.assign(status, fresh);
     settings.planRelayInstalled = status.planRelayInstalled;
-    // Cancelled or failed: a switch that was waiting for the install falls back.
-    if (!status.planRelayInstalled) settings.showPlanInNotch = false;
+    // Cancelled or failed: switches that were waiting for the install fall back.
+    if (!status.planRelayInstalled) {
+      settings.showPlanInNotch = false;
+      settings.showPlanInCompactIsland = false;
+    }
     redraw();
   }
 
@@ -369,10 +375,27 @@ function planSection(status: HookStatus): HTMLElement {
         });
       }
     });
+    const swCompact = toggle(settings.showPlanInCompactIsland, (on) => {
+      if (!on) {
+        settings.showPlanInCompactIsland = false;
+        void save();
+      } else if (status.planRelayInstalled) {
+        settings.showPlanInCompactIsland = true;
+        void save();
+      } else {
+        void reviewChange(body, STATUS_LINE_CHANGE, true, () => void rebuild(), () => {
+          settings.planRelayInstalled = true;
+          settings.showPlanInCompactIsland = true;
+          void save();
+          redraw();
+        });
+      }
+    });
     body.append(
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.claude }),
       h("div", { class: "hint", text: PLAN_SETTINGS_TEXT.claudeCli }),
       h("div", { class: "row" }, h("label", { text: PLAN_SETTINGS_TEXT.showClaude }), sw),
+      h("div", { class: "row" }, h("label", { text: PLAN_SETTINGS_TEXT.showClaudeCompact }), swCompact),
       h("div", { class: "row" },
         h("label", { text: t("Relay") }),
         statusDot(status.planRelayInstalled),
@@ -751,6 +774,23 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
 // ── General section ───────────────────────────────────────────────────────────
 
 function generalSection(): HTMLElement {
+  // The closed island (core/closed.ts): what stays at the top of the screen.
+  const closed = h("select", {}) as HTMLSelectElement;
+  closed.append(
+    h("option", { value: "mochi", text: t("Mochi, as on a Mac without a notch") }),
+    h("option", { value: "time", text: t("The time") }),
+    h("option", { value: "datetime", text: t("The date and the time") }),
+    h("option", { value: "claude", text: t("Claude usage") }),
+    h("option", { value: "music", text: t("What's playing") }),
+    h("option", { value: "empty", text: t("Nothing, just the island") }),
+    h("option", { value: "hidden", text: t("Hide the island") }),
+  );
+  closed.value = closedIsland(settings.closedIsland);
+  closed.addEventListener("change", () => {
+    settings.closedIsland = closed.value;
+    void save();
+  });
+
   const volume = h("input", {
     type: "range", min: "0", max: "0.2", step: "0.005",
     value: String(settings.soundVolume),
@@ -860,6 +900,16 @@ function generalSection(): HTMLElement {
       toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
     ),
     h("div", { class: "hint", text: t("Hovering the island opens it; it folds again shortly after the pointer leaves. Click inside to keep it open.") }),
+    h("div", { class: "row" },
+      h("label", { text: t("Open for every pill's alerts") }),
+      toggle(settings.alertsFromAllPills, (v) => { settings.alertsFromAllPills = v; void save(); }),
+    ),
+    h("div", { class: "hint", text: t("When a pill other than the one shown finishes or hits an error, the notch shows it for a moment, then the pill you had comes back.") }),
+    h("div", { class: "row" },
+      h("label", { text: t("Closed island shows") }),
+      closed,
+    ),
+    h("div", { class: "hint", text: t("A PC has no notch: once closed, a small island stays at the top of the screen. Hover it to bring Coucou back. Hidden, move the pointer to the very top of the screen.") }),
     h("div", { class: "row" },
       h("label", { text: t("Show clock in the island") }),
       toggle(settings.showClock, (v) => { settings.showClock = v; void save(); }),
@@ -1519,10 +1569,22 @@ function providerRow(
   name.addEventListener("change", save);
   url.addEventListener("change", save);
   model.addEventListener("change", save);
+  // Discover the provider's real model ids instead of typing them: the same
+  // /v1/models list the chat view uses, kept as this provider's default.
+  const picker = modelPicker(
+    () => settings.chatModels[provider.id] || provider.defaultModel,
+    (id) => {
+      model.value = id;
+      settings.chatModels = { ...settings.chatModels, [provider.id]: id };
+      save();
+    },
+    () => provider.id,
+  );
   const row = h("div", { style: "display:flex;flex-direction:column;gap:6px" },
     h("div", { class: "row" }, h("label", { text: t("Name") }), name),
     h("div", { class: "row" }, h("label", { text: t("Base URL") }), url),
     h("div", { class: "row" }, h("label", { text: t("Default model") }), model),
+    h("div", { class: "row" }, h("label", { text: t("Models on this account") }), picker.element),
     h("div", { class: "row" }, h("label", { text: t("API key") }), key, h("button", { class: "primary", text: t("Save"), onclick: () => {
       const value = key.value.trim();
       if (!value) return;

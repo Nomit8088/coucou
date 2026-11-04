@@ -122,8 +122,12 @@ export interface Settings {
   autoCloseInterval: number;
   /** Hovering the island opens it all the way (off: hovering only peeks). */
   openOnHover: boolean;
+  /** A pill other than the focused one finishing/failing borrows the island. */
+  alertsFromAllPills: boolean;
   /** Date and time in the middle of the compact island. */
   showClock: boolean;
+  /** What the closed island keeps on screen (see core/closed.ts). */
+  closedIsland: string;
   absenceInterval: number;
   /** Declared pills next to the main one (at most 4), in the order they were added. */
   activeIntegrations: string[];
@@ -143,6 +147,8 @@ export interface Settings {
   model: string;
   /** Show the Claude plan pill (5 h and weekly limits) in the island's header. */
   showPlanInNotch: boolean;
+  /** The same percentage in the compact island, next to the agent dots. */
+  showPlanInCompactIsland: boolean;
   /** Coucou's status line relay is installed in Claude Code's settings. */
   planRelayInstalled: boolean;
   /** Show the Codex plan pill in the island's header. */
@@ -217,7 +223,9 @@ export const DEFAULT_SETTINGS: Settings = {
   soundVolume: 0.12,
   autoCloseInterval: 15,
   openOnHover: false,
+  alertsFromAllPills: false,
   showClock: false,
+  closedIsland: "mochi",
   absenceInterval: 180,
   activeIntegrations: ["integration_github", "integration_resend"],
   mainPill: DEFAULT_MAIN_PILL,
@@ -227,6 +235,7 @@ export const DEFAULT_SETTINGS: Settings = {
   hooksInstalled: false,
   model: "deepseek-chat",
   showPlanInNotch: false,
+  showPlanInCompactIsland: false,
   planRelayInstalled: false,
   showCodexPlanInNotch: false,
   chatProvider: "deepseek",

@@ -279,6 +279,40 @@ test("a finished turn behind another pill only badges its own, for 5.2 s", () =>
   assert.equal(task().pillBadge, null);
 });
 
+test("alerts from every pill: an unfocused finish borrows the front, then gives it back", () => {
+  declare(CLAUDE);
+  State.settings.alertsFromAllPills = true;
+  State.setFocus(DSH);
+  hook({ hook_event_name: "Stop" });
+  assert.equal(State.focusId, CLAUDE);
+  assert.deepEqual(asked, ["alert:finished"]);
+  seconds(5.2);
+  assert.equal(State.focusId, DSH);
+});
+
+test("alerts from every pill: an open island keeps the alert's pill until it closes", () => {
+  declare(CLAUDE);
+  State.settings.alertsFromAllPills = true;
+  State.setFocus(DSH);
+  State.mode = "expanded";
+  hook({ hook_event_name: "Stop" });
+  assert.equal(State.focusId, CLAUDE);
+  assert.deepEqual(asked, ["setView:finished"]);
+  seconds(5.2);
+  // The card is still on screen and names that pill; the front comes back when
+  // the island closes (island.ts).
+  assert.equal(State.focusId, CLAUDE);
+});
+
+test("alerts from every pill: off, an unfocused finish only badges its own pill", () => {
+  declare(CLAUDE);
+  State.setFocus(DSH);
+  hook({ hook_event_name: "Stop" });
+  assert.equal(State.focusId, DSH);
+  assert.deepEqual(asked, []);
+  assert.equal(task(CLAUDE).pillBadge, "finished");
+});
+
 test("a failed turn shows the error view, or the error badge behind another pill", () => {
   dsh({ hook_event_name: "StopFailure" });
   assert.equal(task().state, "error");

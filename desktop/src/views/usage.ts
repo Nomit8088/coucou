@@ -26,6 +26,12 @@ export function claudePillVisible(): boolean {
   return State.view === "overview" && s.showPlanInNotch && s.planRelayInstalled;
 }
 
+/** The percentage in the compact island, next to the agent dots. */
+export function claudeCompactPillVisible(): boolean {
+  const s = State.settings;
+  return State.mode === "compact" && s.showPlanInCompactIsland && s.planRelayInstalled;
+}
+
 /** The Codex pill is in the header: overview, turned on, and Codex is a tool you use. */
 export function codexPillVisible(): boolean {
   return State.view === "overview"

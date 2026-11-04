@@ -3055,3 +3055,89 @@ html[data-dir="rtl"] #views :is(.bubble, .reply .md-p, .reply .md-h, .reply .md-
   unicode-bidi: plaintext;
   text-align: start;
 }
+
+/* ── Compact Claude plan gauge, next to the agent dots ───────────────────── */
+#compact-plan {
+  --plan: #6b7079;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, var(--plan) 14%, transparent);
+  border-radius: 999px;
+  background: #0e0f11;
+  color: var(--dim-3);
+  font: 600 10px var(--font);
+  font-variant-numeric: tabular-nums;
+  line-height: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.25s ease-in-out, right 0.2s ease, background 0.18s, border-color 0.18s, color 0.18s;
+  user-select: none;
+  z-index: 2;
+}
+
+#compact-plan:hover {
+  background: color-mix(in srgb, var(--plan) 18%, transparent);
+  border-color: color-mix(in srgb, var(--plan) 55%, transparent);
+  color: color-mix(in srgb, var(--plan) 70%, white);
+}
+
+#compact-plan .compact-plan-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--plan);
+  flex-shrink: 0;
+}
+
+/* ── The closed island's one line (core/closed.ts) ───────────────────────── */
+#island-closed {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  color: rgba(245, 246, 248, 0.92);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s ease-in;
+  z-index: 3;
+}
+
+#island-closed.on {
+  opacity: 1;
+  transition: opacity 0.3s ease-out 0.12s;
+}
+
+#island-closed .text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+#island-closed .dot {
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+#island-closed.note::before {
+  content: "\266A";
+  flex: 0 0 auto;
+  font-size: 11px;
+  color: #1ed760;
+}

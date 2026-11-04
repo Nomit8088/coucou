@@ -73,6 +73,9 @@ pub struct PollGate {
     active: Mutex<bool>,
     cv: Condvar,
     pub collapsed: AtomicBool,
+    /// The window's logical size while collapsed: the closed island the page
+    /// draws, or the wake strip when it shows nothing.
+    pub collapsed_size: Mutex<(f64, f64)>,
     pub rect: Mutex<IslandRect>,
     /// Mirrors the window flag so we only call into the OS when it changes.
     ignoring: AtomicBool,
@@ -86,6 +89,7 @@ impl PollGate {
             active: Mutex::new(false),
             cv: Condvar::new(),
             collapsed: AtomicBool::new(true),
+            collapsed_size: Mutex::new((STRIP_W, STRIP_H)),
             rect: Mutex::new(IslandRect::default()),
             ignoring: AtomicBool::new(false),
             outside: OutsideWatch::new(),
@@ -131,7 +135,8 @@ pub fn restore_window(app: &AppHandle) {
     if let Some(shared) = app.try_state::<crate::Shared>() {
         let pref = shared.settings.lock().unwrap().screen.clone();
         let collapsed = shared.gate.collapsed.load(Ordering::Relaxed);
-        apply_geometry(app, &pref, collapsed);
+        let size = *shared.gate.collapsed_size.lock().unwrap();
+        apply_geometry(app, &pref, collapsed.then_some(size));
         refresh_click_through(app, &shared.gate);
     }
     if win.is_minimized().unwrap_or(false) {
@@ -330,6 +335,14 @@ mod display_tests {
         assert_eq!(pick_display("primary", &[lap, ext]), None);
         assert_eq!(pick_display("at:nonsense", &[]), None);
     }
+
+    #[test]
+    fn a_closed_island_stays_inside_the_panel() {
+        assert_eq!(clamp_collapsed((160.0, 26.0)), (160.0, 26.0));
+        assert_eq!(clamp_collapsed((5000.0, 900.0)), (PANEL_W, PANEL_H));
+        assert_eq!(clamp_collapsed((0.0, -3.0)), (1.0, 1.0));
+        assert_eq!(clamp_collapsed((f64::NAN, 26.0)), (PANEL_W, 26.0));
+    }
 }
 
 pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
@@ -350,8 +363,9 @@ pub fn screen_info(app: &AppHandle, pref: &str) -> ScreenInfo {
     }
 }
 
-/// Places and sizes the window. `collapsed` picks the wake strip instead of the panel.
-pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
+/// Places and sizes the window: the full panel, or `collapsed` to the size the
+/// closed island needs (the wake strip when it shows nothing).
+pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: Option<(f64, f64)>) {
     let Some(win) = window(app) else { return };
     let Some(m) = target_monitor(app, pref) else { return };
 
@@ -359,7 +373,7 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let mp = *m.position();
     let ms = *m.size();
 
-    let (lw, lh) = if collapsed { (STRIP_W, STRIP_H) } else { (PANEL_W, PANEL_H) };
+    let (lw, lh) = collapsed.map(clamp_collapsed).unwrap_or((PANEL_W, PANEL_H));
     let pw = (lw * scale).round().max(1.0) as u32;
     let ph = (lh * scale).round().max(1.0) as u32;
     let x = mp.x + (ms.width as i32 - pw as i32) / 2;
@@ -392,6 +406,13 @@ pub fn apply_geometry(app: &AppHandle, pref: &str, collapsed: bool) {
     let (lx, ly) = logical_origin(&m);
     platform::pin_to_monitor(&win, lx, ly);
     let _ = win.set_always_on_top(true);
+}
+
+/// A closed island never grows past the panel, and never shrinks below one
+/// pixel (a zero-sized window can't be placed).
+pub fn clamp_collapsed((w, h): (f64, f64)) -> (f64, f64) {
+    let ok = |v: f64, max: f64| if v.is_finite() { v.clamp(1.0, max) } else { max };
+    (ok(w, PANEL_W), ok(h, PANEL_H))
 }
 
 /// Position, size and scale of the monitor the island lives on. Any change here
@@ -461,6 +482,19 @@ pub fn spawn_cursor_poll(app: AppHandle, gate: Arc<PollGate>) {
                     continue;
                 }
                 last = (x, y);
+
+                // Folded, the window is exactly the closed island (or the wake
+                // strip): it always takes the mouse, and the page wakes on its
+                // own mouseover. A tick still in flight while the window folded
+                // must not decide from the open panel's rect — that would make
+                // the closed island click-through, and nothing could wake it.
+                if gate.collapsed.load(Ordering::Relaxed) {
+                    was_down = down;
+                    if gate.ignoring.swap(false, Ordering::Relaxed) {
+                        platform::set_click_through(&win, false);
+                    }
+                    continue;
+                }
 
                 // Click-through: the window only takes the mouse over the island
                 // shape. A small entry margin means the flag is already off by the
@@ -541,10 +575,11 @@ pub fn refresh_click_through(app: &AppHandle, gate: &PollGate) {
     }
     let Some(win) = window(app) else { return };
     let region = if gate.collapsed.load(Ordering::Relaxed) {
-        // The wake strip itself, never "the whole window": if the window ever
-        // fails to shrink to the strip, the rest of it must not swallow clicks
-        // meant for whatever sits under the top of the screen.
-        Some((0.0, 0.0, STRIP_W, STRIP_H))
+        // The closed island (or the wake strip) itself, never "the whole
+        // window": if the window ever fails to shrink, the rest of it must not
+        // swallow clicks meant for whatever sits under the top of the screen.
+        let (w, h) = clamp_collapsed(*gate.collapsed_size.lock().unwrap());
+        Some((0.0, 0.0, w, h))
     } else {
         let r = *gate.rect.lock().unwrap();
         if r.w <= 0.0 {

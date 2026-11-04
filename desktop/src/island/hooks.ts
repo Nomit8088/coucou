@@ -24,6 +24,46 @@ let pendingTimeout: number | null = null;
 const CLAUDE_ID = "integration_claude";
 const CURSOR_ID = "agent_cursor";
 
+/** The pill that was focused before another pill's alert borrowed the front. */
+let focusBeforeAlert: string | null = null;
+let alertPill: string | null = null;
+
+/**
+ * Whether a finish/error should take the island. Off by default only the pill
+ * already in front does; with alertsFromAllPills another pill may borrow the
+ * front for a moment, and restoreAlertFocus() gives it back afterwards. A card
+ * waiting for an answer is never covered, nor is a view the user is working in.
+ */
+function showsAlert(pill: string, focused: boolean): boolean {
+  if (State.pendingApproval) return false;
+  if (focused) return true;
+  if (!State.settings.alertsFromAllPills) return false;
+  if (State.mode === "expanded" && !["overview", "finished", "error", "empty"].includes(State.view)) {
+    return false;
+  }
+  if (focusBeforeAlert == null) focusBeforeAlert = State.focusId;
+  alertPill = pill;
+  State.setFocus(pill);
+  return true;
+}
+
+/** Gives the front back to the pill the user had before an alert borrowed it. */
+export function restoreAlertFocus(): void {
+  if (!focusBeforeAlert) return;
+  const prev = focusBeforeAlert;
+  const borrowed = alertPill;
+  focusBeforeAlert = null;
+  alertPill = null;
+  if (
+    !State.pendingApproval &&
+    State.focusId === borrowed &&
+    borrowed !== prev &&
+    State.tasks.some((t) => t.id === prev)
+  ) {
+    State.setFocus(prev);
+  }
+}
+
 /** Takes the approval or question card down and gives the island back. */
 function dropPendingCard(island: Island): void {
   if (!State.pendingApproval) return;
@@ -649,7 +689,7 @@ function handleHook(island: Island, payload: HookPayload) {
       }
       Sound.play("finish");
       // A card waiting for an answer is never covered by another alert.
-      if (focused && !State.pendingApproval) surface("finished", true);
+      if (showsAlert(agentId, focused)) surface("finished", true);
       else State.setPillBadge(agentId, "finished");
       const stopKey = timerKey(agentId, sessionId);
       cancelStopTimer(agentId, sessionId);
@@ -657,6 +697,10 @@ function handleHook(island: Island, payload: HookPayload) {
         stopKey,
         window.setTimeout(() => {
           stopTimers.delete(stopKey);
+          // While the island is open the alert's card stays on its own pill, and
+          // the pill you had comes back when it closes (island.ts), as on the
+          // Mac. An agent pill about to go hands the front back now.
+          if (isExternalAgent || State.mode !== "expanded") restoreAlertFocus();
           if (sessionId) {
             State.sessionState(agentId, sessionId, "idle");
             State.setPillBadge(agentId, null);
@@ -695,7 +739,7 @@ function handleHook(island: Island, payload: HookPayload) {
       const failed = State.tasks.find((x) => x.id === agentId);
       if (failed) failed.finalLine = stopFailureDetail(payload);
       Sound.play("error");
-      if (focused && !State.pendingApproval) surface("error", true);
+      if (showsAlert(agentId, focused)) surface("error", true);
       else State.setPillBadge(agentId, "error");
       break;
     }
