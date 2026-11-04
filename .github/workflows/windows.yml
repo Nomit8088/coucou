@@ -24,6 +24,11 @@ env:
 jobs:
   build:
     runs-on: windows-latest
+    # The update channel is this repository, spelled out rather than inferred
+    # from `origin` by build.rs: the updater tests and the packed binary must
+    # agree on it even in a checkout whose remote is missing.
+    env:
+      COUCOU_UPDATE_REPO: ${{ github.repository }}
     defaults:
       run:
         working-directory: desktop

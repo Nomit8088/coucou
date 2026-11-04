@@ -2,6 +2,119 @@
   "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every release adds its entry here: 1 to 4 items, a short title and one line each, an icon from whats-new/icons.ts. Ported from upstream without the Flow steps.",
   "releases": [
     {
+      "version": "0.3.3",
+      "items": [
+        {
+          "icon": "eye",
+          "title": {
+            "en": "A small island that stays",
+            "zh-Hans": "常驻小黑岛",
+            "hi": "छोटा द्वीप जो रहता है",
+            "es": "Una isla pequeña que se queda",
+            "ar": "جزيرة صغيرة تبقى",
+            "fr": "Une petite île qui reste",
+            "bn": "ছোট্ট আইল্যান্ড থাকে",
+            "pt-BR": "Uma ilha pequena que fica",
+            "ru": "Маленький остров остаётся",
+            "id": "Pulau kecil yang tetap ada"
+          },
+          "detail": {
+            "en": "Folded, Coucou keeps a thin bar with the time, the date or Claude's usage. Click to open it.",
+            "zh-Hans": "折叠后仍留一条小黑岛，显示时间、日期或 Claude 用量，点一下展开。",
+            "hi": "मोड़ने पर भी एक पतली पट्टी बचती है: समय, तारीख़ या Claude का उपयोग। खोलने के लिए क्लिक करें।",
+            "es": "Al plegarse queda una barra fina con la hora, la fecha o el uso de Claude. Haz clic para abrirla.",
+            "ar": "عند الطيّ يبقى شريط رفيع يعرض الوقت أو التاريخ أو استهلاك Claude. انقر لفتحه.",
+            "fr": "Repliée, Coucou laisse une fine barre avec l'heure, la date ou l'usage de Claude. Cliquez pour ouvrir.",
+            "bn": "ভাঁজ করলেও সরু বার থাকে: সময়, তারিখ বা Claude-এর ব্যবহার। খুলতে ক্লিক করুন।",
+            "pt-BR": "Recolhida, fica uma barra fina com a hora, a data ou o uso do Claude. Clique para abrir.",
+            "ru": "В свёрнутом виде остаётся узкая полоса со временем, датой или расходом Claude. Нажмите, чтобы открыть.",
+            "id": "Saat dilipat, tersisa bilah tipis berisi waktu, tanggal, atau pemakaian Claude. Klik untuk membuka."
+          }
+        },
+        {
+          "icon": "bell",
+          "title": {
+            "en": "Alerts from every pill",
+            "zh-Hans": "别的胶囊也能提醒",
+            "hi": "हर पिल से अलर्ट",
+            "es": "Avisos de cualquier pill",
+            "ar": "تنبيهات من كل بطاقة",
+            "fr": "Alertes de chaque pastille",
+            "bn": "সব পিল থেকে সতর্কতা",
+            "pt-BR": "Avisos de qualquer pill",
+            "ru": "Сигналы с любой пилюли",
+            "id": "Notifikasi dari semua pil"
+          },
+          "detail": {
+            "en": "When another agent finishes or fails, it can come to the front; closing the island gives the pill back.",
+            "zh-Hans": "其他代理完成或出错时也能借到前台，岛一关就归还原胶囊。",
+            "hi": "दूसरा एजेंट पूरा हो या विफल हो, वह सामने आ सकता है; द्वीप बंद होते ही पिल वापस मिलती है।",
+            "es": "Si otro agente termina o falla, puede pasar al frente; al cerrar la isla vuelve a su pill.",
+            "ar": "عندما ينتهي وكيل آخر أو يفشل يمكنه الظهور في المقدمة، ويعود عند إغلاق الشريط.",
+            "fr": "Si un autre agent termine ou échoue, il peut passer devant ; la pastille revient à la fermeture.",
+            "bn": "অন্য এজেন্ট শেষ হলে বা ব্যর্থ হলে সামনে আসতে পারে; আইল্যান্ড বন্ধ হলে আগের পিল ফিরে আসে।",
+            "pt-BR": "Se outro agente termina ou falha, pode vir à frente; a pill volta quando a ilha fecha.",
+            "ru": "Если другой агент завершился или упал, он может выйти вперёд; при закрытии острова пилюля возвращается.",
+            "id": "Kalau agen lain selesai atau gagal, ia bisa tampil di depan; pil asal kembali saat pulau ditutup."
+          }
+        },
+        {
+          "icon": "bolt",
+          "title": {
+            "en": "Plan usage at a glance",
+            "zh-Hans": "紧凑岛看计划用量",
+            "hi": "प्लान का उपयोग एक नज़र में",
+            "es": "Uso del plan a la vista",
+            "ar": "استهلاك الخطة بلمحة",
+            "fr": "L'usage du forfait visible",
+            "bn": "প্ল্যানের ব্যবহার এক নজরে",
+            "pt-BR": "Uso do plano à vista",
+            "ru": "Расход плана на виду",
+            "id": "Pemakaian paket terlihat"
+          },
+          "detail": {
+            "en": "The compact island shows Claude's plan usage next to the agent's name.",
+            "zh-Hans": "紧凑岛的代理名字旁直接显示 Claude 计划用量。",
+            "hi": "कॉम्पैक्ट द्वीप एजेंट के नाम के पास Claude के प्लान का उपयोग दिखाता है।",
+            "es": "La isla compacta muestra el uso del plan de Claude junto al agente.",
+            "ar": "الشريط المصغّر يعرض استهلاك خطة Claude بجانب اسم الوكيل.",
+            "fr": "L'île compacte affiche l'usage du forfait Claude à côté de l'agent.",
+            "bn": "কম্প্যাক্ট আইল্যান্ড এজেন্টের পাশে Claude প্ল্যানের ব্যবহার দেখায়।",
+            "pt-BR": "A ilha compacta mostra o uso do plano Claude ao lado do agente.",
+            "ru": "Компактный остров показывает расход плана Claude рядом с агентом.",
+            "id": "Pulau ringkas menampilkan pemakaian paket Claude di samping agen."
+          }
+        },
+        {
+          "icon": "sparkles",
+          "title": {
+            "en": "Models found for you",
+            "zh-Hans": "自动列出可用模型",
+            "hi": "मॉडल खुद मिल जाते हैं",
+            "es": "Modelos encontrados solos",
+            "ar": "النماذج تُكتشف تلقائيًا",
+            "fr": "Les modèles trouvés seuls",
+            "bn": "মডেল নিজেই খুঁজে নেয়",
+            "pt-BR": "Modelos descobertos",
+            "ru": "Модели находятся сами",
+            "id": "Model ditemukan sendiri"
+          },
+          "detail": {
+            "en": "Settings asks the provider which models the account has and saves the one you pick.",
+            "zh-Hans": "设置页向提供方查询账号可用的模型，选中的直接存为默认。",
+            "hi": "सेटिंग्स प्रदाता से खाते के मॉडल पूछती है और चुना हुआ मॉडल सहेज लेती है।",
+            "es": "Ajustes pregunta al proveedor qué modelos tiene la cuenta y guarda el que elijas.",
+            "ar": "الإعدادات تسأل المزوّد عن نماذج الحساب وتحفظ ما تختاره.",
+            "fr": "Les réglages demandent au fournisseur les modèles du compte et gardent celui choisi.",
+            "bn": "সেটিংস প্রোভাইডারের কাছে অ্যাকাউন্টের মডেল জানতে চায় এবং বেছে নেওয়াটি সেভ করে।",
+            "pt-BR": "Os ajustes perguntam ao provedor quais modelos a conta tem e salvam o escolhido.",
+            "ru": "Настройки спрашивают у провайдера модели аккаунта и сохраняют выбранную.",
+            "id": "Setelan menanyakan model akun ke penyedia dan menyimpan yang dipilih."
+          }
+        }
+      ]
+    },
+    {
       "version": "0.3.2",
       "items": [
         {

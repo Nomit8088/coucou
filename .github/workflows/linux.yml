@@ -35,6 +35,11 @@ jobs:
     # The oldest supported Ubuntu: an AppImage only runs on systems whose glibc
     # is at least as new as the one it was built against.
     runs-on: ubuntu-22.04
+    # The update channel is this repository, spelled out rather than inferred
+    # from `origin` by build.rs: the updater tests and the packed binary must
+    # agree on it even in a checkout whose remote is missing.
+    env:
+      COUCOU_UPDATE_REPO: ${{ github.repository }}
     outputs:
       version: ${{ steps.pack.outputs.version }}
       publish: ${{ steps.gate.outputs.publish }}
