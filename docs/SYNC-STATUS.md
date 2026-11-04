@@ -16,13 +16,13 @@
 
 | 项目 | Commit | 说明 |
 |---|---|---|
-| 源仓库上游已比较 | `47d1c2da12bf1dce8fb28b825757d497c1e1d88d` | `Louis-CFM/coucou` `main`，2026-10-23；上一轮基线 `47e4da35…` 之后的 99 个提交已逐项分类，其中 3 项已移植（见「本轮同步（2026-10-26）」） |
-| Fork 记录快照 | `7401530b70e3870cb525e5d2b36307ae20365ece` | 本轮完成 DPI 修复、蓝 Mochi、What's new 卡（去 Flow），版本 0.3.2 |
+| 源仓库上游已比较 | `74363634b037108393e450428e5f207515c2c29b` | `Louis-CFM/coucou` `main`，2026-11-03；上一轮基线 `47d1c2da…` 之后的 234 个提交（83 个合并）已分类，其中 4 项已移植、2 项部分移植（见「本轮同步（2026-11-04）」） |
+| Fork 记录快照 | `562f8b3` | 常驻关闭岛、全胶囊告警、紧凑岛用量、模型发现，版本仍为 0.3.2 |
 | 共同祖先 | `c946650bec0e37fd902322c8f149b7e83f06d22f` | 本轮比较使用的 merge-base（未变） |
-| 比较结果 | 源仓库前移 99 commits（含 Mac 0.5.3、Windows/Linux 0.5.2~0.5.3、Android 0.3.0~0.3.7） | `compare/47e4da35...47d1c2da` |
-| 记录时间 | 2026-10-26 11:40（Asia/Shanghai） | 本文档本轮更新时间 |
+| 比较结果 | 源仓库前移 234 commits（含 Mac 0.5.7~0.5.9 / iPhone 2.0 / Windows-Linux 0.5.7~0.5.9 / Android 0.4.0） | `compare/47d1c2da...7436363` |
+| 记录时间 | 2026-11-04 15:20（Asia/Shanghai） | 本文档本轮更新时间 |
 
-下次同步从源仓库 `47d1c2da…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
+下次同步从源仓库 `7436363…` 之后的提交开始检查，而不是从 Fork 的 HEAD 猜测。
 
 > 2026-10-26 补记：`47e4da35…` → `47d1c2da12bf1dce8fb28b825757d497c1e1d88d` 的 99 个提交已完成逐项分类，其中 #1/#2/#3 已移植并验证（见「本轮同步（2026-10-26）」），基线前移到 `47d1c2da…`。
 
@@ -168,6 +168,54 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 - `CARGO_TARGET_DIR=<C 盘临时目录> cargo check -p coucou --offline`：通过（仅既有 warning）。
 - `cargo test -p coucou --offline`：245 passed、0 failed、1 ignored（新增 `tray::tests::the_body_turns_blue_the_outline_stays`）。
 
+## 本轮同步（2026-11-04）
+
+- 源仓库范围：`47d1c2da12bf1dce8fb28b825757d497c1e1d88d`（Mac 0.5.3 / Win-Linux 0.5.3 / Android 0.3.0）→ `74363634b037108393e450428e5f207515c2c29b`（Mac 0.5.9 / Win-Linux 0.5.9 / Android 0.4.0）
+- 提交规模：234 个（151 个非合并 + 83 个合并）。`windows/` 323 次文件改动、`NotchBuddy/` 245 次、`android/` 18 次，其余为 README/CHANGELOG/CI/脚本
+- Fork 快照：`562f8b3`（`main`）
+- 共同祖先：`c946650bec0e37fd902322c8f149b7e83f06d22f`（未变）
+- 决策：**四项功能逻辑移植**（非 cherry-pick），同步游标前移到 `7436363…`
+
+### 已移植（逻辑移植）
+
+| # | 源提交 | 内容 | Fork 落地 | 验证 |
+|---|---|---|---|---|
+| 1 | `2ab4217868354d7c41ba8de91998bfbad85593b3` | 关闭后的岛常驻屏幕：Mochi（默认）／时间／日期时间／Claude 用量／正在播放／空，或「隐藏」保留旧的 6 px 唤醒条；折叠后的窗口就是它本身，尺寸随内容变化 | 新增 `desktop/src/core/closed.ts`、`desktop/tests/closed.test.mjs`；`island.rs` 的 `collapsed_size` + `clamp_collapsed` + `apply_geometry(…, Option<(w,h)>)`；`set_collapsed` 带宽高；`island.ts` 的 `#island-closed`、`updateClosed()`、`targetSize()`、`sendCollapsedSize()`；`settings/main.ts` 的「关闭岛显示」下拉；`extra.json` 13 条文案 ×9 语言 | `tests/closed.test.mjs` 7 项；`fsm`/`hooks`/`i18n` 全套通过；`cargo test` 251 passed |
+| 2 | `0d0da8e742602a27de8d9e127e58680755ebf5fd`（#976）<br>`c68a39ee6b162dda0f4450c1ce133b04c5196fa8` | 其他胶囊完成/失败可借用前台，岛关闭时归还；等待答复的卡片永不覆盖；卡片型视图不被抢占 | `settings.rs` / `state.ts` 的 `alertsFromAllPills`；`hooks.ts` 的 `showsAlert()` / `restoreAlertFocus()`；`island.ts` 在离开 expanded 时归还（按 `c68a39e` 的时机，而不是在关闭按钮里） | `tests/hooks.test.mjs` 新增 3 项（借用并归还、展开时保持、关闭时不借用） |
+| 3 | `39a651f`（#979）<br>`0ef5ab54cf6f8823204bc9a8ea570e83d6388b12` | 紧凑岛在代理点旁显示 Claude 计划用量，点击打开计划卡 | `settings.rs` / `state.ts` 的 `showPlanInCompactIsland`；`views/usage.ts` 的 `claudeCompactPillVisible()`；`island.ts` 的 `#compact-plan`；设置页开关；`style.css` | 类型检查 + `i18n` 测试；需装状态栏中继后人工看 |
+| 4 | `37adcc3c0db8e65f479077d616fde23ddb49ce8a`（#1000） | 从提供方的 `/v1/models` 发现真实模型 id 并保存选择 | `desktop/src/settings/model-picker.ts` + 设置页提供方卡片的「Models on this account」一栏；复用既有 `Bridge.chatModels`，不请求直到点「Refresh」 | 类型检查；本 Fork 聊天已不走 Claude API，故不做上游的 Claude 专用模型卡 |
+
+### 部分移植 / 未跟进
+
+| 源提交 | 处理 | 原因 |
+|---|---|---|
+| `861d443`（关闭岛总能唤醒） | **只移植防冻结部分**：折叠态的光标轮询不再改写点击穿透标志（`island.rs` 的 tick 顶部判定）。Mochi 在关闭岛里眨眼/张望、听写超时自动停止未移植 | 窗口折叠后正好是关闭岛大小，系统鼠标事件本身就能唤醒，不需要 4 Hz 偷看；Mochi 生命体征与听写链路属另一批功能 |
+| `da04f8e`（关闭岛只偷看） | **已移植**：`fsm.ts` 的 `hoverOpenDelay = 0.5`，悬停先到紧凑岛，指针停留后才全开；路过不弹。另加：`−` 隐藏（dismissed）时不留下关闭岛 | PC 没有刘海，常驻岛被路过的频率远高于 Mac；「隐藏直到下一条通知」若仍留一个不可唤醒的形状会吞点击 |
+| `2ab4217` 的 ✕ 按钮与 Mac 线性图标（`views/icons.ts`、`views/views.ts`） | 未跟进 | 本 Fork 的 `−` 是「隐藏直到下一条通知」，语义与上游 ✕（折叠）不同，本轮不改按钮语义与图标集 |
+
+### 明确不做 / 不适用
+
+| 范围 | 原因 |
+|---|---|
+| `NotchBuddy/`（245 次改动：Mac 0.5.7~0.5.9、iPhone 2.0、App Store 2.0、角落岛 #1016） | Swift/AppKit 原生端；本 Fork 的 Mac 走 Tauri |
+| `android/`（Android 0.4.0 与 Mac 互联 `#1054`：TLS server、Bonjour、证书） | 本 Fork 没有 `android/`，且互联涉及新的安全边界 |
+| 听写 / Flow（`c5a1105`、`d8516a6`、`bce6f87`、`#1003`、左侧键与自定义快捷键、说话时静音其他应用） | 依赖 sherpa-onnx/Parakeet 音频栈与模型下载，本 Fork 尚未引入 |
+| 设置搜索（`#1002`）、Claude Desktop 胶囊（`#975`）、Flow 角落胶囊（`#980`/`#981`） | 与本 Fork 现有设置页/胶囊结构不同，收益低于改动面；按需另立 |
+| Mail 修复、Homebrew cask、版本号与 CHANGELOG | 本 Fork 走自己的邮件卡片与发布流程 |
+
+### 本轮验证
+
+- `npx tsc --noEmit`：0 错误。
+- `npm test`：458 测试，456 passed、2 skipped、0 failed（新增 `tests/closed.test.mjs` 7 项、`fsm` 悬停 2 项、`hooks` 告警 3 项）。
+- `CARGO_TARGET_DIR=<C 盘临时目录> cargo test -p coucou --offline`：251 passed、0 failed、1 ignored。
+- 未在真实 Windows 上目视关闭岛：窗口缩放逻辑由 `clamp_collapsed` 单测覆盖，悬停/唤醒需发版前人工过一遍。
+
+### 待决与隐患
+
+- 版本号仍是 `0.3.2`；发版前若要升 `0.3.3`，需同步 `package.json`、`package-lock.json`、`Cargo.toml`、`Cargo.lock`（`coucou` 与 `coucou-hook` 两条）、`tauri.conf.json`，并给 `whats-new.json` 补词条。
+- 「关闭岛显示 Claude 用量」需要先装状态栏中继，否则回落为时间。
+- 「Models on this account」要真的请求提供方；未配 API key 时只会显示错误原文，不发请求本身不消耗额度。
+
 ## 功能状态总表
 
 | 领域 | 源仓库近期状态 | 本 Fork 状态 | 同步策略 |
@@ -177,6 +225,10 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 | Claude Code | Mac 原生完整；Windows/Linux 走 hooks | 已恢复并扩展：hooks 安装/卸载、ExitPlanMode 计划卡片、错误详情、用量、Cursor 标签 | 与上游行为保持一致并做跨平台适配 |
 | 智能体提问 | Antigravity 提问通知 (#709) | 已移植：ask_question 识别、提问状态与响铃 | 已完成移植与单测 |
 | 紧凑时钟 | Island clock (#788) | 已移植：紧凑灵动岛居中时钟与设置项 | 纯前端与 settings 扩展 |
+| 关闭后的岛 | 常驻小黑岛（0.5.9，`2ab4217`/`861d443`/`da04f8e`） | 已移植：Mochi／时间／日期时间／Claude 用量／正在播放／空／隐藏；悬停先展开紧凑岛，停留才全开 | 与上游一致；本 Fork 另加「− 隐藏时不残留」与折叠态防点击穿透 |
+| 跨胶囊告警 | Alerts from every pill (#976) | 已移植：借用前台、岛关闭时归还，等待答复时不覆盖 | 已有单测 |
+| 紧凑岛用量 | Plan usage in compact island (#979) | 已移植：代理点旁显示百分比，点击开计划卡 | 需状态栏中继 |
+| 模型发现 | Discover Claude API models (#1000) | 已移植到设置页提供方卡片（本 Fork 聊天不走 Claude API） | 与上游不同：不做 Claude 专用模型卡 |
 | 自动更新 | 上游 Windows/Mac 自动更新器 (#822) | 明确拒绝（避免覆盖本 Fork 增强版本）；只吸收「有新版时 Mochi 与托盘变蓝」（2026-10-26） | 维持 Fork 独立发布流程，检查仍是手动的 |
 | 更新说明卡 | What's new after update (#910 周期内) | 已移植（去掉依赖 Flow 的第二步） | 每版在 `whats-new.json` 补词条，测试会拦 |
 | 多显示器 / DPI | 换屏后按新 DPR 重画 | 已移植（`canvasDpr` + 媒体查询重挂载） | 与上游一致 |
