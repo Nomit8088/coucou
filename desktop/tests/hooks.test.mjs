@@ -139,6 +139,41 @@ test("a submitted prompt shows as thinking, truncated to 60 characters", () => {
   assert.equal(task().steps.at(-1), "older field");
 });
 
+test("a background task's notification is not shown as the prompt", () => {
+  dsh({
+    hook_event_name: "UserPromptSubmit", cwd: "/p",
+    prompt: "<task-notification><task-id>t1</task-id><summary>Build finished</summary><status>completed</status></task-notification>",
+  });
+  assert.equal(task().steps.at(-1), "Build finished");
+  // No summary: nothing is shown, rather than the raw tags.
+  dsh({ hook_event_name: "UserPromptSubmit", cwd: "/p", prompt: "<task-notification><task-id>t1</task-id></task-notification>" });
+  assert.equal(task().steps.length, 1);
+});
+
+test("a slash command or a system reminder shows by its name, not as tags", () => {
+  dsh({
+    hook_event_name: "UserPromptSubmit", cwd: "/p",
+    prompt: "<command-name>/compact</command-name><command-args></command-args>",
+  });
+  assert.equal(task().steps.at(-1), "/compact");
+  dsh({
+    hook_event_name: "UserPromptSubmit", cwd: "/p",
+    prompt: "<system-reminder>hidden context</system-reminder>Fix the build",
+  });
+  assert.equal(task().steps.at(-1), "Fix the build");
+});
+
+test("a new prompt leaves the finished card that was showing the old one", () => {
+  dsh({ hook_event_name: "SessionStart", session_id: "s1" });
+  dsh({ hook_event_name: "Stop", session_id: "s1", last_assistant_message: "done" });
+  State.mode = "expanded";
+  State.view = "finished";
+  State.setFocus(DSH);
+  asked.length = 0;
+  dsh({ hook_event_name: "UserPromptSubmit", session_id: "s1", prompt: "next" });
+  assert.deepEqual(asked, ["setView:overview"]);
+});
+
 test("lowercase DSH tools are labelled like their PascalCase twins", () => {
   const step = (tool_name, tool_input) => {
     dsh({ hook_event_name: "PreToolUse", cwd: "/p", tool_name, tool_input });

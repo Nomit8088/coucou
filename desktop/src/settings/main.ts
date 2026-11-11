@@ -64,6 +64,12 @@ function toggle(on: boolean, onChange: (v: boolean) => void): HTMLElement {
   return el;
 }
 
+/** Shows a switch made by toggle() as on or off, without calling its onChange. */
+function setSwitch(el: HTMLElement, on: boolean) {
+  el.classList.toggle("on", on);
+  el.setAttribute("aria-pressed", String(on));
+}
+
 /** Puts text on the clipboard, with the old hidden-field fallback. */
 async function copyText(text: string): Promise<void> {
   try {
@@ -773,6 +779,10 @@ function integrationsSection(present: Record<string, boolean>): HTMLElement {
 
 // ── General section ───────────────────────────────────────────────────────────
 
+/** Puts the General fields back in line with the settings after a change made
+ *  elsewhere (the island's own settings change sound, volume and auto-close). */
+let generalSync: (() => void) | null = null;
+
 function generalSection(): HTMLElement {
   // The closed island (core/closed.ts): what stays at the top of the screen.
   const closed = h("select", {}) as HTMLSelectElement;
@@ -884,25 +894,52 @@ function generalSection(): HTMLElement {
     void save();
   });
 
+  const sound = toggle(settings.soundEnabled, (v) => { settings.soundEnabled = v; void save(); });
+  const openOnHover = toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); });
+  const alertsEverywhere = toggle(settings.alertsFromAllPills, (v) => { settings.alertsFromAllPills = v; void save(); });
+  const clock = toggle(settings.showClock, (v) => { settings.showClock = v; void save(); });
+  const autostart = toggle(settings.autostart, (v) => { settings.autostart = v; void save(); });
+  const quiet = toggle(settings.doNotDisturb, (v) => { settings.doNotDisturb = v; void save(); });
+
+  generalSync = () => {
+    setSwitch(sound, settings.soundEnabled);
+    setSwitch(openOnHover, settings.openOnHover);
+    setSwitch(alertsEverywhere, settings.alertsFromAllPills);
+    setSwitch(clock, settings.showClock);
+    setSwitch(autostart, settings.autostart);
+    setSwitch(quiet, settings.doNotDisturb);
+    // A field being edited keeps what is in it; it catches up when it is left.
+    if (document.activeElement !== volume) volume.value = String(settings.soundVolume);
+    if (document.activeElement !== autoClose) {
+      const stay = Math.round(settings.autoCloseInterval) === 0;
+      autoClose.value = String(stay ? 0 : Math.round(settings.autoCloseInterval));
+      autoClose.disabled = stay;
+      stayOpenCheck.checked = stay;
+    }
+    if (document.activeElement !== closed) closed.value = closedIsland(settings.closedIsland);
+  };
+  volume.addEventListener("blur", () => generalSync?.());
+  autoClose.addEventListener("blur", () => generalSync?.());
+
   return h(
     "section",
     {},
     h("h2", {}, h("span", { text: t("General") })),
     h("div", { class: "row" },
       h("label", { text: t("Sound") }),
-      toggle(settings.soundEnabled, (v) => { settings.soundEnabled = v; void save(); }),
+      sound,
       volume,
     ),
     h("div", { class: "row" }, soundsFolder, reloadSounds, customCount),
     h("div", { class: "hint", text: t("Drop a file named like one of Mochi's sounds (finish.wav, approval.mp3, greet.m4a…) in the sounds folder to replace it, then Reload.") }),
     h("div", { class: "row" },
       h("label", { text: t("Open on hover") }),
-      toggle(settings.openOnHover, (v) => { settings.openOnHover = v; void save(); }),
+      openOnHover,
     ),
     h("div", { class: "hint", text: t("Hovering the island opens it; it folds again shortly after the pointer leaves. Click inside to keep it open.") }),
     h("div", { class: "row" },
       h("label", { text: t("Open for every pill's alerts") }),
-      toggle(settings.alertsFromAllPills, (v) => { settings.alertsFromAllPills = v; void save(); }),
+      alertsEverywhere,
     ),
     h("div", { class: "hint", text: t("When a pill other than the one shown finishes or hits an error, the notch shows it for a moment, then the pill you had comes back.") }),
     h("div", { class: "row" },
@@ -912,7 +949,7 @@ function generalSection(): HTMLElement {
     h("div", { class: "hint", text: t("A PC has no notch: once closed, a small island stays at the top of the screen. Hover it to bring Coucou back. Hidden, move the pointer to the very top of the screen.") }),
     h("div", { class: "row" },
       h("label", { text: t("Show clock in the island") }),
-      toggle(settings.showClock, (v) => { settings.showClock = v; void save(); }),
+      clock,
     ),
     h("div", { class: "hint", text: t("The date and the time in the middle of the island when it is compact.") }),
     h("div", { class: "row" },
@@ -927,11 +964,11 @@ function generalSection(): HTMLElement {
     ),
     h("div", { class: "row" },
       h("label", { text: t("Launch at startup") }),
-      toggle(settings.autostart, (v) => { settings.autostart = v; void save(); }),
+      autostart,
     ),
     h("div", { class: "row" },
       h("label", { text: t("Do not disturb") }),
-      toggle(settings.doNotDisturb, (v) => { settings.doNotDisturb = v; void save(); }),
+      quiet,
     ),
     h("div", { class: "hint", text: t("Nothing opens the island on its own. Minimizing takes it off the screen until you open Coucou from the tray.") }),
     ...recapRows(),
@@ -1277,6 +1314,7 @@ async function main() {
     settings = { ...settings, ...s, ...sanitizeDeclared(s) };
     shortcutsListener?.settingsChanged();
     for (const redraw of declaredViews) redraw();
+    generalSync?.();
     applyLanguage();
   });
 }

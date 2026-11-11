@@ -55,6 +55,14 @@ test("lastDays returns the newest days across weeks, oldest first, clamped", () 
   assert.deepEqual(lastDays(activity, 0), []);
 });
 
+test("lastDays grades its days against the busiest of them, not the year", () => {
+  // GitHub's own levels are year quartiles, so a quiet week can be all level 1.
+  const levels = lastDays(activity, 7).map((d) => d.level);
+  assert.deepEqual(levels, [2, 3, 4, 1, 0, 2, 4]);
+  const quiet = { total: 0, fetchedAt: 0, weeks: [[day("2026-02-01", 0, 0, 0), day("2026-02-02", 0, 0, 1)]] };
+  assert.deepEqual(lastDays(quiet, 2).map((d) => d.level), [0, 0], "no contributions, no grading");
+});
+
 test("the grid shows 23 weeks, Sunday on top, gaps where a day is missing", () => {
   assert.equal(GRID_WEEKS, 23);
   const column = weekColumn(activity.weeks[1]);

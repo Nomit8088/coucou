@@ -22,7 +22,7 @@ import { Greeting } from "../mochi/greeting";
 import { createMiniBot, pruneMiniBots, syncMiniBotStates, tickMiniBots } from "../mochi/minibots";
 import { SeasonCache, parseOutfit } from "../mochi/wardrobe";
 import { UploadCanvas } from "../upload/canvas";
-import { USC, UploadSeq } from "../upload/sequence";
+import { USC, UploadSeq, uploadProgressCurve } from "../upload/sequence";
 import { claudeCompactPillVisible, closePlanCard, openPlanColor, planCardOpen } from "../views/usage";
 import { dominantPct, planColor } from "../core/plan";
 import { buildHeader, buildViews, type ViewActions, type ViewHost } from "../views/views";
@@ -142,6 +142,10 @@ export class Island {
   /** Drop sequence bookkeeping: last tick played, and whether the ✓ has fired. */
   private uploadTens = 0;
   private uploadDone = false;
+  /** A drag that left the island waits this long before upload mode gives up. */
+  private dragLeaveTimer: number | null = null;
+  /** Whether the drag in progress is what opened the island (so it may fold it). */
+  private dragOpenedIsland = false;
 
   constructor(root: HTMLElement) {
     this.root = root;
@@ -776,6 +780,12 @@ export class Island {
   private onDragDrop(e: { type: string; paths?: string[]; position?: { x: number; y: number } }) {
     if (e.type !== "over") void Bridge.log(`drag ${e.type} ${e.paths?.length ?? 0} file(s)`);
     if (State.paused) return;
+    // Anything but another leave means the drag went on: the give-up timer is
+    // for a drag that left and never came back.
+    if (this.dragLeaveTimer != null && e.type !== "leave") {
+      window.clearTimeout(this.dragLeaveTimer);
+      this.dragLeaveTimer = null;
+    }
     if (e.position && Number.isFinite(e.position.x) && Number.isFinite(e.position.y)) {
       const rect = this.islandRect();
       State.mouse = e.position;
@@ -789,6 +799,9 @@ export class Island {
       case "over": {
         if (State.fileDragOver) return;
         State.fileDragOver = true;
+        // Whether this drag is what opens the island: a drag that did not is
+        // given the island back when it leaves (see below).
+        this.dragOpenedIsland = State.mode !== "expanded";
         this.engine.animateMorph(1);
         // enterZone must run before the island expands, so the sequence is
         // already active by the time the view becomes `upload`.
@@ -800,9 +813,23 @@ export class Island {
         if (!State.fileDragOver) return;
         State.fileDragOver = false;
         this.engine.animateMorph(0);
-        // The island deliberately stays open: the drag session is still alive.
+        // The island stays open briefly for recovery, but leaves upload mode if
+        // the drop happened outside or the drag was aborted.
         UploadSeq.exitZone();
         State.notify();
+        if (this.dragLeaveTimer != null) window.clearTimeout(this.dragLeaveTimer);
+        this.dragLeaveTimer = window.setTimeout(() => {
+          this.dragLeaveTimer = null;
+          // An island folded in the meantime stays folded: setView would reopen it.
+          if (!State.fileDragOver && State.mode === "expanded" && State.view === "upload") {
+            this.engine.animateMorph(0);
+            this.setView(State.defaultView());
+            // Fold the island again when the drag was what opened it; an island
+            // the user already had open stays where it is.
+            if (this.dragOpenedIsland) this.fsm.mouseLeft();
+          }
+          this.dragOpenedIsland = false;
+        }, 800);
         break;
       }
       case "drop": {
@@ -859,7 +886,11 @@ export class Island {
         this.engine.animateMorph(0);
         this.setView("note");
         Sound.play("error");
-        window.setTimeout(() => this.setView(State.defaultView()), 2400);
+        window.setTimeout(() => {
+          // Only the note still on screen: setView would reopen a folded island
+          // and replace a view the user opened since.
+          if (State.mode === "expanded" && State.view === "note") this.setView(State.defaultView());
+        }, 2400);
       });
   }
 
@@ -879,6 +910,10 @@ export class Island {
     if (since == null) return;
     const dur = State.uploadDuration;
     const p = Math.max(0, Math.min(1, (since - PRE_PROGRESS) / dur));
+
+    // The bar and the percentage follow the same eased curve as Mochi.
+    State.uploadProgress = uploadProgressCurve(p);
+    if (State.view === "uploading") this.views.get("uploading")?.sync();
 
     const tens = Math.floor(p * 10);
     if (tens > this.uploadTens && tens < 10) {
