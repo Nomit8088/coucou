@@ -17,7 +17,7 @@
 | 项目 | Commit | 说明 |
 |---|---|---|
 | 源仓库上游已比较 | `74363634b037108393e450428e5f207515c2c29b` | `Louis-CFM/coucou` `main`，2026-11-03；上一轮基线 `47d1c2da…` 之后的 234 个提交（83 个合并）已分类，其中 4 项已移植、2 项部分移植（见「本轮同步（2026-11-04）」） |
-| Fork 记录快照 | `40d4cb8` | 常驻关闭岛、全胶囊告警、紧凑岛用量、模型发现；版本 0.3.3（2026-11-04 发布） |
+| Fork 记录快照 | `9889561` | 常驻关闭岛、全胶囊告警、紧凑岛用量、模型发现、上游七个小修复；版本 0.3.4（2026-11-11 发布） |
 | 共同祖先 | `c946650bec0e37fd902322c8f149b7e83f06d22f` | 本轮比较使用的 merge-base（未变） |
 | 比较结果 | 源仓库前移 234 commits（含 Mac 0.5.7~0.5.9 / iPhone 2.0 / Windows-Linux 0.5.7~0.5.9 / Android 0.4.0） | `compare/47d1c2da...7436363` |
 | 记录时间 | 2026-11-04 15:20（Asia/Shanghai） | 本文档本轮更新时间 |
@@ -212,7 +212,7 @@ git diff --stat 0dffbafcc0014d29e3e4af6fe9ba3a4ca063e105...FETCH_HEAD
 
 ### 待决与隐患
 
-- 版本号已升到 `0.3.3` 并打了 tag（2026-11-04）；下次发版仍需同步 `package.json`、`package-lock.json`、`Cargo.toml`、`Cargo.lock`（`coucou` 与 `coucou-hook` 两条）、`tauri.conf.json`，并给 `whats-new.json` 补词条。
+- 版本号已升到 `0.3.4` 并打了 tag（2026-11-11）；下次发版仍需同步 `package.json`、`package-lock.json`、`Cargo.toml`、`Cargo.lock`（`coucou` 与 `coucou-hook` 两条）、`tauri.conf.json`，并给 `whats-new.json` 补词条。
 - 「关闭岛显示 Claude 用量」需要先装状态栏中继，否则回落为时间。
 - 「Models on this account」要真的请求提供方；未配 API key 时只会显示错误原文，不发请求本身不消耗额度。
 

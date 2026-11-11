@@ -2,6 +2,119 @@
   "about": "What's new, shown once in the island after Coucou updates itself (src/whats-new/). Every release adds its entry here: 1 to 4 items, a short title and one line each, an icon from whats-new/icons.ts. Ported from upstream without the Flow steps.",
   "releases": [
     {
+      "version": "0.3.4",
+      "items": [
+        {
+          "icon": "download",
+          "title": {
+            "en": "Uploads that show their progress",
+            "zh-Hans": "上传进度真的在走",
+            "hi": "अपलोड की प्रगति दिखती है",
+            "es": "Las subidas muestran su progreso",
+            "ar": "الرفع يعرض تقدّمه",
+            "fr": "Les envois montrent leur progression",
+            "bn": "আপলোডের অগ্রগতি দেখা যায়",
+            "pt-BR": "Os envios mostram o progresso",
+            "ru": "Загрузка показывает прогресс",
+            "id": "Unggahan menampilkan progres"
+          },
+          "detail": {
+            "en": "The bar and the percentage follow Mochi across the island — they used to stay at 0 %.",
+            "zh-Hans": "进度条和百分比跟着 Mochi 走；之前它们一直停在 0%。",
+            "hi": "बार और प्रतिशत Mochi के साथ चलते हैं — पहले वे 0 % पर अटके रहते थे।",
+            "es": "La barra y el porcentaje siguen a Mochi por la isla; antes se quedaban en 0 %.",
+            "ar": "الشريط والنسبة يتبعان Mochi عبر الشريط — كانا يبقيان عند 0 %.",
+            "fr": "La barre et le pourcentage suivent Mochi dans l'île ; avant, ils restaient à 0 %.",
+            "bn": "বার ও শতাংশ Mochi-এর সঙ্গে চলে — আগে ০ %-এ আটকে থাকত।",
+            "pt-BR": "A barra e a porcentagem seguem o Mochi pela ilha; antes ficavam em 0 %.",
+            "ru": "Полоса и проценты идут за Mochi по острову — раньше стояли на 0 %.",
+            "id": "Bilah dan persentase mengikuti Mochi melintasi pulau — dulu tertahan di 0 %."
+          }
+        },
+        {
+          "icon": "chat",
+          "title": {
+            "en": "A new prompt clears the last answer",
+            "zh-Hans": "新提示词收起旧卡片",
+            "hi": "नया प्रॉम्प्ट पिछला उत्तर हटा देता है",
+            "es": "Un prompt nuevo retira la respuesta anterior",
+            "ar": "الطلب الجديد يزيل الجواب السابق",
+            "fr": "Un nouveau prompt retire la réponse précédente",
+            "bn": "নতুন প্রম্পট আগের উত্তর সরায়",
+            "pt-BR": "Um novo prompt tira a resposta anterior",
+            "ru": "Новый запрос убирает прошлый ответ",
+            "id": "Prompt baru menyingkirkan jawaban lama"
+          },
+          "detail": {
+            "en": "The finished card leaves when you type again, instead of showing the old prompt as the answer.",
+            "zh-Hans": "再输入时离开完成卡，不再把上一轮的 prompt 当成答案显示。",
+            "hi": "दोबारा लिखते ही फ़िनिश कार्ड हट जाता है, पुराना प्रॉम्प्ट उत्तर की तरह नहीं दिखता।",
+            "es": "La tarjeta de fin se va al escribir de nuevo; el prompt viejo ya no aparece como respuesta.",
+            "ar": "بطاقة الانتهاء تختفي عند الكتابة مجددًا، فلا يظهر الطلب القديم كأنه الجواب.",
+            "fr": "La carte de fin s'en va quand vous retapez ; l'ancien prompt n'apparaît plus comme la réponse.",
+            "bn": "আবার লিখলে ফিনিশ কার্ড সরে যায়; পুরনো প্রম্পট উত্তর হিসেবে দেখায় না।",
+            "pt-BR": "O cartão de concluído sai ao digitar de novo; o prompt antigo não aparece mais como resposta.",
+            "ru": "Карточка «готово» уходит при новом вводе — старый запрос больше не выглядит ответом.",
+            "id": "Kartu selesai hilang saat mengetik lagi; prompt lama tak lagi tampil sebagai jawaban."
+          }
+        },
+        {
+          "icon": "bolt",
+          "title": {
+            "en": "Abandoned drags let go",
+            "zh-Hans": "拖走文件不再卡住",
+            "hi": "छोड़ी गई ड्रैग अब अटकती नहीं",
+            "es": "Arrastrar y salir ya no se atasca",
+            "ar": "السحب المتروك لا يعلق",
+            "fr": "Un glisser abandonné ne bloque plus",
+            "bn": "ছেড়ে দেওয়া ড্র্যাগ আর আটকে থাকে না",
+            "pt-BR": "Arrastar e sair não trava mais",
+            "ru": "Брошенное перетаскивание больше не застревает",
+            "id": "Seret yang ditinggalkan tidak macet lagi"
+          },
+          "detail": {
+            "en": "Dragging a file over the island and leaving now returns to the normal card after a moment.",
+            "zh-Hans": "把文件拖到岛上又拖走，片刻后自动回到普通卡片，不用再手动收起。",
+            "hi": "फ़ाइल द्वीप पर लाकर छोड़ने पर थोड़ी देर में सामान्य कार्ड पर लौट आता है।",
+            "es": "Si arrastras un archivo a la isla y te vas, vuelve a la tarjeta normal al momento.",
+            "ar": "سحب ملف إلى الشريط ثم تركه يعيد البطاقة العادية بعد لحظة.",
+            "fr": "Glisser un fichier sur l'île puis partir revient à la carte normale après un instant.",
+            "bn": "ফাইল টেনে আইল্যান্ডে এনে ছেড়ে দিলে কিছুক্ষণ পরে সাধারণ কার্ডে ফিরে আসে।",
+            "pt-BR": "Arrastar um arquivo até a ilha e sair volta ao cartão normal após um instante.",
+            "ru": "Если перетащить файл на остров и уйти, через мгновение вернётся обычная карточка.",
+            "id": "Menyeret file ke pulau lalu pergi akan kembali ke kartu biasa sejenak kemudian."
+          }
+        },
+        {
+          "icon": "bell",
+          "title": {
+            "en": "Background tasks stop posing as prompts",
+            "zh-Hans": "后台任务不再冒充提示词",
+            "hi": "बैकग्राउंड कार्य अब प्रॉम्प्ट नहीं बनते",
+            "es": "Las tareas en segundo plano ya no parecen prompts",
+            "ar": "المهام الخلفية لم تعد تظهر كطلبات",
+            "fr": "Les tâches de fond ne passent plus pour des prompts",
+            "bn": "ব্যাকগ্রাউন্ড কাজ আর প্রম্পট সাজে না",
+            "pt-BR": "Tarefas em segundo plano não se passam mais por prompts",
+            "ru": "Фоновые задачи больше не выдают себя за запросы",
+            "id": "Tugas latar belakang tak lagi menyamar jadi prompt"
+          },
+          "detail": {
+            "en": "A task notification shows its summary, a slash command its name — not a wall of raw tags.",
+            "zh-Hans": "任务通知只显示摘要、斜杠命令只显示命令名，不再是一屏原始标签。",
+            "hi": "टास्क सूचना अपना सार दिखाती है, स्लैश कमांड अपना नाम — कच्चे टैग नहीं।",
+            "es": "Una notificación muestra su resumen y un comando su nombre, no etiquetas en bruto.",
+            "ar": "إشعار المهمة يعرض ملخّصه، وأمر الشرطة المائلة اسمه — لا وسوم خام.",
+            "fr": "Une notification montre son résumé, une commande son nom — plus de balises brutes.",
+            "bn": "টাস্ক বিজ্ঞপ্তি সারাংশ দেখায়, স্ল্যাশ কমান্ড নাম — কাঁচা ট্যাগ নয়।",
+            "pt-BR": "Uma notificação mostra o resumo, um comando o nome — não tags cruas.",
+            "ru": "Уведомление задачи показывает сводку, команда — имя, а не сырые теги.",
+            "id": "Notifikasi tugas menampilkan ringkasan, perintah garis miring namanya — bukan tag mentah."
+          }
+        }
+      ]
+    },
+    {
       "version": "0.3.3",
       "items": [
         {
